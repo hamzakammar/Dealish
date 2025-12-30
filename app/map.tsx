@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, Polyline, Region } from "react-native-maps"; // Added Polyline
-import { supabase } from "../lib/supabase";
+import { supabase } from "./lib/supabase";
 // @ts-ignore - @mapbox/polyline doesn't have types
 import polyline from '@mapbox/polyline';
 
@@ -422,3 +422,4 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 });
+
