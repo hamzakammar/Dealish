@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ActivityIndicator, View, StyleSheet, TouchableOpacity, Text } from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
-import * as Location from "expo-location";
-import { supabase } from "../lib/supabase"; 
 import AntDesign from '@expo/vector-icons/AntDesign';
+import * as Location from "expo-location";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import MapView, { Marker, Polyline, Region } from "react-native-maps"; // Added Polyline
+import { supabase } from "../lib/supabase";
+// @ts-ignore - @mapbox/polyline doesn't have types
+import polyline from '@mapbox/polyline';
 
 type Restaurant = {
   id: string;
@@ -13,6 +15,12 @@ type Restaurant = {
 };
 
 type MapType = "standard" | "satellite" | "hybrid" | "terrain";
+const ORS_API_KEY = process.env.EXPO_PUBLIC_ORS_API_KEY || ""; // Better error handling
+
+type RouteCoordinate = {
+  latitude: number;
+  longitude: number;
+};
 
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
@@ -22,6 +30,9 @@ export default function MapScreen() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [mapType, setMapType] = useState<MapType>("hybrid");
   const [showMenu, setShowMenu] = useState(false);
+  const [routeCoordinates, setRouteCoordinates] = useState<RouteCoordinate[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const mapTypes: { label: string; value: MapType }[] = [
     { label: "Standard", value: "standard" },
@@ -35,6 +46,7 @@ export default function MapScreen() {
     []
   );
 
+  // Single useEffect - removed duplicate
   useEffect(() => {
     let mounted = true;
 
@@ -47,14 +59,20 @@ export default function MapScreen() {
             "Location required",
             "We need location to show navigation and nearby deals."
           );
-          // still fetch restaurants even if location is denied
         }
 
-        // 2) Get current location (if allowed)
         if (status === "granted") {
           const pos = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
+
+          // Store user location for directions
+          if (mounted) {
+            setUserLocation({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+          }
 
           const nextRegion: Region = {
             latitude: pos.coords.latitude,
@@ -70,7 +88,6 @@ export default function MapScreen() {
           }, 200);
         }
 
-        // 3) Fetch restaurant pins from Supabase
         const { data, error } = await supabase
           .from("restaurants")
           .select("id,name,lat,lng")
@@ -102,12 +119,111 @@ export default function MapScreen() {
     };
   }, [initialDelta]);
 
+  const getDirections = async (destinationLat: number, destinationLng: number) => {
+
+    
+    if (!userLocation) {
+      Alert.alert("Error", "User location not available");
+      return;
+    }
+
+    if (!ORS_API_KEY) {
+      Alert.alert("Error", "OpenRouteService API key not configured");
+      return;
+    }
+
+    try {
+      // OpenRouteService expects [longitude, latitude] format
+      const start = [userLocation.lng, userLocation.lat];
+      const end = [destinationLng, destinationLat];
+
+      // Request GeoJSON format to get coordinates directly, or use encoded polyline
+      const response = await fetch(
+        `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&format=geojson`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            coordinates: [start, end],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Directions API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        const geometry = data.routes[0].geometry;
+        
+        // Handle both encoded polyline string and coordinates array
+        let coordinates: RouteCoordinate[] = [];
+        
+        if (typeof geometry === 'string') {
+          // Step 3: Decode encoded polyline using @mapbox/polyline
+          // polyline.decode returns array of [lat, lng] pairs
+          try {
+            const decoded = polyline.decode(geometry);
+            coordinates = decoded.map((coord: [number, number]) => ({
+              latitude: coord[0],  // First is latitude
+              longitude: coord[1], // Second is longitude
+            }));
+          } catch (decodeError) {
+            console.error("Polyline decode error:", decodeError);
+            Alert.alert("Error", "Failed to decode route geometry");
+            return;
+          }
+        } else if (geometry.coordinates) {
+          // Coordinates array format (GeoJSON format: [lng, lat])
+          coordinates = geometry.coordinates.map((coord: number[]) => ({
+            latitude: coord[1], // lat is second in GeoJSON
+            longitude: coord[0], // lng is first in GeoJSON
+          }));
+        } else {
+          throw new Error("Unknown geometry format");
+        }
+
+        setRouteCoordinates(coordinates);
+
+        // Calculate bounding box and zoom to route
+        if (coordinates.length > 0) {
+          const lats = coordinates.map(c => c.latitude);
+          const lngs = coordinates.map(c => c.longitude);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLng = Math.min(...lngs);
+          const maxLng = Math.max(...lngs);
+
+          const centerLat = (minLat + maxLat) / 2;
+          const centerLng = (minLng + maxLng) / 2;
+          const latDelta = (maxLat - minLat) * 1.5; // Add padding
+          const lngDelta = (maxLng - minLng) * 1.5;
+
+          mapRef.current?.animateToRegion({
+            latitude: centerLat,
+            longitude: centerLng,
+            latitudeDelta: Math.max(latDelta, 0.01),
+            longitudeDelta: Math.max(lngDelta, 0.01),
+          }, 1000);
+        }
+      }
+    } catch (error: any) {
+      console.error("Directions error:", error);
+      Alert.alert("Error", error.message || "Failed to get directions");
+    }
+  };
+
   // Fallback region if user denies location (Toronto-ish)
   const fallbackRegion: Region = {
     latitude: 43.6532,
     longitude: -79.3832,
-    latitudeDelta: 0.2,
-    longitudeDelta: 0.2,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
   };
 
   if (loading) {
@@ -121,21 +237,56 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <MapView
-        ref={(r) => (mapRef.current = r)}
+        ref={(r) => {
+          mapRef.current = r;
+        }}
         style={{ flex: 1 }}
         initialRegion={region ?? fallbackRegion}
         showsUserLocation={true}
         showsMyLocationButton={true}
         mapType={mapType}
-        >
+      >
         {restaurants.map((r) => (
           <Marker
-          key={r.id}
-          coordinate={{ latitude: r.lat, longitude: r.lng }}
-          title={r.name}
+            key={r.id}
+            coordinate={{ latitude: r.lat, longitude: r.lng }}
+            title={r.name}
+            onPress={() => setSelectedRestaurant(r)}
           />
         ))}
+
+        {/* Display route polyline */}
+        {routeCoordinates.length > 0 && (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="#007AFF"
+            strokeWidth={4}
+          />
+        )}
       </MapView>
+
+      {/* Add directions button when restaurant is selected */}
+      {selectedRestaurant && (
+        <View style={styles.directionsContainer}>
+          <TouchableOpacity
+            style={styles.directionsButton}
+            onPress={() => getDirections(selectedRestaurant.lat, selectedRestaurant.lng)}
+          >
+            <AntDesign name="arrow-right" size={18} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.directionsButtonText}>Get Directions</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => {
+              setSelectedRestaurant(null);
+              setRouteCoordinates([]);
+            }}
+          >
+            <AntDesign name="close" size={18} color="#333" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.mapTypeContainer}>
         <TouchableOpacity 
           style={styles.menuButton}
@@ -158,26 +309,22 @@ export default function MapScreen() {
                   setShowMenu(false);
                 }}
               >
-
-                  <Text
-                    style={[
-                      styles.menuItemText,
-                      mapType === type.value && styles.menuItemTextActive,
-                    ]}
-                  >
-                    {type.label}
-                  </Text>
+                <Text
+                  style={[
+                    styles.menuItemText,
+                    mapType === type.value && styles.menuItemTextActive,
+                  ]}
+                >
+                  {type.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
       </View>
-      
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   mapTypeContainer: {
@@ -196,10 +343,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    width: 50, // Fixed width
-    height: 38, // Fixed height (paddingVertical: 10 + 18 icon = 38)
-    alignItems: "center", // Center the icon horizontally
-    justifyContent: "center", // Center the icon vertically
+    width: 50,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuButtonText: {
     fontSize: 14,
@@ -234,5 +381,44 @@ const styles = StyleSheet.create({
   menuItemTextActive: {
     color: "#fff",
     fontWeight: "600",
+  },
+  directionsContainer: {
+    position: "absolute",
+    bottom: 50,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  directionsButton: {
+    flex: 1,
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  directionsButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  closeButton: {
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
