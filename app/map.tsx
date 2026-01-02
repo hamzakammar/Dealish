@@ -252,7 +252,26 @@ export default function MapScreen() {
             coordinate={{ latitude: r.lat, longitude: r.lng }}
             title={r.name}
             onPress={() => setSelectedRestaurant(r)}
-          />
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <View style={styles.markerWrapper}>
+              <View style={[
+                styles.markerContainer,
+                selectedRestaurant?.id === r.id && styles.markerContainerSelected
+              ]}>
+                <AntDesign 
+                  name="shop" 
+                  size={selectedRestaurant?.id === r.id ? 20 : 16} 
+                  color="#fff" 
+                />
+              </View>
+              <View style={[
+                styles.markerPin,
+                selectedRestaurant?.id === r.id && styles.markerPinSelected
+              ]} />
+              <View style={styles.markerPinShadow} />
+            </View>
+          </Marker>
         ))}
 
         {/* Display route polyline */}
@@ -420,6 +439,67 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  markerWrapper: {
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  markerContainer: {
+    backgroundColor: "#FE902A",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1,
+  },
+  markerContainerSelected: {
+    backgroundColor: "#007AFF",
+    borderColor: "#fff",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    transform: [{ scale: 1.1 }],
+  },
+  markerPin: {
+    width: 0,
+    height: 0,
+    backgroundColor: "transparent",
+    borderStyle: "solid",
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 16,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#FE902A",
+    marginTop: -3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
+    zIndex: 0,
+  },
+  markerPinSelected: {
+    borderTopColor: "#007AFF",
+    borderLeftWidth: 12,
+    borderRightWidth: 12,
+    borderTopWidth: 18,
+  },
+  markerPinShadow: {
+    width: 12,
+    height: 8,
+    borderRadius: 6,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    marginTop: -4,
+    transform: [{ scaleX: 0.8 }],
   },
 });
 
