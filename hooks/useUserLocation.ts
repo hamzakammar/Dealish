@@ -1,8 +1,14 @@
+import { UserLocation as UserLocationType } from "@/types/restaurant";
+import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
-import * as Location from "expo-location";
 import { Region } from "react-native-maps";
-import { UserLocation as UserLocationType } from "@/types/restaurant";
+
+// Delay before animating to user location to ensure map is ready
+const MAP_ANIMATION_DELAY_MS = 200;
+
+// Duration of the animation to smoothly transition to the user's location
+const MAP_ANIMATION_DURATION_MS = 600;
 
 export function useUserLocation(mapRef: React.RefObject<any>) {
   const [userLocation, setUserLocation] = useState<UserLocationType | null>(null);
@@ -26,29 +32,23 @@ export function useUserLocation(mapRef: React.RefObject<any>) {
           return;
         }
 
-        if (status === "granted") {
-          const pos = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (mounted) {
+          setUserLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
           });
-
-          if (mounted) {
-            setUserLocation({
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-            });
-
-            const nextRegion: Region = {
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              ...initialDelta,
-            };
-
-            setRegion(nextRegion);
-
-            setTimeout(() => {
-              mapRef.current?.animateToRegion(nextRegion, 600);
-            }, 200);
-          }
+          const nextRegion: Region = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            ...initialDelta,
+          };
+          setRegion(nextRegion);
+          setTimeout(() => {
+            mapRef.current?.animateToRegion(nextRegion, MAP_ANIMATION_DURATION_MS);
+          }, MAP_ANIMATION_DELAY_MS);
         }
       } catch (e: any) {
         console.error(e);
@@ -62,7 +62,7 @@ export function useUserLocation(mapRef: React.RefObject<any>) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [mapRef]);
 
   return { userLocation, region, loading };
 }

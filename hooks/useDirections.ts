@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { Alert } from "react-native";
 // @ts-ignore - @mapbox/polyline doesn't have types
-import polyline from "@mapbox/polyline";
 import { RouteCoordinate, UserLocation } from "@/types/restaurant";
+import polyline from "@mapbox/polyline";
 
 const ORS_API_KEY = process.env.EXPO_PUBLIC_ORS_API_KEY || "";
+
+// Multiplier for route bounds padding to ensure the route is visible with adequate margin
+// A value of 1.5 adds 50% padding on each side, preventing the route from touching map edges
+const ROUTE_BOUNDS_PADDING_MULTIPLIER = 1.5;
 
 export function useDirections() {
   const [routeCoordinates, setRouteCoordinates] = useState<RouteCoordinate[]>([]);
@@ -30,11 +34,12 @@ export function useDirections() {
       const end = [destinationLng, destinationLat];
 
       const response = await fetch(
-        `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&format=geojson`,
+        "https://api.openrouteservice.org/v2/directions/driving-car?format=geojson",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: ORS_API_KEY,
           },
           body: JSON.stringify({
             coordinates: [start, end],
@@ -49,10 +54,24 @@ export function useDirections() {
 
       const data = await response.json();
 
-      if (data.routes && data.routes.length > 0) {
-        const geometry = data.routes[0].geometry;
+      let coordinates: RouteCoordinate[] = [];
 
-        let coordinates: RouteCoordinate[] = [];
+      // Handle GeoJSON format (when format=geojson is requested)
+      if (data.features && data.features.length > 0) {
+        const geometry = data.features[0].geometry;
+
+        if (!geometry || !geometry.coordinates) {
+          throw new Error("Invalid GeoJSON geometry format");
+        }
+
+        // GeoJSON coordinates are [lng, lat] arrays
+        coordinates = geometry.coordinates.map((coord: number[]) => ({
+          latitude: coord[1],
+          longitude: coord[0],
+        }));
+      } else if (data.routes && data.routes.length > 0) {
+        // Fallback: Handle default JSON format (for backwards compatibility)
+        const geometry = data.routes[0].geometry;
 
         if (typeof geometry === "string") {
           try {
@@ -74,32 +93,34 @@ export function useDirections() {
         } else {
           throw new Error("Unknown geometry format");
         }
+      } else {
+        throw new Error("No route data found in response");
+      }
 
-        setRouteCoordinates(coordinates);
+      setRouteCoordinates(coordinates);
 
-        if (coordinates.length > 0 && mapRef.current) {
-          const lats = coordinates.map((c) => c.latitude);
-          const lngs = coordinates.map((c) => c.longitude);
-          const minLat = Math.min(...lats);
-          const maxLat = Math.max(...lats);
-          const minLng = Math.min(...lngs);
-          const maxLng = Math.max(...lngs);
+      if (coordinates.length > 0 && mapRef.current) {
+        const lats = coordinates.map((c) => c.latitude);
+        const lngs = coordinates.map((c) => c.longitude);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
 
-          const centerLat = (minLat + maxLat) / 2;
-          const centerLng = (minLng + maxLng) / 2;
-          const latDelta = (maxLat - minLat) * 1.5;
-          const lngDelta = (maxLng - minLng) * 1.5;
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+        const latDelta = (maxLat - minLat) * ROUTE_BOUNDS_PADDING_MULTIPLIER;
+        const lngDelta = (maxLng - minLng) * ROUTE_BOUNDS_PADDING_MULTIPLIER;
 
-          mapRef.current.animateToRegion(
-            {
-              latitude: centerLat,
-              longitude: centerLng,
-              latitudeDelta: Math.max(latDelta, 0.01),
-              longitudeDelta: Math.max(lngDelta, 0.01),
-            },
-            1000
-          );
-        }
+        mapRef.current.animateToRegion(
+          {
+            latitude: centerLat,
+            longitude: centerLng,
+            latitudeDelta: Math.max(latDelta, 0.01),
+            longitudeDelta: Math.max(lngDelta, 0.01),
+          },
+          1000
+        );
       }
     } catch (error: any) {
       console.error("Directions error:", error);

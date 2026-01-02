@@ -1,17 +1,27 @@
+import DealCard from "@/components/DealCard";
+import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
+import { Restaurant } from "@/types/restaurant";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useRef } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Animated,
-  ActivityIndicator,
+    ActivityIndicator,
+    Animated,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import { Restaurant } from "@/types/restaurant";
-import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
-import DealCard from "./DealCard";
+
+// Spring animation configuration for card slide-in
+const SPRING_ANIMATION_TENSION = 65;
+const SPRING_ANIMATION_FRICTION = 11;
+
+// Duration for card slide-out animation when closing
+const CLOSE_ANIMATION_DURATION_MS = 200;
+
+// Vertical offset for card entrance/exit animation (pixels off-screen)
+const CARD_ANIMATION_OFFSET = 600;
 
 type RestaurantDetailCardProps = {
   restaurant: Restaurant;
@@ -31,15 +41,15 @@ export default function RestaurantDetailCard({
     Animated.spring(slideAnim, {
       toValue: 1,
       useNativeDriver: true,
-      tension: 65,
-      friction: 11,
+      tension: SPRING_ANIMATION_TENSION,
+      friction: SPRING_ANIMATION_FRICTION,
     }).start();
   }, []);
 
   const handleClose = () => {
     Animated.timing(slideAnim, {
       toValue: 0,
-      duration: 200,
+      duration: CLOSE_ANIMATION_DURATION_MS,
       useNativeDriver: true,
     }).start(() => {
       onClose();
@@ -48,7 +58,7 @@ export default function RestaurantDetailCard({
 
   const translateY = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [600, 0],
+    outputRange: [CARD_ANIMATION_OFFSET, 0],
   });
 
   return (
@@ -87,7 +97,7 @@ export default function RestaurantDetailCard({
 
         {restaurant.address && (
           <View style={styles.infoRow}>
-            <AntDesign name="enviromento" size={16} color="#666" />
+            <AntDesign name="environment" size={16} color="#666" />
             <Text style={styles.infoText}>{restaurant.address}</Text>
           </View>
         )}

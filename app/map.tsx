@@ -1,14 +1,13 @@
 import React, { useRef, useState } from "react";
-import { ActivityIndicator, View, StyleSheet } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
-import { Restaurant, MapType, RouteCoordinate } from "@/types/restaurant";
+import { Restaurant, MapType } from "@/types/restaurant";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useDirections } from "@/hooks/useDirections";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
 import MapTypeSelector from "@/components/MapTypeSelector";
-import DirectionsButton from "@/components/DirectionsButton";
 import RestaurantDetailCard from "@/components/RestaurantDetailCard";
 
 const fallbackRegion: Region = {
@@ -20,7 +19,7 @@ const fallbackRegion: Region = {
 
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
-  const [mapType, setMapType] = useState<MapType>("hybrid");
+  const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
@@ -80,14 +79,11 @@ export default function MapScreen() {
       </MapView>
 
       {selectedRestaurant && (
-        <>
-        
         <RestaurantDetailCard
-          restaurant={selectedRestaurant}
-          onClose={handleCloseRestaurant}
-          onGetDirections={handleGetDirections}
+        restaurant={selectedRestaurant}
+        onClose={handleCloseRestaurant}
+        onGetDirections={handleGetDirections}
         />
-        </>
       )}
 
       <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />

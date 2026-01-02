@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Alert } from "react-native";
 import { supabase } from "@/app/lib/supabase";
 import { Restaurant } from "@/types/restaurant";
+import { useEffect, useState } from "react";
+import { Alert } from "react-native";
 
 export function useRestaurants() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -15,7 +15,7 @@ export function useRestaurants() {
       try {
         const { data, error } = await supabase
           .from("restaurants")
-          .select("id,name,lat,lng")
+          .select("id,name,lat,lng,address,phone,type")
           .eq("is_active", true)
           .limit(500);
 
@@ -27,6 +27,10 @@ export function useRestaurants() {
             name: r.name,
             lat: Number(r.lat),
             lng: Number(r.lng),
+            description: r.description ?? undefined,
+            address: r.address ?? undefined,
+            phone: r.phone ?? undefined,
+            cuisine_type: r.cuisine_type ?? undefined,
           })) ?? [];
 
         if (mounted) setRestaurants(parsed);
@@ -34,7 +38,7 @@ export function useRestaurants() {
         console.error(e);
         if (mounted) {
           setError(e);
-          Alert.alert("Error", e?.message ?? "Something went wrong");
+          Alert.alert("Error", e?.message ?? "Unable to load restaurants. Please check your internet connection and try again.");
         }
       } finally {
         if (mounted) setLoading(false);

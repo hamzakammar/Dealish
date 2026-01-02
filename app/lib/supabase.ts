@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+function getRequiredEnvVar(name: string): string {
+    const value = process.env[name];
+    if (!value) {
+        throw new Error(`Missing required environment variable: ${name}`);
+    }
+    return value;
+}
+const url = getRequiredEnvVar('EXPO_PUBLIC_SUPABASE_URL');
+const anon = getRequiredEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 export const supabase = createClient(url, anon, {
     auth: {
