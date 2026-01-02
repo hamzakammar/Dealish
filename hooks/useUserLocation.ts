@@ -1,0 +1,69 @@
+import { useEffect, useState } from "react";
+import { Alert } from "react-native";
+import * as Location from "expo-location";
+import { Region } from "react-native-maps";
+import { UserLocation as UserLocationType } from "@/types/restaurant";
+
+export function useUserLocation(mapRef: React.RefObject<any>) {
+  const [userLocation, setUserLocation] = useState<UserLocationType | null>(null);
+  const [region, setRegion] = useState<Region | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const initialDelta = { latitudeDelta: 0.01, longitudeDelta: 0.01 };
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function bootstrap() {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Location required",
+            "We need location to show navigation and nearby deals."
+          );
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        if (status === "granted") {
+          const pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+
+          if (mounted) {
+            setUserLocation({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+
+            const nextRegion: Region = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              ...initialDelta,
+            };
+
+            setRegion(nextRegion);
+
+            setTimeout(() => {
+              mapRef.current?.animateToRegion(nextRegion, 600);
+            }, 200);
+          }
+        }
+      } catch (e: any) {
+        console.error(e);
+        Alert.alert("Error", e?.message ?? "Something went wrong");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    bootstrap();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { userLocation, region, loading };
+}
+
