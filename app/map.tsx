@@ -1,4 +1,5 @@
 import AntDesign from '@expo/vector-icons/AntDesign';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Location from "expo-location";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -242,10 +243,24 @@ export default function MapScreen() {
         }}
         style={{ flex: 1 }}
         initialRegion={region ?? fallbackRegion}
-        showsUserLocation={true}
         showsMyLocationButton={true}
         mapType={mapType}
       >
+        {/* Custom User Location Marker */}
+        {userLocation && (
+          <Marker
+            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }}
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={styles.userLocationMarker}>
+              <View style={styles.userLocationHalo} />
+              <View style={styles.userLocationCircle}>
+                <MaterialCommunityIcons name="navigation" size={20} color="#fff" />
+              </View>
+            </View>
+          </Marker>
+        )}
+
         {restaurants.map((r) => (
           <Marker
             key={r.id}
@@ -278,7 +293,7 @@ export default function MapScreen() {
         {routeCoordinates.length > 0 && (
           <Polyline
             coordinates={routeCoordinates}
-            strokeColor="#007AFF"
+            strokeColor="#FE902A"
             strokeWidth={4}
           />
         )}
@@ -412,7 +427,7 @@ const styles = StyleSheet.create({
   },
   directionsButton: {
     flex: 1,
-    backgroundColor: "#007AFF",
+    backgroundColor: "#FE902A",
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 8,
@@ -461,7 +476,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   markerContainerSelected: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#FE902A",
     borderColor: "#fff",
     width: 42,
     height: 42,
@@ -488,7 +503,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   markerPinSelected: {
-    borderTopColor: "#007AFF",
+    borderTopColor: "#FE902A",
     borderLeftWidth: 12,
     borderRightWidth: 12,
     borderTopWidth: 18,
@@ -500,6 +515,31 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.2)",
     marginTop: -4,
     transform: [{ scaleX: 0.8 }],
+  },
+  userLocationMarker: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userLocationHalo: {
+    position: "absolute",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FE902A",
+    opacity: 0.3,
+  },
+  userLocationCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FE902A",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
 });
 
