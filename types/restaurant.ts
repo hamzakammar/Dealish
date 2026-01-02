@@ -7,6 +7,10 @@ export type Restaurant = {
   address?: string;
   phone?: string;
   cuisine_type?: string;
+  rating?: number;
+  rating_count?: number;
+  image_url?: string;
+  logo_url?: string;
 };
 
 export type Deal = {

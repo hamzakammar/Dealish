@@ -6,6 +6,7 @@ import React, { useEffect, useRef } from "react";
 import {
     ActivityIndicator,
     Animated,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -73,11 +74,29 @@ export default function RestaurantDetailCard({
       <View style={styles.dragHandle} />
 
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.restaurantName}>{restaurant.name}</Text>
-          {restaurant.cuisine_type && (
-            <Text style={styles.cuisineType}>{restaurant.cuisine_type}</Text>
-          )}
+        <View style={styles.headerMain}>
+          <View style={styles.logoContainer}>
+            {(restaurant.logo_url || restaurant.image_url) ? (
+              <Image
+                source={{ uri: restaurant.logo_url || restaurant.image_url }}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={[styles.logo, styles.logoPlaceholder]}>
+                <AntDesign name="picture" size={24} color="#ccc" />
+              </View>
+            )}
+          </View>
+          <View style={styles.headerContent}>
+            <Text style={styles.restaurantName}>{restaurant.name}</Text>
+            {restaurant.address && (
+              <View style={styles.addressRow}>
+                <AntDesign name="environment" size={14} color="#666" />
+                <Text style={styles.addressText}>{restaurant.address}</Text>
+              </View>
+            )}
+          </View>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <AntDesign name="close" size={20} color="#333" />
@@ -92,13 +111,6 @@ export default function RestaurantDetailCard({
         {restaurant.description && (
           <View style={styles.section}>
             <Text style={styles.description}>{restaurant.description}</Text>
-          </View>
-        )}
-
-        {restaurant.address && (
-          <View style={styles.infoRow}>
-            <AntDesign name="environment" size={16} color="#666" />
-            <Text style={styles.infoText}>{restaurant.address}</Text>
           </View>
         )}
 
@@ -128,16 +140,22 @@ export default function RestaurantDetailCard({
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.directionsButton}
-          onPress={onGetDirections}
+          style={styles.moreInfoButton}
+          onPress={() => {
+            // Handle More Info action
+            console.log("More Info pressed");
+          }}
         >
-          <AntDesign
-            name="arrow-right"
-            size={18}
-            color="#fff"
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.directionsButtonText}>Get Directions</Text>
+          <Text style={styles.moreInfoButtonText}>More Info</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={() => {
+            // Handle favorite action
+            console.log("Favorite pressed");
+          }}
+        >
+          <AntDesign name="heart" size={20} color="#FE902A" />
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -178,20 +196,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
-  headerContent: {
+  headerMain: {
+    flexDirection: "row",
     flex: 1,
     marginRight: 12,
   },
+  logoContainer: {
+    marginRight: 12,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    backgroundColor: "#f5f5f5",
+  },
+  logoPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f0f0f0",
+    overflow: "hidden",
+  },
+  headerContent: {
+    flex: 1,
+  },
   restaurantName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  cuisineType: {
-    fontSize: 14,
+  addressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    gap: 4,
+  },
+  addressText: {
+    fontSize: 13,
     color: "#666",
-    fontStyle: "italic",
+    flex: 1,
   },
   closeButton: {
     padding: 4,
@@ -249,13 +292,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
+    flexDirection: "row",
+    gap: 12,
   },
-  directionsButton: {
+  moreInfoButton: {
+    flex: 1,
     backgroundColor: "#FE902A",
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 8,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -264,9 +309,24 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  directionsButtonText: {
+  moreInfoButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  favoriteButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#FE902A",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
 });

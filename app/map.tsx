@@ -60,14 +60,17 @@ export default function MapScreen() {
       >
         {userLocation && <UserLocationMarker location={userLocation} />}
 
-        {restaurants.map((r) => (
-          <RestaurantMarker
-            key={r.id}
-            restaurant={r}
-            isSelected={selectedRestaurant?.id === r.id}
-            onPress={setSelectedRestaurant}
-          />
-        ))}
+        {restaurants.map((r) => {
+          const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
+          return (
+            <RestaurantMarker
+              key={`${r.id}-${isSelected ? 'selected' : 'unselected'}`}
+              restaurant={r}
+              isSelected={isSelected}
+              onPress={setSelectedRestaurant}
+            />
+          );
+        })}
 
         {routeCoordinates.length > 0 && (
           <Polyline

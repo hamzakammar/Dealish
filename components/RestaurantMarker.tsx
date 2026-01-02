@@ -1,8 +1,8 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import { Marker } from "react-native-maps";
-import AntDesign from "@expo/vector-icons/AntDesign";
 import { Restaurant } from "@/types/restaurant";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
   restaurant: Restaurant;
@@ -18,11 +18,18 @@ export default function RestaurantMarker({
   return (
     <Marker
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
-      title={restaurant.name}
       onPress={() => onPress(restaurant)}
       anchor={{ x: 0.5, y: 1 }}
+      tracksViewChanges={true}
     >
       <View style={styles.markerWrapper}>
+        {isSelected === true ? (
+          <View style={styles.titleContainer}>
+            <Text style={styles.markerTitle} numberOfLines={1}>
+              {restaurant.name}
+            </Text>
+          </View>
+        ) : null}
         <View
           style={[
             styles.markerContainer,
@@ -46,6 +53,24 @@ const styles = StyleSheet.create({
   markerWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
+  },
+  titleContainer: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    maxWidth: 120,
+  },
+  markerTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
   },
   markerContainer: {
     backgroundColor: "#FE902A",
