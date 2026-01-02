@@ -1,14 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-function getRequiredEnvVar(name: string): string {
-    const value = process.env[name];
-    if (!value) {
-        throw new Error(`Missing required environment variable: ${name}`);
-    }
-    return value;
+// Use static property access so Expo's Babel plugin can inline these at build time
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!url) {
+    throw new Error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_URL');
 }
-const url = getRequiredEnvVar('EXPO_PUBLIC_SUPABASE_URL');
-const anon = getRequiredEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+if (!anon) {
+    throw new Error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_ANON_KEY');
+}
 
 export const supabase = createClient(url, anon, {
     auth: {

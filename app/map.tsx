@@ -1,14 +1,14 @@
+import MapTypeSelector from "@/components/MapTypeSelector";
+import RestaurantDetailCard from "@/components/RestaurantDetailCard";
+import RestaurantMarker from "@/components/RestaurantMarker";
+import UserLocationMarker from "@/components/UserLocationMarker";
+import { useDirections } from "@/hooks/useDirections";
+import { useRestaurants } from "@/hooks/useRestaurants";
+import { useUserLocation } from "@/hooks/useUserLocation";
+import { MapType, Restaurant } from "@/types/restaurant";
 import React, { useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
-import { Restaurant, MapType } from "@/types/restaurant";
-import { useRestaurants } from "@/hooks/useRestaurants";
-import { useUserLocation } from "@/hooks/useUserLocation";
-import { useDirections } from "@/hooks/useDirections";
-import RestaurantMarker from "@/components/RestaurantMarker";
-import UserLocationMarker from "@/components/UserLocationMarker";
-import MapTypeSelector from "@/components/MapTypeSelector";
-import RestaurantDetailCard from "@/components/RestaurantDetailCard";
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -39,6 +39,10 @@ export default function MapScreen() {
     clearRoute();
   };
 
+  const handleRestaurantSelect = (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -67,7 +71,7 @@ export default function MapScreen() {
               key={`${r.id}-${isSelected ? 'selected' : 'unselected'}`}
               restaurant={r}
               isSelected={isSelected}
-              onPress={setSelectedRestaurant}
+              onPress={handleRestaurantSelect}
             />
           );
         })}
@@ -83,9 +87,9 @@ export default function MapScreen() {
 
       {selectedRestaurant && (
         <RestaurantDetailCard
-        restaurant={selectedRestaurant}
-        onClose={handleCloseRestaurant}
-        onGetDirections={handleGetDirections}
+          restaurant={selectedRestaurant}
+          onClose={handleCloseRestaurant}
+          onGetDirections={handleGetDirections}
         />
       )}
 

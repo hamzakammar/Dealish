@@ -7,12 +7,19 @@ import {
     ActivityIndicator,
     Animated,
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    UIManager,
+    View
 } from "react-native";
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // Spring animation configuration for card slide-in
 const SPRING_ANIMATION_TENSION = 65;
@@ -37,23 +44,33 @@ export default function RestaurantDetailCard({
 }: RestaurantDetailCardProps) {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const closingRestaurantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Reset animation when restaurant changes
+    slideAnim.setValue(0);
+    closingRestaurantIdRef.current = null;
     Animated.spring(slideAnim, {
       toValue: 1,
       useNativeDriver: true,
       tension: SPRING_ANIMATION_TENSION,
       friction: SPRING_ANIMATION_FRICTION,
     }).start();
-  }, []);
+  }, [restaurant.id]);
 
   const handleClose = () => {
+    // Store the restaurant ID when close animation starts
+    closingRestaurantIdRef.current = restaurant.id;
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: CLOSE_ANIMATION_DURATION_MS,
       useNativeDriver: true,
     }).start(() => {
-      onClose();
+      // Only call onClose if the restaurant hasn't changed
+      if (closingRestaurantIdRef.current === restaurant.id) {
+        onClose();
+      }
+      closingRestaurantIdRef.current = null;
     });
   };
 
@@ -74,35 +91,35 @@ export default function RestaurantDetailCard({
       <View style={styles.dragHandle} />
 
       <View style={styles.header}>
-        <View style={styles.headerMain}>
-          <View style={styles.logoContainer}>
-            {(restaurant.logo_url || restaurant.image_url) ? (
-              <Image
-                source={{ uri: restaurant.logo_url || restaurant.image_url }}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            ) : (
-              <View style={[styles.logo, styles.logoPlaceholder]}>
-                <AntDesign name="picture" size={24} color="#ccc" />
-              </View>
-            )}
+          <View style={styles.headerMain}>
+            <View style={styles.logoContainer}>
+              {(restaurant.logo_url || restaurant.image_url) ? (
+                <Image
+                  source={{ uri: restaurant.logo_url || restaurant.image_url }}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={[styles.logo, styles.logoPlaceholder]}>
+                  <AntDesign name="picture" size={24} color="#ccc" />
+                </View>
+              )}
+            </View>
+            <View style={styles.headerContent}>
+              <Text style={styles.restaurantName}>{restaurant.name}</Text>
+              {restaurant.address && (
+                <View style={styles.addressRow}>
+                  <AntDesign name="environment" size={14} color="#666" />
+                  <Text style={styles.addressText}>{restaurant.address}</Text>
+                </View>
+              )}
+            </View>
           </View>
-          <View style={styles.headerContent}>
-            <Text style={styles.restaurantName}>{restaurant.name}</Text>
-            {restaurant.address && (
-              <View style={styles.addressRow}>
-                <AntDesign name="environment" size={14} color="#666" />
-                <Text style={styles.addressText}>{restaurant.address}</Text>
-              </View>
-            )}
-          </View>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+            <AntDesign name="close" size={20} color="#333" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-          <AntDesign name="close" size={20} color="#333" />
-        </TouchableOpacity>
-      </View>
-
+      
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -140,13 +157,16 @@ export default function RestaurantDetailCard({
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.moreInfoButton}
-          onPress={() => {
-            // Handle More Info action
-            console.log("More Info pressed");
-          }}
+          style={styles.directionsButton}
+          onPress={onGetDirections}
         >
-          <Text style={styles.moreInfoButtonText}>More Info</Text>
+          <AntDesign
+            name="arrow-right"
+            size={18}
+            color="#fff"
+            style={{ marginRight: 8 }}
+          />
+          <Text style={styles.directionsButtonText}>Get Directions</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.favoriteButton}
@@ -171,13 +191,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: "80%",
+    maxHeight: 600,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
-  },
+    },
   dragHandle: {
     width: 40,
     height: 4,
@@ -295,12 +315,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  moreInfoButton: {
+  directionsButton: {
     flex: 1,
     backgroundColor: "#FE902A",
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -309,7 +330,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  moreInfoButtonText: {
+  directionsButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
