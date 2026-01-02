@@ -9,6 +9,7 @@ import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
 import MapTypeSelector from "@/components/MapTypeSelector";
 import DirectionsButton from "@/components/DirectionsButton";
+import RestaurantDetailCard from "@/components/RestaurantDetailCard";
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -79,10 +80,14 @@ export default function MapScreen() {
       </MapView>
 
       {selectedRestaurant && (
-        <DirectionsButton
-          onPress={handleGetDirections}
+        <>
+        
+        <RestaurantDetailCard
+          restaurant={selectedRestaurant}
           onClose={handleCloseRestaurant}
+          onGetDirections={handleGetDirections}
         />
+        </>
       )}
 
       <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />
