@@ -1,10 +1,19 @@
-import { useState } from "react";
-import { Alert } from "react-native";
-// @ts-ignore - @mapbox/polyline doesn't have types
 import { RouteCoordinate, UserLocation } from "@/types/restaurant";
 import polyline from "@mapbox/polyline";
+import { useState } from "react";
+import { Alert } from "react-native";
 
 const ORS_API_KEY = process.env.EXPO_PUBLIC_ORS_API_KEY || "";
+
+// Validate API key at module load time
+const isDirectionsAvailable = Boolean(ORS_API_KEY && ORS_API_KEY.trim() !== "");
+
+if (!isDirectionsAvailable) {
+  console.warn(
+    "Directions feature is disabled: EXPO_PUBLIC_ORS_API_KEY is not configured. " +
+    "To enable directions, add your OpenRouteService API key to your .env file."
+  );
+}
 
 // Multiplier for route bounds padding to ensure the route is visible with adequate margin
 // A value of 1.5 adds 50% padding on each side, preventing the route from touching map edges
@@ -24,8 +33,11 @@ export function useDirections() {
       return;
     }
 
-    if (!ORS_API_KEY) {
-      Alert.alert("Error", "OpenRouteService API key not configured");
+    if (!isDirectionsAvailable || !ORS_API_KEY) {
+      Alert.alert(
+        "Directions Unavailable",
+        "Directions are not configured. Please add your OpenRouteService API key to the EXPO_PUBLIC_ORS_API_KEY environment variable."
+      );
       return;
     }
 
@@ -123,8 +135,9 @@ export function useDirections() {
         );
       }
     } catch (error: any) {
-      console.error("Directions error:", error);
-      Alert.alert("Error", error.message || "Failed to get directions");
+      const errorMessage = (error && typeof error === "object" && "message" in error && (error as any).message) || (typeof error === "string" ? error : "Failed to get directions");
+      console.error("Directions error:", errorMessage, error);
+      Alert.alert("Error", errorMessage);
     }
   };
 
@@ -132,6 +145,6 @@ export function useDirections() {
     setRouteCoordinates([]);
   };
 
-  return { routeCoordinates, getDirections, clearRoute };
+  return { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable };
 }
 

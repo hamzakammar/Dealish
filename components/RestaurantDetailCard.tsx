@@ -4,16 +4,16 @@ import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useRef } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    UIManager,
-    View
+  ActivityIndicator,
+  Animated,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View
 } from "react-native";
 
 // Enable LayoutAnimation on Android
@@ -35,12 +35,14 @@ type RestaurantDetailCardProps = {
   restaurant: Restaurant;
   onClose: () => void;
   onGetDirections: () => void;
+  isDirectionsAvailable?: boolean;
 };
 
 export default function RestaurantDetailCard({
   restaurant,
   onClose,
   onGetDirections,
+  isDirectionsAvailable = true,
 }: RestaurantDetailCardProps) {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -156,18 +158,20 @@ export default function RestaurantDetailCard({
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.directionsButton}
-          onPress={onGetDirections}
-        >
-          <AntDesign
-            name="arrow-right"
-            size={18}
-            color="#fff"
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.directionsButtonText}>Get Directions</Text>
-        </TouchableOpacity>
+        {isDirectionsAvailable && (
+          <TouchableOpacity
+            style={styles.directionsButton}
+            onPress={onGetDirections}
+          >
+            <AntDesign
+              name="arrow-right"
+              size={18}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.directionsButtonText}>Get Directions</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.favoriteButton}
           onPress={() => {

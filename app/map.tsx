@@ -24,7 +24,7 @@ export default function MapScreen() {
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
-  const { routeCoordinates, getDirections, clearRoute } = useDirections();
+  const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
 
   const loading = restaurantsLoading || locationLoading;
 
@@ -68,7 +68,7 @@ export default function MapScreen() {
           const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
           return (
             <RestaurantMarker
-              key={`${r.id}-${isSelected ? 'selected' : 'unselected'}`}
+              key={r.id}
               restaurant={r}
               isSelected={isSelected}
               onPress={handleRestaurantSelect}
@@ -90,6 +90,7 @@ export default function MapScreen() {
           restaurant={selectedRestaurant}
           onClose={handleCloseRestaurant}
           onGetDirections={handleGetDirections}
+          isDirectionsAvailable={isDirectionsAvailable}
         />
       )}
 

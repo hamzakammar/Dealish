@@ -1,7 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
 import { Deal } from "@/types/restaurant";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 type DealCardProps = {
   deal: Deal;
@@ -18,21 +18,37 @@ export default function DealCard({ deal }: DealCardProps) {
     });
   };
 
-  const isActive = () => {
-    if (!deal.start_at && !deal.end_at) return true;
+  const getDealStatus = (): 'active' | 'upcoming' | 'expired' => {
     const now = new Date();
-    if (deal.start_at && new Date(deal.start_at) > now) return false;
-    if (deal.end_at && new Date(deal.end_at) < now) return false;
-    return true;
+    
+    // Check if deal has ended
+    if (deal.end_at && new Date(deal.end_at) < now) {
+      return 'expired';
+    }
+    
+    // Check if deal hasn't started yet
+    if (deal.start_at && new Date(deal.start_at) > now) {
+      return 'upcoming';
+    }
+    
+    // Otherwise, deal is active
+    return 'active';
   };
+
+  const dealStatus = getDealStatus();
 
   return (
     <View style={styles.dealCard}>
       <View style={styles.dealHeader}>
         <Text style={styles.dealTitle}>{deal.title}</Text>
-        {!isActive() && (
+        {dealStatus === 'expired' && (
           <View style={styles.expiredBadge}>
             <Text style={styles.expiredText}>Expired</Text>
+          </View>
+        )}
+        {dealStatus === 'upcoming' && (
+          <View style={styles.upcomingBadge}>
+            <Text style={styles.upcomingText}>Coming Soon</Text>
           </View>
         )}
       </View>
@@ -110,6 +126,17 @@ const styles = StyleSheet.create({
   },
   expiredText: {
     color: "#c62828",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  upcomingBadge: {
+    backgroundColor: "#e3f2fd",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  upcomingText: {
+    color: "#1976d2",
     fontSize: 10,
     fontWeight: "600",
   },

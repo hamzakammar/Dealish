@@ -23,13 +23,6 @@ export default function RestaurantMarker({
       tracksViewChanges={true}
     >
       <View style={styles.markerWrapper}>
-        {isSelected === true ? (
-          <View style={styles.titleContainer}>
-            <Text style={styles.markerTitle} numberOfLines={1}>
-              {restaurant.name}
-            </Text>
-          </View>
-        ) : null}
         <View
           style={[
             styles.markerContainer,
