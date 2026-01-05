@@ -9,6 +9,10 @@ import { MapType, Restaurant } from "@/types/restaurant";
 import React, { useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
+import { useAuthContext } from "./providers/auth";
+import { supabase } from '@/app/lib/supabase';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -28,11 +32,17 @@ export default function MapScreen() {
 
   const loading = restaurantsLoading || locationLoading;
 
+  const {session} = useAuthContext();
+
   const handleGetDirections = () => {
     if (selectedRestaurant) {
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
     }
   };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  }
 
   const handleCloseRestaurant = () => {
     setSelectedRestaurant(null);
@@ -42,6 +52,8 @@ export default function MapScreen() {
   const handleRestaurantSelect = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
   };
+
+
 
   if (loading) {
     return (
@@ -93,8 +105,35 @@ export default function MapScreen() {
           isDirectionsAvailable={isDirectionsAvailable}
         />
       )}
+      {session && (
+        <TouchableOpacity 
+          style={styles.signOutButton} 
+          onPress={handleSignOut}
+        >
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      )}
+
 
       <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />
     </View>
   );
 }
+const styles = StyleSheet.create({
+  signOutButton: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    backgroundColor: '#FE902A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  signOutText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+});
+
