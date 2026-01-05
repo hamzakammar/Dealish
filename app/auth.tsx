@@ -2,13 +2,27 @@ import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { 
+  ActivityIndicator, 
+  Alert, 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  View 
+} from 'react-native';
+
 
 // Complete the OAuth session in the browser
 WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthScreen() {
   const { session, isLoading } = useAuthContext();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // If already logged in, redirect to map
   if (session) {
@@ -23,7 +37,47 @@ export default function AuthScreen() {
       </View>
     );
   }
+  const handleEmailAuth = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
 
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        // Sign up
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (error) {
+          Alert.alert('Error', error.message);
+        } else {
+          Alert.alert(
+            'Success', 
+            'Check your email for the confirmation link!'
+          );
+        }
+      } else {
+        // Sign in
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          Alert.alert('Error', error.message);
+        }
+        // Success - session will be handled automatically by AuthProvider
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleGoogleSignIn = async () => {
     try {
       // Always use the deep link scheme explicitly (not localhost)
@@ -87,37 +141,111 @@ export default function AuthScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Dealish</Text>
+      <Text style={styles.title}>Take advantage of this deal</Text>
       <Text style={styles.subtitle}>Sign in to continue</Text>
+
+      <View style={styles.form}>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#999"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#999"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="password"
+        />
+
+        <TouchableOpacity 
+          style={[styles.button, styles.emailButton, loading && styles.buttonDisabled]} 
+          onPress={handleEmailAuth}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {isSignUp ? 'Sign Up' : 'Sign In'}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          onPress={() => setIsSignUp(!isSignUp)}
+          style={styles.toggleButton}
+        >
+          <Text style={styles.toggleText}>
+            {isSignUp 
+              ? 'Already have an account? Sign in' 
+              : "Don't have an account? Sign up"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>OR</Text>
+        <View style={styles.dividerLine} />
+      </View>
 
       <TouchableOpacity 
         style={[styles.button, styles.googleButton]} 
         onPress={handleGoogleSignIn}
       >
-        <Text style={styles.buttonText}>Sign in with Google</Text>
+        <Text style={styles.googleButtonText}>Sign in with Google</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
     backgroundColor: '#fff',
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontFamily: 'Monrope',
+    fontWeight: 'normal',
+    marginTop: 99,
     marginBottom: 8,
+    textAlign: 'center',
     color: '#333',
   },
   subtitle: {
     fontSize: 16,
+
     color: '#666',
     marginBottom: 40,
+    textAlign: 'center',
+  },
+  form: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  input: {
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
   },
   button: {
     width: '100%',
@@ -127,12 +255,47 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: 'center',
   },
+  emailButton: {
+    backgroundColor: '#FE902A',
+  },
   googleButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#E9EAEB',
+    borderRadius: 8,
+  },
+  googleButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  toggleButton: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  toggleText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#999',
+    fontSize: 14,
   },
 });
