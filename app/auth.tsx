@@ -1,25 +1,27 @@
-import { supabase, getAuthRedirectUrl } from '@/app/lib/supabase';
+import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
+import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
-import { 
-  ActivityIndicator, 
-  Alert, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  View 
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import validator from 'validator';
 
 // Complete the OAuth session in the browser
 WebBrowser.maybeCompleteAuthSession();
 
 const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return validator.isEmail(email);
   };
+  
 
 export default function AuthScreen() {
   const { session, isLoading } = useAuthContext();
@@ -29,11 +31,27 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   // If already logged in, redirect to map
   if (session) {
     return <Redirect href="/map" />;
   }
+
+  // Check rate limit on mount
+  useEffect(() => {
+    const checkLimit = async () => {
+      const { allowed, remainingTime } = await checkRateLimit();
+      if (!allowed && remainingTime) {
+        setIsRateLimited(true);
+        setRateLimitError(
+          `Too many failed attempts. Please try again in ${formatRemainingTime(remainingTime)}.`
+        );
+      }
+    };
+    checkLimit();
+  }, []);
 
   // Show loading state
   if (isLoading) {
@@ -47,6 +65,23 @@ export default function AuthScreen() {
     // Reset errors
     setEmailError('');
     setPasswordError('');
+    setRateLimitError(null);
+
+    // Check rate limit first
+    const { allowed, remainingTime } = await checkRateLimit();
+    if (!allowed) {
+      setIsRateLimited(true);
+      if (remainingTime) {
+        setRateLimitError(
+          `Too many failed attempts. Please try again in ${formatRemainingTime(remainingTime)}.`
+        );
+      } else {
+        setRateLimitError('Too many failed attempts. Please try again later.');
+      }
+      return;
+    }
+
+    setIsRateLimited(false);
   
     // Validate email
     if (!email) {
@@ -79,8 +114,11 @@ export default function AuthScreen() {
         });
   
         if (error) {
+          await recordFailedAttempt();
           Alert.alert('Error', error.message);
         } else {
+          // Clear rate limit on success
+          await clearRateLimit();
           Alert.alert(
             'Success', 
             'Check your email for the confirmation link!'
@@ -93,10 +131,24 @@ export default function AuthScreen() {
         });
   
         if (error) {
+          await recordFailedAttempt();
           Alert.alert('Error', error.message);
+          
+          // Re-check rate limit after failure
+          const limitCheck = await checkRateLimit();
+          if (!limitCheck.allowed && limitCheck.remainingTime) {
+            setIsRateLimited(true);
+            setRateLimitError(
+              `Too many failed attempts. Please try again in ${formatRemainingTime(limitCheck.remainingTime)}.`
+            );
+          }
+        } else {
+          // Clear rate limit on success
+          await clearRateLimit();
         }
       }
     } catch (error: any) {
+      await recordFailedAttempt();
       Alert.alert('Error', error.message || 'Authentication failed');
     } finally {
       setLoading(false);
@@ -128,29 +180,7 @@ export default function AuthScreen() {
         );
 
         if (result.type === 'success') {
-          // Parse the URL to extract the session
-          const { url } = result;
-          if (url) {
-            // Extract the access token from the URL
-            const urlParts = url.split('#');
-            if (urlParts.length > 1) {
-              const params = new URLSearchParams(urlParts[1]);
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-              
-              if (accessToken && refreshToken) {
-                // Set the session manually
-                const {error: sessionError } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken,
-                });
-                
-                if (sessionError) {
-                  Alert.alert('Error', 'Failed to set session');
-                }
-              }
-            }
-          }
+          //Supabase has automatic session handling
         } else if (result.type === 'cancel') {
           // User cancelled, do nothing
         } else {
@@ -175,11 +205,18 @@ export default function AuthScreen() {
       <Text style={styles.subtitle}>Sign in to continue</Text>
 
       <View style={styles.form}>
+        {rateLimitError && (
+          <View style={styles.rateLimitContainer}>
+            <Text style={styles.rateLimitText}>{rateLimitError}</Text>
+          </View>
+        )}
+
         <View>
             <TextInput
             style={[
                 styles.input,
-                emailError && styles.inputError
+                emailError && styles.inputError,
+                isRateLimited && styles.inputDisabled
             ]}
             placeholder="Email"
             placeholderTextColor="#999"
@@ -187,11 +224,12 @@ export default function AuthScreen() {
             onChangeText={(text) => {
                 setEmail(text);
                 // Clear error when user starts typing
-                if (emailError) setEmailError(null);
+                if (emailError) setEmailError('');
             }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
+            editable={!isRateLimited}
             />
             {emailError && (
             <Text style={styles.errorText}>{emailError}</Text>
@@ -202,7 +240,8 @@ export default function AuthScreen() {
             <TextInput
             style={[
                 styles.input,
-                passwordError && styles.inputError
+                passwordError && styles.inputError,
+                isRateLimited && styles.inputDisabled
             ]}
             placeholder="Password"
             placeholderTextColor="#999"
@@ -210,11 +249,12 @@ export default function AuthScreen() {
             onChangeText={(text) => {
                 setPassword(text);
                 // Clear error when user starts typing
-                if (passwordError) setPasswordError(null);
+                if (passwordError) setPasswordError('');
             }}
             secureTextEntry
             autoCapitalize="none"
             autoComplete="password"
+            editable={!isRateLimited}
             />
             {passwordError && (
             <Text style={styles.errorText}>{passwordError}</Text>
@@ -222,9 +262,13 @@ export default function AuthScreen() {
         </View>
 
         <TouchableOpacity 
-          style={[styles.button, styles.emailButton, loading && styles.buttonDisabled]} 
+          style={[
+            styles.button, 
+            styles.emailButton, 
+            (loading || isRateLimited) && styles.buttonDisabled
+          ]} 
           onPress={handleEmailAuth}
-          disabled={loading}
+          disabled={loading || isRateLimited}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -362,5 +406,22 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 8,
     marginLeft: 4,
+  },
+  rateLimitContainer: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  rateLimitText: {
+    color: '#856404',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  inputDisabled: {
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
   },
 });

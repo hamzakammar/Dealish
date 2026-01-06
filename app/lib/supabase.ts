@@ -16,8 +16,6 @@ if (!anon) {
 export const AUTH_REDIRECT_PATH = 'auth/callback';
 export const getAuthRedirectUrl = () => Linking.createURL(AUTH_REDIRECT_PATH);
 
-const redirectUrl = Linking.createURL('/');
-
 export const supabase = createClient(url, anon, {
     auth: {
         storage: AsyncStorage,
