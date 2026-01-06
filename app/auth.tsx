@@ -1,6 +1,7 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
+import { Ionicons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -33,6 +34,7 @@ export default function AuthScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // If already logged in, redirect to map
   if (session) {
@@ -213,7 +215,7 @@ export default function AuthScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Take advantage of this deal</Text>
-      <Text style={styles.subtitle}>Sign in to continue</Text>
+      <Text style={styles.subtitle}>{isSignUp ? 'Sign up to continue' : 'Sign in to continue'}</Text>
 
       <View style={styles.form}>
         {rateLimitError && (
@@ -229,12 +231,11 @@ export default function AuthScreen() {
                 emailError && styles.inputError,
                 isRateLimited && styles.inputDisabled
             ]}
-            placeholder="Email"
+            placeholder="Your Email"
             placeholderTextColor="#999"
             value={email}
             onChangeText={(text) => {
                 setEmail(text);
-                // Clear error when user starts typing
                 if (emailError) setEmailError('');
             }}
             keyboardType="email-address"
@@ -248,25 +249,38 @@ export default function AuthScreen() {
         </View>
 
         <View>
-            <TextInput
-            style={[
-                styles.input,
+            <View style={[
+                styles.passwordContainer,
                 passwordError && styles.inputError,
                 isRateLimited && styles.inputDisabled
-            ]}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            value={password}
-            onChangeText={(text) => {
-                setPassword(text);
-                // Clear error when user starts typing
-                if (passwordError) setPasswordError('');
-            }}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            editable={!isRateLimited}
-            />
+            ]}>
+                <TextInput
+                style={styles.passwordInput}
+                placeholder="Your Password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={(text) => {
+                    setPassword(text);
+                    // Clear error when user starts typing
+                    if (passwordError) setPasswordError('');
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="password"
+                editable={!isRateLimited}
+                />
+                <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                    disabled={isRateLimited}
+                >
+                    <Ionicons
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={20}
+                        color="#999"
+                    />
+                </TouchableOpacity>
+            </View>
             {passwordError && (
             <Text style={styles.errorText}>{passwordError}</Text>
             )}
@@ -328,7 +342,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontFamily: 'Manrope',
-    fontWeight: 'normal',
+    fontWeight: 'bold',
     marginTop: 99,
     marginBottom: 8,
     textAlign: 'center',
@@ -336,7 +350,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-
+    fontFamily: 'Manrope',
+    fontWeight: 'regular',
     color: '#666',
     marginBottom: 40,
     textAlign: 'center',
@@ -349,7 +364,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     marginBottom: 12,
@@ -434,5 +449,28 @@ const styles = StyleSheet.create({
   inputDisabled: {
     backgroundColor: '#f5f5f5',
     opacity: 0.6,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+    margin: 0,
+  },
+  eyeIcon: {
+    paddingLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
