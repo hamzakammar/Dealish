@@ -1,13 +1,14 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     StyleSheet,
     Text,
     TextInput,
@@ -322,12 +323,29 @@ export default function AuthScreen() {
         <View style={styles.dividerLine} />
       </View>
 
-      <TouchableOpacity 
-        style={[styles.button, styles.googleButton]} 
-        onPress={handleGoogleSignIn}
-      >
-        <Text style={styles.googleButtonText}>Sign in with Google</Text>
-      </TouchableOpacity>
+      <View style={styles.socialButtonsContainer}>
+        <TouchableOpacity 
+          style={[styles.socialButton, styles.googleButton]} 
+          onPress={handleGoogleSignIn}
+        >
+          <Image 
+            source={require('@/assets/images/google-logo.png')} 
+            style={styles.googleLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.socialButtonText}>Google</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.socialButton, styles.appleButton]} 
+          onPress={() => {}}
+        >
+          <View style={styles.appleIconContainer}>
+            <FontAwesome5 name="apple" size={20} color="#000" />
+          </View>
+          <Text style={styles.socialButtonText}>Apple</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -382,14 +400,45 @@ const styles = StyleSheet.create({
   emailButton: {
     backgroundColor: '#FE902A',
   },
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    backgroundColor: '#E9EAEB',
+    marginRight: 6,
+  },
+  appleButton: {
+    backgroundColor: '#E9EAEB',
+    marginRight: 0,
+    marginLeft: 6,
+  },
   googleButton: {
     backgroundColor: '#E9EAEB',
-    borderRadius: 8,
   },
-  googleButtonText: {
+  googleLogo: {
+    width: 20,
+    height: 20,
+  },
+  appleIconContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialButtonText: {
     color: '#333',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
   buttonDisabled: {
     opacity: 0.6,
