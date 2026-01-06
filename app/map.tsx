@@ -1,3 +1,4 @@
+import { supabase } from '@/app/lib/supabase';
 import MapTypeSelector from "@/components/MapTypeSelector";
 import RestaurantDetailCard from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
@@ -7,8 +8,9 @@ import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
 import React, { useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
+import { useAuthContext } from "./providers/auth";
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -21,6 +23,7 @@ export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
   const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -28,9 +31,35 @@ export default function MapScreen() {
 
   const loading = restaurantsLoading || locationLoading;
 
+  const {session} = useAuthContext();
+
   const handleGetDirections = () => {
     if (selectedRestaurant) {
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        Alert.alert(
+          'Sign Out Failed',
+          error.message || 'Unable to sign out. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+      // If successful, the AuthProvider will automatically update the session state
+    } catch (error: any) {
+      Alert.alert(
+        'Sign Out Failed',
+        error?.message || 'An unexpected error occurred while signing out. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -93,8 +122,44 @@ export default function MapScreen() {
           isDirectionsAvailable={isDirectionsAvailable}
         />
       )}
+      {session && (
+        <TouchableOpacity 
+          style={[
+            styles.signOutButton,
+            signingOut && styles.signOutButtonDisabled
+          ]} 
+          onPress={handleSignOut}
+          disabled={signingOut}
+        >
+          {signingOut ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.signOutText}>Sign Out</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />
     </View>
   );
 }
+const styles = StyleSheet.create({
+  signOutButton: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    backgroundColor: '#FE902A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  signOutText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  signOutButtonDisabled: {
+    opacity: 0.6,
+  },
+});
