@@ -13,7 +13,6 @@ import { useAuthContext } from "./providers/auth";
 import { supabase } from '@/app/lib/supabase';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
-
 const fallbackRegion: Region = {
   latitude: 43.6532,
   longitude: -79.3832,
@@ -42,7 +41,7 @@ export default function MapScreen() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-  }
+  };
 
   const handleCloseRestaurant = () => {
     setSelectedRestaurant(null);
@@ -52,8 +51,6 @@ export default function MapScreen() {
   const handleRestaurantSelect = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
   };
-
-
 
   if (loading) {
     return (
@@ -114,7 +111,6 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-
       <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />
     </View>
   );
@@ -136,4 +132,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-

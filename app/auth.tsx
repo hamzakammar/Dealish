@@ -1,4 +1,4 @@
-import { supabase } from '@/app/lib/supabase';
+import { supabase, getAuthRedirectUrl } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -13,9 +13,13 @@ import {
   View 
 } from 'react-native';
 
-
 // Complete the OAuth session in the browser
 WebBrowser.maybeCompleteAuthSession();
+
+const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
 export default function AuthScreen() {
   const { session, isLoading } = useAuthContext();
@@ -23,6 +27,8 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   // If already logged in, redirect to map
   if (session) {
@@ -38,20 +44,40 @@ export default function AuthScreen() {
     );
   }
   const handleEmailAuth = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+    // Reset errors
+    setEmailError('');
+    setPasswordError('');
+  
+    // Validate email
+    if (!email) {
+      setEmailError('Email is required');
       return;
     }
-
+  
+    if (!validateEmail(email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+  
+    // Validate password
+    if (!password) {
+      setPasswordError('Password is required');
+      return;
+    }
+  
+    if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+  
     setLoading(true);
     try {
       if (isSignUp) {
-        // Sign up
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
         });
-
+  
         if (error) {
           Alert.alert('Error', error.message);
         } else {
@@ -61,16 +87,14 @@ export default function AuthScreen() {
           );
         }
       } else {
-        // Sign in
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
+  
         if (error) {
           Alert.alert('Error', error.message);
         }
-        // Success - session will be handled automatically by AuthProvider
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Authentication failed');
@@ -81,8 +105,8 @@ export default function AuthScreen() {
   const handleGoogleSignIn = async () => {
     try {
       // Always use the deep link scheme explicitly (not localhost)
-      const redirectUrl = 'dealish://auth/callback';
-      
+      const redirectUrl = getAuthRedirectUrl();
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -116,7 +140,7 @@ export default function AuthScreen() {
               
               if (accessToken && refreshToken) {
                 // Set the session manually
-                const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                const {error: sessionError } = await supabase.auth.setSession({
                   access_token: accessToken,
                   refresh_token: refreshToken,
                 });
@@ -133,8 +157,14 @@ export default function AuthScreen() {
           Alert.alert('Error', 'Authentication failed');
         }
       }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to sign in with Google');
+    } catch (error: unknown) {
+        let errorMessage = 'Failed to sign in with Google';
+        if (error instanceof Error && error.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string' && error) {
+          errorMessage = error;
+        }
+        Alert.alert('Error', errorMessage);
     }
   };
 
@@ -145,27 +175,51 @@ export default function AuthScreen() {
       <Text style={styles.subtitle}>Sign in to continue</Text>
 
       <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="email"
-        />
+        <View>
+            <TextInput
+            style={[
+                styles.input,
+                emailError && styles.inputError
+            ]}
+            placeholder="Email"
+            placeholderTextColor="#999"
+            value={email}
+            onChangeText={(text) => {
+                setEmail(text);
+                // Clear error when user starts typing
+                if (emailError) setEmailError(null);
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            />
+            {emailError && (
+            <Text style={styles.errorText}>{emailError}</Text>
+            )}
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#999"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete="password"
-        />
+        <View>
+            <TextInput
+            style={[
+                styles.input,
+                passwordError && styles.inputError
+            ]}
+            placeholder="Password"
+            placeholderTextColor="#999"
+            value={password}
+            onChangeText={(text) => {
+                setPassword(text);
+                // Clear error when user starts typing
+                if (passwordError) setPasswordError(null);
+            }}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="password"
+            />
+            {passwordError && (
+            <Text style={styles.errorText}>{passwordError}</Text>
+            )}
+        </View>
 
         <TouchableOpacity 
           style={[styles.button, styles.emailButton, loading && styles.buttonDisabled]} 
@@ -218,7 +272,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontFamily: 'Monrope',
+    fontFamily: 'Manrope',
     fontWeight: 'normal',
     marginTop: 99,
     marginBottom: 8,
@@ -297,5 +351,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     color: '#999',
     fontSize: 14,
+  },
+  inputError: {
+    borderColor: '#ff4444',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 8,
+    marginLeft: 4,
   },
 });

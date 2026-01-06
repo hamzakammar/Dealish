@@ -62,8 +62,7 @@ function RootLayoutNav() {
         try {
           await supabase.auth.getSession();
         } catch (error) {
-          // Silently handle errors
-        }
+          console.error('Error handling OAuth deep link in supabase.auth.getSession():', error);        }
       }
     };
 
