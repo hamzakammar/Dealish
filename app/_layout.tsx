@@ -1,5 +1,5 @@
-import { supabase } from '@/app/lib/supabase'; // ← Import from the centralized location
-import AuthProvider from '@/app/providers/auth'; // ← Remove supabase import from here
+import { supabase } from '@/app/lib/supabase'; 
+import AuthProvider from '@/app/providers/auth'; 
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';

@@ -180,7 +180,18 @@ export default function AuthScreen() {
         );
 
         if (result.type === 'success') {
-          //Supabase has automatic session handling
+            // OAuth flow completed in the browser, verify that Supabase created a session
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) {
+                console.warn('Failed to retrieve Supabase session after OAuth:', sessionError);
+                Alert.alert('Error', 'Authentication completed, but we could not verify your session. Please try again.');
+            } else if (!sessionData?.session) {
+                console.warn('No Supabase session found after successful OAuth redirect.');
+                Alert.alert('Error', 'Authentication completed, but no active session was found. Please try again.');
+            }else {
+                // Supabase has established the session; any post-login logic (navigation, etc.)
+                // should be triggered by the global auth state (e.g., AuthContext) elsewhere.
+            }
         } else if (result.type === 'cancel') {
           // User cancelled, do nothing
         } else {
