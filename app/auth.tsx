@@ -1,12 +1,14 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
-import { Redirect } from 'expo-router';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { Redirect, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     StyleSheet,
     Text,
     TextInput,
@@ -25,6 +27,7 @@ const validateEmail = (email: string) => {
 
 export default function AuthScreen() {
   const { session, isLoading } = useAuthContext();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -33,6 +36,7 @@ export default function AuthScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // If already logged in, redirect to map
   if (session) {
@@ -213,7 +217,7 @@ export default function AuthScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Take advantage of this deal</Text>
-      <Text style={styles.subtitle}>Sign in to continue</Text>
+      <Text style={styles.subtitle}>{isSignUp ? 'Sign up to continue' : 'Sign in to continue'}</Text>
 
       <View style={styles.form}>
         {rateLimitError && (
@@ -229,12 +233,11 @@ export default function AuthScreen() {
                 emailError && styles.inputError,
                 isRateLimited && styles.inputDisabled
             ]}
-            placeholder="Email"
+            placeholder="Your Email"
             placeholderTextColor="#999"
             value={email}
             onChangeText={(text) => {
                 setEmail(text);
-                // Clear error when user starts typing
                 if (emailError) setEmailError('');
             }}
             keyboardType="email-address"
@@ -248,25 +251,40 @@ export default function AuthScreen() {
         </View>
 
         <View>
-            <TextInput
-            style={[
-                styles.input,
+            <View style={[
+                styles.passwordContainer,
                 passwordError && styles.inputError,
                 isRateLimited && styles.inputDisabled
-            ]}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            value={password}
-            onChangeText={(text) => {
-                setPassword(text);
-                // Clear error when user starts typing
-                if (passwordError) setPasswordError('');
-            }}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            editable={!isRateLimited}
-            />
+            ]}>
+                <TextInput
+                style={styles.passwordInput}
+                placeholder="Your Password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={(text) => {
+                    setPassword(text);
+                    // Clear error when user starts typing
+                    if (passwordError) setPasswordError('');
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="password"
+                editable={!isRateLimited}
+                />
+                <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                    disabled={isRateLimited}
+                    accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                    accessibilityHint="Toggles password visibility"
+                >
+                    <Ionicons
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={20}
+                        color="#999"
+                    />
+                </TouchableOpacity>
+            </View>
             {passwordError && (
             <Text style={styles.errorText}>{passwordError}</Text>
             )}
@@ -280,6 +298,8 @@ export default function AuthScreen() {
           ]} 
           onPress={handleEmailAuth}
           disabled={loading || isRateLimited}
+          accessibilityLabel={isSignUp ? "Sign Up" : "Sign In"}
+          accessibilityHint={isSignUp ? "Creates a new account with your email and password" : "Signs in to your existing account"}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -290,9 +310,22 @@ export default function AuthScreen() {
           )}
         </TouchableOpacity>
 
+        {!isSignUp && (
+          <TouchableOpacity 
+            onPress={() => router.push('/reset-password')}
+            style={styles.forgotPasswordButton}
+            accessibilityLabel="Forgot Password"
+            accessibilityHint="Opens the password reset page to recover your account"
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity 
           onPress={() => setIsSignUp(!isSignUp)}
           style={styles.toggleButton}
+          accessibilityLabel={isSignUp ? "Switch to Sign In" : "Switch to Sign Up"}
+          accessibilityHint={isSignUp ? "Switches to the sign in form for existing users" : "Switches to the sign up form to create a new account"}
         >
           <Text style={styles.toggleText}>
             {isSignUp 
@@ -308,12 +341,35 @@ export default function AuthScreen() {
         <View style={styles.dividerLine} />
       </View>
 
-      <TouchableOpacity 
-        style={[styles.button, styles.googleButton]} 
-        onPress={handleGoogleSignIn}
-      >
-        <Text style={styles.googleButtonText}>Sign in with Google</Text>
-      </TouchableOpacity>
+      <View style={styles.socialButtonsContainer}>
+        <TouchableOpacity 
+          style={[styles.socialButton, styles.googleButton]} 
+          onPress={handleGoogleSignIn}
+          accessibilityLabel="Sign in with Google"
+          accessibilityHint="Opens Google sign in in your browser"
+        >
+          <Image 
+            source={require('@/assets/images/google-logo.png')} 
+            style={styles.googleLogo}
+            resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="Google logo"
+          />
+          <Text style={styles.socialButtonText}>Google</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.socialButton, styles.appleButton]} 
+          disabled={true}
+          accessibilityLabel="Sign in with Apple is not currently available"
+          accessibilityHint="Apple sign in is not currently available"
+        >
+          <View style={styles.appleIconContainer}>
+            <FontAwesome5 name="apple" size={20} color="#000" />
+          </View>
+          <Text style={styles.socialButtonText}>Apple</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -328,7 +384,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontFamily: 'Manrope',
-    fontWeight: 'normal',
+    fontWeight: 'bold',
     marginTop: 99,
     marginBottom: 8,
     textAlign: 'center',
@@ -336,7 +392,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-
+    fontFamily: 'Manrope',
+    fontWeight: '400',
     color: '#666',
     marginBottom: 40,
     textAlign: 'center',
@@ -349,7 +406,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     marginBottom: 12,
@@ -367,14 +424,45 @@ const styles = StyleSheet.create({
   emailButton: {
     backgroundColor: '#FE902A',
   },
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    backgroundColor: '#E9EAEB',
+    marginRight: 6,
+  },
+  appleButton: {
+    backgroundColor: '#E9EAEB',
+    marginRight: 0,
+    marginLeft: 6,
+  },
   googleButton: {
     backgroundColor: '#E9EAEB',
-    borderRadius: 8,
   },
-  googleButtonText: {
+  googleLogo: {
+    width: 20,
+    height: 20,
+  },
+  appleIconContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialButtonText: {
     color: '#333',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -383,6 +471,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  forgotPasswordButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  forgotPasswordText: {
+    color: '#FE902A',
+    fontSize: 14,
+    fontWeight: '500',
   },
   toggleButton: {
     marginTop: 12,
@@ -434,5 +532,28 @@ const styles = StyleSheet.create({
   inputDisabled: {
     backgroundColor: '#f5f5f5',
     opacity: 0.6,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+    margin: 0,
+  },
+  eyeIcon: {
+    paddingLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
