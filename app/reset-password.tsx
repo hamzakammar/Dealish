@@ -2,7 +2,7 @@ import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -22,7 +22,6 @@ const validateEmail = (email: string) => {
 export default function ResetPasswordScreen() {
     const { session, isLoading } = useAuthContext();
     const router = useRouter();
-    const params = useLocalSearchParams();
     const [email, setEmail] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,12 +49,6 @@ export default function ResetPasswordScreen() {
                     setHasRecoveryToken(true);
                     return;
                 }
-
-                // Check if session exists with recovery type
-                const { data: { session: currentSession } } = await supabase.auth.getSession();
-                if (currentSession?.user?.recovery) {
-                    setHasRecoveryToken(true);
-                }
             } catch (error) {
                 console.error('Error checking recovery token:', error);
             }
@@ -69,9 +62,7 @@ export default function ResetPasswordScreen() {
             if (url && (url.includes('#access_token=') || url.includes('type=recovery'))) {
                 setHasRecoveryToken(true);
                 // Parse the token and set session
-                supabase.auth.getSession().then(() => {
-                    setHasRecoveryToken(true);
-                });
+                supabase.auth.getSession();
             }
         });
 
@@ -190,6 +181,8 @@ export default function ResetPasswordScreen() {
                                     setEmailSent(false);
                                     setEmail('');
                                 }}
+                                accessibilityLabel="Send Another Email"
+                                accessibilityHint="Sends another password reset email to your address"
                             >
                                 <Text style={styles.buttonText}>Send Another Email</Text>
                             </TouchableOpacity>
@@ -226,6 +219,8 @@ export default function ResetPasswordScreen() {
                                 ]}
                                 onPress={handleSendResetEmail}
                                 disabled={loading}
+                                accessibilityLabel="Send Reset Email"
+                                accessibilityHint="Sends a password reset link to your email address"
                             >
                                 {loading ? (
                                     <ActivityIndicator color="#fff" />
@@ -239,6 +234,8 @@ export default function ResetPasswordScreen() {
                     <TouchableOpacity
                         onPress={() => router.back()}
                         style={styles.backButton}
+                        accessibilityLabel="Back to Sign In"
+                        accessibilityHint="Returns to the sign in page"
                     >
                         <Text style={styles.backText}>Back to Sign In</Text>
                     </TouchableOpacity>
@@ -257,13 +254,12 @@ export default function ResetPasswordScreen() {
 
             <View style={styles.form}>
                 <View>
-                    <View style={styles.passwordContainer}>
+                    <View style={[
+                        styles.passwordContainer,
+                        passwordError && styles.inputError,
+                    ]}>
                         <TextInput
-                            style={[
-                                styles.input,
-                                styles.passwordInput,
-                                passwordError && styles.inputError,
-                            ]}
+                            style={styles.passwordInput}
                             placeholder="New Password"
                             placeholderTextColor="#999"
                             value={newPassword}
@@ -273,11 +269,13 @@ export default function ResetPasswordScreen() {
                             }}
                             secureTextEntry={!showPassword}
                             autoCapitalize="none"
-                            autoComplete="password"
+                            autoComplete="new-password"
                         />
                         <TouchableOpacity
                             style={styles.eyeIcon}
                             onPress={() => setShowPassword(!showPassword)}
+                            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                            accessibilityHint="Toggles password visibility"
                         >
                             <Ionicons
                                 name={showPassword ? 'eye-off' : 'eye'}
@@ -292,13 +290,12 @@ export default function ResetPasswordScreen() {
                 </View>
 
                 <View>
-                    <View style={styles.passwordContainer}>
+                    <View style={[
+                        styles.passwordContainer,
+                        confirmPasswordError && styles.inputError,
+                    ]}>
                         <TextInput
-                            style={[
-                                styles.input,
-                                styles.passwordInput,
-                                confirmPasswordError && styles.inputError,
-                            ]}
+                            style={styles.passwordInput}
                             placeholder="Confirm New Password"
                             placeholderTextColor="#999"
                             value={confirmPassword}
@@ -308,11 +305,13 @@ export default function ResetPasswordScreen() {
                             }}
                             secureTextEntry={!showConfirmPassword}
                             autoCapitalize="none"
-                            autoComplete="password"
+                            autoComplete="new-password"
                         />
                         <TouchableOpacity
                             style={styles.eyeIcon}
                             onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                            accessibilityLabel={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                            accessibilityHint="Toggles confirm password visibility"
                         >
                             <Ionicons
                                 name={showConfirmPassword ? 'eye-off' : 'eye'}
@@ -334,6 +333,8 @@ export default function ResetPasswordScreen() {
                     ]}
                     onPress={handleResetPassword}
                     disabled={loading}
+                    accessibilityLabel="Reset Password"
+                    accessibilityHint="Updates your account password with the new password you entered"
                 >
                     {loading ? (
                         <ActivityIndicator color="#fff" />
@@ -364,7 +365,7 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 16,
         fontFamily: 'Manrope',
-        fontWeight: 'regular',
+        fontWeight: '400',
         color: '#666',
         marginBottom: 40,
         textAlign: 'center',
@@ -388,7 +389,7 @@ const styles = StyleSheet.create({
         width: '100%',
         paddingVertical: 16,
         paddingHorizontal: 24,
-        borderRadius: 8,
+        borderRadius: 16,
         marginBottom: 12,
         alignItems: 'center',
     },
@@ -437,8 +438,6 @@ const styles = StyleSheet.create({
     passwordInput: {
         flex: 1,
         fontSize: 16,
-        padding: 0,
-        margin: 0,
     },
     eyeIcon: {
         position: 'absolute',

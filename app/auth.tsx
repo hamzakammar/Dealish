@@ -275,6 +275,8 @@ export default function AuthScreen() {
                     style={styles.eyeIcon}
                     onPress={() => setShowPassword(!showPassword)}
                     disabled={isRateLimited}
+                    accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                    accessibilityHint="Toggles password visibility"
                 >
                     <Ionicons
                         name={showPassword ? 'eye-off' : 'eye'}
@@ -296,6 +298,8 @@ export default function AuthScreen() {
           ]} 
           onPress={handleEmailAuth}
           disabled={loading || isRateLimited}
+          accessibilityLabel={isSignUp ? "Sign Up" : "Sign In"}
+          accessibilityHint={isSignUp ? "Creates a new account with your email and password" : "Signs in to your existing account"}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -310,6 +314,8 @@ export default function AuthScreen() {
           <TouchableOpacity 
             onPress={() => router.push('/reset-password')}
             style={styles.forgotPasswordButton}
+            accessibilityLabel="Forgot Password"
+            accessibilityHint="Opens the password reset page to recover your account"
           >
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
@@ -318,6 +324,8 @@ export default function AuthScreen() {
         <TouchableOpacity 
           onPress={() => setIsSignUp(!isSignUp)}
           style={styles.toggleButton}
+          accessibilityLabel={isSignUp ? "Switch to Sign In" : "Switch to Sign Up"}
+          accessibilityHint={isSignUp ? "Switches to the sign in form for existing users" : "Switches to the sign up form to create a new account"}
         >
           <Text style={styles.toggleText}>
             {isSignUp 
@@ -337,18 +345,24 @@ export default function AuthScreen() {
         <TouchableOpacity 
           style={[styles.socialButton, styles.googleButton]} 
           onPress={handleGoogleSignIn}
+          accessibilityLabel="Sign in with Google"
+          accessibilityHint="Opens Google sign in in your browser"
         >
           <Image 
             source={require('@/assets/images/google-logo.png')} 
             style={styles.googleLogo}
             resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="Google logo"
           />
           <Text style={styles.socialButtonText}>Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.socialButton, styles.appleButton]} 
-          onPress={() => {}}
+          disabled={true}
+          accessibilityLabel="Sign in with Apple is not currently available"
+          accessibilityHint="Apple sign in is not currently available"
         >
           <View style={styles.appleIconContainer}>
             <FontAwesome5 name="apple" size={20} color="#000" />
@@ -379,7 +393,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     fontFamily: 'Manrope',
-    fontWeight: 'regular',
+    fontWeight: '400',
     color: '#666',
     marginBottom: 40,
     textAlign: 'center',
