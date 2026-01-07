@@ -2,7 +2,7 @@ import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
@@ -27,6 +27,7 @@ const validateEmail = (email: string) => {
 
 export default function AuthScreen() {
   const { session, isLoading } = useAuthContext();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -305,6 +306,15 @@ export default function AuthScreen() {
           )}
         </TouchableOpacity>
 
+        {!isSignUp && (
+          <TouchableOpacity 
+            onPress={() => router.push('/reset-password')}
+            style={styles.forgotPasswordButton}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity 
           onPress={() => setIsSignUp(!isSignUp)}
           style={styles.toggleButton}
@@ -447,6 +457,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  forgotPasswordButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  forgotPasswordText: {
+    color: '#FE902A',
+    fontSize: 14,
+    fontWeight: '500',
   },
   toggleButton: {
     marginTop: 12,
