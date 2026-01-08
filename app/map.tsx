@@ -90,6 +90,15 @@ export default function MapScreen() {
         initialRegion={region ?? fallbackRegion}
         showsMyLocationButton={true}
         mapType={mapType}
+        onPress={(e) => {
+          // Close restaurant card when tapping on map (not on markers)
+          if (e.nativeEvent.action === 'marker-press') {
+            return; // Don't close if tapping a marker
+          }
+          if (selectedRestaurant) {
+            handleCloseRestaurant();
+          }
+        }}
       >
         {userLocation && <UserLocationMarker location={userLocation} />}
 
@@ -115,12 +124,21 @@ export default function MapScreen() {
       </MapView>
 
       {selectedRestaurant && (
-        <RestaurantDetailCard
-          restaurant={selectedRestaurant}
-          onClose={handleCloseRestaurant}
-          onGetDirections={handleGetDirections}
-          isDirectionsAvailable={isDirectionsAvailable}
-        />
+        <>
+          {/* Overlay to close card when tapping outside - must be behind the card */}
+          <TouchableOpacity
+            style={styles.mapOverlay}
+            activeOpacity={1}
+            onPress={handleCloseRestaurant}
+          />
+          <RestaurantDetailCard
+            restaurant={selectedRestaurant}
+            onClose={handleCloseRestaurant}
+            onGetDirections={handleGetDirections}
+            isDirectionsAvailable={isDirectionsAvailable}
+            userLocation={userLocation}
+          />
+        </>
       )}
       {session && (
         <TouchableOpacity 
@@ -144,6 +162,16 @@ export default function MapScreen() {
   );
 }
 const styles = StyleSheet.create({
+  mapOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 1,
+    // This overlay is behind the card, so taps on the card won't reach here
+  },
   signOutButton: {
     position: 'absolute',
     top: 50,

@@ -1,12 +1,13 @@
 import DealCard from "@/components/DealCard";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
-import { Restaurant } from "@/types/restaurant";
+import { Restaurant, UserLocation } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   Animated,
   Image,
+  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -36,21 +37,73 @@ type RestaurantDetailCardProps = {
   onClose: () => void;
   onGetDirections: () => void;
   isDirectionsAvailable?: boolean;
+  userLocation?: UserLocation | null;
 };
+
+// Calculate distance between two coordinates using Haversine formula
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in kilometers
+  return distance;
+}
+
+// Format distance for display
+function formatDistance(distanceKm: number): string {
+  if (distanceKm < 1) {
+    return `${Math.round(distanceKm * 1000)}m`;
+  } else if (distanceKm < 10) {
+    return `${distanceKm.toFixed(1)}km`;
+  } else {
+    return `${Math.round(distanceKm)}km`;
+  }
+}
 
 export default function RestaurantDetailCard({
   restaurant,
   onClose,
   onGetDirections,
   isDirectionsAvailable = true,
+  userLocation,
 }: RestaurantDetailCardProps) {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
+
+  // Calculate distance if user location is available
+  const distance = useMemo(() => {
+    if (!userLocation) return null;
+    const dist = calculateDistance(
+      userLocation.lat,
+      userLocation.lng,
+      restaurant.lat,
+      restaurant.lng
+    );
+    return formatDistance(dist);
+  }, [userLocation, restaurant.lat, restaurant.lng]);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
   const closingRestaurantIdRef = useRef<string | null>(null);
+  const lastDragY = useRef(0);
+  const isDragging = useRef(false);
 
   useEffect(() => {
     // Reset animation when restaurant changes
     slideAnim.setValue(0);
+    dragY.setValue(0);
+    lastDragY.current = 0;
+    isDragging.current = false;
     closingRestaurantIdRef.current = null;
     Animated.spring(slideAnim, {
       toValue: 1,
@@ -59,6 +112,63 @@ export default function RestaurantDetailCard({
       friction: SPRING_ANIMATION_FRICTION,
     }).start();
   }, [restaurant.id]);
+
+  // Pan responder for drag gesture on the handle/header area
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => {
+        // Always allow starting the pan responder on the draggable area
+        return true;
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond if moving down significantly (swiping down to close)
+        return gestureState.dy > 5 && Math.abs(gestureState.dx) < 50;
+      },
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        dragY.setOffset(lastDragY.current);
+        dragY.setValue(0);
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Only allow dragging down (positive dy)
+        if (gestureState.dy > 0) {
+          dragY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        isDragging.current = false;
+        dragY.flattenOffset();
+
+        // If dragged down more than 100px or fast swipe down, close the card
+        const threshold = 100;
+        if (gestureState.dy > threshold || gestureState.vy > 0.5) {
+          // Close the card
+          closingRestaurantIdRef.current = restaurant.id;
+          Animated.timing(dragY, {
+            toValue: CARD_ANIMATION_OFFSET,
+            duration: CLOSE_ANIMATION_DURATION_MS,
+            useNativeDriver: true,
+          }).start(() => {
+            dragY.setValue(0);
+            lastDragY.current = 0;
+            if (closingRestaurantIdRef.current === restaurant.id) {
+              handleClose();
+            }
+          });
+        } else {
+          // Snap back to original position
+          Animated.spring(dragY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+          }).start(() => {
+            lastDragY.current = 0;
+          });
+        }
+      },
+    })
+  ).current;
 
   const handleClose = () => {
     // Store the restaurant ID when close animation starts
@@ -76,10 +186,13 @@ export default function RestaurantDetailCard({
     });
   };
 
-  const translateY = slideAnim.interpolate({
+  const baseTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [CARD_ANIMATION_OFFSET, 0],
   });
+
+  // Combine base animation with drag gesture
+  const translateY = Animated.add(baseTranslateY, dragY);
 
   return (
     <Animated.View
@@ -89,10 +202,17 @@ export default function RestaurantDetailCard({
           transform: [{ translateY }],
         },
       ]}
+      pointerEvents="box-none"
     >
-      <View style={styles.dragHandle} />
+      {/* Draggable area: handle + header */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={styles.draggableArea}
+        pointerEvents="box-none"
+      >
+        <View style={styles.dragHandle} />
 
-      <View style={styles.header}>
+        <View style={styles.header} pointerEvents="auto">
           <View style={styles.headerMain}>
             <View style={styles.logoContainer}>
               {(restaurant.logo_url || restaurant.image_url) ? (
@@ -115,49 +235,60 @@ export default function RestaurantDetailCard({
                   <Text style={styles.addressText}>{restaurant.address}</Text>
                 </View>
               )}
+              {distance && (
+                <View style={styles.distanceRow}>
+                  <AntDesign name="environment" size={14} color="#FE902A" />
+                  <Text style={styles.distanceText}>{distance} away</Text>
+                </View>
+              )}
             </View>
           </View>
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+          <TouchableOpacity 
+            style={styles.closeButton} 
+            onPress={handleClose}
+          >
             <AntDesign name="close" size={20} color="#333" />
           </TouchableOpacity>
         </View>
+      </Animated.View>
       
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        pointerEvents="auto"
       >
-        {restaurant.description && (
-          <View style={styles.section}>
-            <Text style={styles.description}>{restaurant.description}</Text>
-          </View>
-        )}
-
-        {restaurant.phone && (
-          <View style={styles.infoRow}>
-            <AntDesign name="phone" size={16} color="#666" />
-            <Text style={styles.infoText}>{restaurant.phone}</Text>
-          </View>
-        )}
-
-        <View style={styles.dealsSection}>
-          <Text style={styles.sectionTitle}>Available Deals</Text>
-          {dealsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#FE902A" />
-            </View>
-          ) : deals.length > 0 ? (
-            deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
-          ) : (
-            <View style={styles.emptyState}>
-              <AntDesign name="inbox" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No deals available</Text>
+          {restaurant.description && (
+            <View style={styles.section}>
+              <Text style={styles.description}>{restaurant.description}</Text>
             </View>
           )}
-        </View>
+
+          {restaurant.phone && (
+            <View style={styles.infoRow}>
+              <AntDesign name="phone" size={16} color="#666" />
+              <Text style={styles.infoText}>{restaurant.phone}</Text>
+            </View>
+          )}
+
+          <View style={styles.dealsSection}>
+            <Text style={styles.sectionTitle}>Available Deals</Text>
+            {dealsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FE902A" />
+              </View>
+            ) : deals.length > 0 ? (
+              deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
+            ) : (
+              <View style={styles.emptyState}>
+                <AntDesign name="inbox" size={48} color="#ccc" />
+                <Text style={styles.emptyText}>No deals available</Text>
+              </View>
+            )}
+          </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={styles.footer} pointerEvents="auto">
         {isDirectionsAvailable && (
           <TouchableOpacity
             style={styles.directionsButton}
@@ -201,7 +332,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
+    zIndex: 2, // Above the overlay
     },
+  draggableArea: {
+    // Wraps drag handle and header for drag gesture
+  },
   dragHandle: {
     width: 40,
     height: 4,
@@ -259,6 +394,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     flex: 1,
+  },
+  distanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 4,
+  },
+  distanceText: {
+    fontSize: 13,
+    color: "#FE902A",
+    fontWeight: "600",
   },
   closeButton: {
     padding: 4,

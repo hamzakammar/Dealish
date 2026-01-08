@@ -1,5 +1,5 @@
 import { Deal } from "@/types/restaurant";
-import AntDesign from "@expo/vector-icons/AntDesign";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -8,14 +8,60 @@ type DealCardProps = {
 };
 
 export default function DealCard({ deal }: DealCardProps) {
-  const formatDate = (dateString?: string) => {
+  const formatTime = (dateString?: string) => {
     if (!dateString) return null;
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+    const timeString = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
     });
+    // Format "5:00 PM" -> "5PM" or "12:00 AM" -> "12AM"
+    return timeString.replace(/:\d{2}\s/, ''); // Remove ":00 " or ":30 " etc.
+  };
+
+  const isToday = (dateString?: string) => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  const formatTimeRange = () => {
+    if (!deal.start_at && !deal.end_at) return null;
+    
+    const startTime = deal.start_at ? formatTime(deal.start_at) : null;
+    const endTime = deal.end_at ? formatTime(deal.end_at) : null;
+    
+    // Check if both start and end are today
+    const bothToday = deal.start_at && deal.end_at && 
+                      isToday(deal.start_at) && isToday(deal.end_at);
+    
+    if (bothToday) {
+      return `Today ${startTime} - ${endTime}`;
+    }
+    
+    // If only start is today, or if we have both but only one is today
+    if (deal.start_at && isToday(deal.start_at) && endTime) {
+      return `Today ${startTime} - ${endTime}`;
+    }
+    
+    // Otherwise show both times separately or individually
+    if (startTime && endTime) {
+      return `${startTime} - ${endTime}`;
+    }
+    
+    if (startTime) {
+      return `Starts: ${startTime}`;
+    }
+    
+    if (endTime) {
+      return `Ends: ${endTime}`;
+    }
+    
+    return null;
   };
 
   const getDealStatus = (): 'active' | 'upcoming' | 'expired' => {
@@ -67,24 +113,14 @@ export default function DealCard({ deal }: DealCardProps) {
         </View>
       )}
 
-      {(deal.start_at || deal.end_at) && (
+      {formatTimeRange() && (
         <View style={styles.dateContainer}>
-          {deal.start_at && (
-            <View style={styles.dateRow}>
-              <AntDesign name="calendar" size={12} color="#666" />
-              <Text style={styles.dateText}>
-                Starts: {formatDate(deal.start_at)}
-              </Text>
-            </View>
-          )}
-          {deal.end_at && (
-            <View style={styles.dateRow}>
-              <AntDesign name="calendar" size={12} color="#666" />
-              <Text style={styles.dateText}>
-                Ends: {formatDate(deal.end_at)}
-              </Text>
-            </View>
-          )}
+          <View style={styles.dateRow}>
+            <Ionicons name="time-outline" size={12} color="#666" />
+            <Text style={styles.dateText}>
+              {formatTimeRange()}
+            </Text>
+          </View>
         </View>
       )}
     </View>
