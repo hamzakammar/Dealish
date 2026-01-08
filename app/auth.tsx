@@ -36,6 +36,7 @@ export default function AuthScreen() {
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const redirectingRef = useRef(false);
 
   // ALL hooks must be called BEFORE any conditional returns, in consistent order
   
@@ -53,14 +54,16 @@ export default function AuthScreen() {
     checkLimit();
   }, []);
 
-  // Second useEffect: If already logged in, redirect to map (only redirect when session appears)
+  // Second useEffect: If already logged in, redirect to map (only redirect once)
   // Must be called consistently on every render, BEFORE any returns
   useEffect(() => {
     // Always declare timeoutId at the top for consistent hook structure
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // Only redirect if we're loaded and have a session
-    if (!isLoading && session) {
+    // Only redirect if we're loaded, have a session, and haven't already initiated redirect
+    if (!isLoading && session && !redirectingRef.current) {
+      redirectingRef.current = true;
+      
       // Use setTimeout with 0 delay to ensure redirect happens after render completes
       timeoutId = setTimeout(() => {
         router.replace('/map');
