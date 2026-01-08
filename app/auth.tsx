@@ -242,18 +242,58 @@ export default function AuthScreen() {
           redirectUrl
         );
 
-        if (result.type === 'success') {
-            // OAuth flow completed in the browser, verify that Supabase created a session
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError) {
-                console.warn('Failed to retrieve Supabase session after OAuth:', sessionError);
-                Alert.alert('Error', 'Authentication completed, but we could not verify your session. Please try again.');
-            } else if (!sessionData?.session) {
-                console.warn('No Supabase session found after successful OAuth redirect.');
-                Alert.alert('Error', 'Authentication completed, but no active session was found. Please try again.');
-            }else {
-                // Supabase has established the session; any post-login logic (navigation, etc.)
-                // should be triggered by the global auth state (e.g., AuthContext) elsewhere.
+        if (result.type === 'success' && result.url) {
+            // OAuth flow completed in the browser
+            // On native with skipBrowserRedirect, we need to manually process the callback URL
+            // The URL contains the access_token and refresh_token that Supabase needs
+            try {
+                // Parse the callback URL to extract the tokens
+                const callbackUrl = result.url;
+                console.log('OAuth callback URL:', callbackUrl);
+                
+                // On native with skipBrowserRedirect, Supabase doesn't automatically process the callback URL
+                // We need to manually extract tokens from the URL hash and set the session
+                const hashStart = callbackUrl.indexOf('#');
+                if (hashStart === -1) {
+                    console.warn('No hash fragment in OAuth callback URL');
+                    Alert.alert('Error', 'Invalid OAuth callback URL');
+                    return;
+                }
+                
+                const hash = callbackUrl.substring(hashStart + 1);
+                const params = new URLSearchParams(hash);
+                
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                
+                if (!accessToken || !refreshToken) {
+                    console.warn('Missing tokens in OAuth callback URL', { accessToken: !!accessToken, refreshToken: !!refreshToken });
+                    Alert.alert('Error', 'Invalid OAuth callback. Missing authentication tokens.');
+                    return;
+                }
+                
+                // Manually set the session using the tokens from the URL
+                const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                });
+                
+                if (sessionError) {
+                    console.error('Error setting session from OAuth callback:', sessionError);
+                    Alert.alert('Error', `Failed to create session: ${sessionError.message}`);
+                    return;
+                }
+                
+                if (sessionData?.session) {
+                    console.log('OAuth authentication successful - session created');
+                    // Session is set, AuthProvider will handle navigation automatically
+                } else {
+                    console.warn('No session data returned after setSession');
+                    Alert.alert('Error', 'Failed to create session. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error processing OAuth callback:', error);
+                Alert.alert('Error', 'Failed to complete authentication. Please try again.');
             }
         } else if (result.type === 'cancel') {
           // User cancelled, do nothing

@@ -58,12 +58,35 @@ function RootLayoutNav() {
       const { url } = event;
       
       // Check if this is an auth callback
-      if (url.includes('auth/callback') || url.includes('#access_token=') || url.includes('?code=')) {
-        // Supabase should automatically handle the session via detectSessionInUrl
+      if (url.includes('auth/callback') || url.includes('#access_token=') || url.includes('?code=') || url.includes('access_token=')) {
+        // On native, Supabase might not automatically detect session from deep links
+        // Try to manually process the callback URL
         try {
-          await supabase.auth.getSession();
+          // Extract the hash or query params from the URL
+          const urlObj = new URL(url);
+          const hash = urlObj.hash.substring(1); // Remove the #
+          const params = new URLSearchParams(hash || urlObj.search);
+          
+          // Check if we have access_token in the URL
+          const accessToken = params.get('access_token');
+          
+          if (accessToken) {
+            // Supabase should detect this automatically, but force a session refresh
+            // Wait a moment for Supabase to process
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await supabase.auth.getSession();
+          } else {
+            // Just refresh the session
+            await supabase.auth.getSession();
+          }
         } catch (error) {
-          console.error('Error handling OAuth deep link in supabase.auth.getSession():', error);
+          console.error('Error handling OAuth deep link:', error);
+          // Fallback: just try to get the session
+          try {
+            await supabase.auth.getSession();
+          } catch (sessionError) {
+            console.error('Error getting session after deep link:', sessionError);
+          }
         }
       }
     };
