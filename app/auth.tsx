@@ -2,14 +2,13 @@ import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { Redirect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Image,
-    StyleSheet,
+    Image, Platform, StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -38,12 +37,9 @@ export default function AuthScreen() {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // If already logged in, redirect to map
-  if (session) {
-    return <Redirect href="/map" />;
-  }
-
-  // Check rate limit on mount
+  // ALL hooks must be called BEFORE any conditional returns, in consistent order
+  
+  // First useEffect: Check rate limit on mount
   useEffect(() => {
     const checkLimit = async () => {
       const { allowed, remainingTime } = await checkRateLimit();
@@ -57,8 +53,40 @@ export default function AuthScreen() {
     checkLimit();
   }, []);
 
-  // Show loading state
+  // Second useEffect: If already logged in, redirect to map (only redirect when session appears)
+  // Must be called consistently on every render, BEFORE any returns
+  useEffect(() => {
+    // Always declare timeoutId at the top for consistent hook structure
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    // Only redirect if we're loaded and have a session
+    if (!isLoading && session) {
+      // Use setTimeout with 0 delay to ensure redirect happens after render completes
+      timeoutId = setTimeout(() => {
+        router.replace('/map');
+      }, 0);
+    }
+
+    // ALWAYS return cleanup function for consistent hook structure
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [session, isLoading, router]);
+
+  // NOW we can do conditional returns - but show loading instead of null to keep component mounted
+  // Show loading state or if already logged in (during redirect)
   if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#FE902A" />
+      </View>
+    );
+  }
+
+  // If we have a session, show loading while redirecting (don't return null to keep hooks consistent)
+  if (session) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#FE902A" />
@@ -159,15 +187,42 @@ export default function AuthScreen() {
     }
   };
   const handleGoogleSignIn = async () => {
+    // Only allow OAuth in client-side browser/native environments (not during static export)
+    if (typeof window === 'undefined') {
+      Alert.alert('Error', 'OAuth is not available in this environment.');
+      return;
+    }
+
     try {
-      // Always use the deep link scheme explicitly (not localhost)
-      const redirectUrl = getAuthRedirectUrl();
+      // On native, skip browser redirect and handle manually with WebBrowser
+      // On web, let Supabase handle it
+      const isNative = Platform.OS !== 'web';
+
+      let redirectUrl: string;
+      try {
+        // Only generate redirect URL in client-side contexts
+        if (isNative) {
+          redirectUrl = getAuthRedirectUrl();
+        } else {
+          // On web, use current origin
+          redirectUrl = window.location.origin;
+        }
+      } catch (err) {
+        // If we're in a server environment, show error
+        Alert.alert('Error', 'OAuth is not available in this environment.');
+        return;
+      }
+
+      if (!redirectUrl) {
+        Alert.alert('Error', 'Could not determine redirect URL. Please try again.');
+        return;
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
+          skipBrowserRedirect: isNative, // Skip redirect on native, use WebBrowser instead
         },
       });
 
@@ -176,8 +231,9 @@ export default function AuthScreen() {
         return;
       }
 
-      // Open the OAuth URL in browser
-      if (data.url) {
+      // On native, use WebBrowser to handle OAuth flow
+      // On web, Supabase will handle the redirect automatically
+      if (isNative && data.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUrl
@@ -200,6 +256,14 @@ export default function AuthScreen() {
           // User cancelled, do nothing
         } else {
           Alert.alert('Error', 'Authentication failed');
+        }
+      } else if (!isNative && data.url) {
+        // On web, Supabase handles the redirect automatically
+        // Navigate to the OAuth URL if window is available (not during static export)
+        if (typeof window !== 'undefined') {
+          window.location.href = data.url;
+        } else {
+          Alert.alert('Error', 'OAuth is not available in this environment. Please use a browser.');
         }
       }
     } catch (error: unknown) {

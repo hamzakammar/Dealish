@@ -21,7 +21,8 @@ export function useAuthContext() {
 }
 
 export default function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<Session | undefined | null>()
+  // ALL hooks MUST be called unconditionally at the top level
+  const [session, setSession] = useState<Session | undefined | null>(undefined)
   const [profile, setProfile] = useState<Profile | null | undefined>(null)
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true)
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(false)
@@ -29,42 +30,85 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   // Use ref to track if component is mounted and the current session being fetched
   const isMountedRef = useRef(true)
   const currentFetchSessionIdRef = useRef<string | null>(null)
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
 
   // Combined loading state - true if either session or profile is loading
   const isLoading = isLoadingSession || isLoadingProfile
 
   // Fetch the session once, and subscribe to auth state changes
+  // This effect MUST always run to maintain hook consistency
   useEffect(() => {
-    const fetchSession = async () => {
-      setIsLoadingSession(true)
+    let isActive = true
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
 
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-      
-      if (!isMountedRef.current) return
-      
-      if (error) {
-        console.error('Error fetching auth session:', error)
+    // Always initialize subscription synchronously to maintain hook consistency
+    // This ensures the hook structure is always the same, even if it fails
+    const initializeSubscription = () => {
+      try {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (isActive && isMountedRef.current) {
+            setSession(session)
+          }
+        })
+        subscriptionRef.current = subscription
+      } catch (subErr) {
+        console.error('Error setting up auth state change subscription:', subErr)
+        subscriptionRef.current = null
       }
-      setSession(session)
-      setIsLoadingSession(false)
     }
 
-    fetchSession()
+    // Fetch session asynchronously
+    const fetchSession = async () => {
+      if (!isActive) return
+      
+      try {
+        setIsLoadingSession(true)
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMountedRef.current) {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+        
+        if (!isActive || !isMountedRef.current) return
+        
+        if (error) {
+          console.error('Error fetching auth session:', error)
+        }
         setSession(session)
+        setIsLoadingSession(false)
+      } catch (err) {
+        if (!isActive || !isMountedRef.current) return
+        console.error('Error fetching auth session:', err)
+        setIsLoadingSession(false)
       }
-    })
+    }
 
-    // Cleanup subscription on unmount
+    // Initialize subscription immediately (synchronously)
+    initializeSubscription()
+
+    // Fetch session after a tiny delay to ensure mount is complete
+    timeoutId = setTimeout(() => {
+      if (isActive) {
+        fetchSession()
+      }
+    }, 0)
+
+    // Always return cleanup function for consistent hook structure
     return () => {
-      subscription.unsubscribe()
+      isActive = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      if (subscriptionRef.current) {
+        try {
+          subscriptionRef.current.unsubscribe()
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+        subscriptionRef.current = null
+      }
       isMountedRef.current = false
     }
   }, [])

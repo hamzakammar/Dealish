@@ -1,5 +1,5 @@
-import { supabase } from '@/app/lib/supabase'; 
-import AuthProvider from '@/app/providers/auth'; 
+import { supabase } from '@/app/lib/supabase';
+import AuthProvider from '@/app/providers/auth';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -41,10 +41,8 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
-
+  // Always render RootLayoutNav to maintain hook consistency
+  // The loading state is handled inside RootLayoutNav if needed
   return <RootLayoutNav />;
 }
 
@@ -52,6 +50,9 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
+    // Always declare subscription at the top for consistent hook structure
+    let subscription: { remove: () => void } | null = null;
+
     // Handle OAuth callbacks
     const handleDeepLink = async (event: { url: string }) => {
       const { url } = event;
@@ -62,28 +63,58 @@ function RootLayoutNav() {
         try {
           await supabase.auth.getSession();
         } catch (error) {
-          console.error('Error handling OAuth deep link in supabase.auth.getSession():', error);        }
+          console.error('Error handling OAuth deep link in supabase.auth.getSession():', error);
+        }
       }
     };
 
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
+    // Initialize linking - must always execute to maintain hook consistency
+    // Even if it fails, we still need the cleanup function structure to be consistent
+    const initializeLinking = () => {
+      try {
+        // Try to set up the event listener first
+        subscription = Linking.addEventListener('url', handleDeepLink);
+        
+        // Then check for initial URL
+        Linking.getInitialURL().then((url) => {
+          if (url) {
+            handleDeepLink({ url });
+          }
+        }).catch(() => {
+          // Ignore errors
+        });
+      } catch (err) {
+        // If addEventListener fails, subscription remains null
+        // This is fine - the cleanup will handle it
+        console.error('Error setting up deep linking:', err);
       }
-    });
+    };
 
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-    return () => subscription.remove();
+    // Initialize linking
+    initializeLinking();
+
+    // ALWAYS return cleanup function - this is critical for hook consistency
+    // React expects this cleanup function to exist on every render
+    return () => {
+      if (subscription) {
+        try {
+          subscription.remove();
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+      }
+      subscription = null;
+    };
   }, []);
   
   return (
     <AuthProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="map" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          {/* <Stack.Screen name="reset-password" options={{ headerShown: false }} /> */}
         </Stack>
       </ThemeProvider>
     </AuthProvider>

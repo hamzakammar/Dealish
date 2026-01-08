@@ -1,4 +1,5 @@
 import { supabase } from '@/app/lib/supabase';
+import { useAuthContext } from "@/app/providers/auth";
 import MapTypeSelector from "@/components/MapTypeSelector";
 import RestaurantDetailCard from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
@@ -10,7 +11,6 @@ import { MapType, Restaurant } from "@/types/restaurant";
 import React, { useRef, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
-import { useAuthContext } from "./providers/auth";
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
