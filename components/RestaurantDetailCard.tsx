@@ -264,13 +264,6 @@ export default function RestaurantDetailCard({
             </View>
           )}
 
-          {restaurant.phone && (
-            <View style={styles.infoRow}>
-              <AntDesign name="phone" size={16} color="#666" />
-              <Text style={styles.infoText}>{restaurant.phone}</Text>
-            </View>
-          )}
-
           <View style={styles.dealsSection}>
             <Text style={styles.sectionTitle}>Available Deals</Text>
             {dealsLoading ? (
