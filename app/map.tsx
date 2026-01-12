@@ -1,15 +1,15 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from "@/app/providers/auth";
+import RestaurantList from "@/components/listView";
 import MapTypeSelector from "@/components/MapTypeSelector";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
-import RestaurantList from "@/components/listView";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
 import { useDirections } from "@/hooks/useDirections";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
 
@@ -35,7 +35,7 @@ export default function MapScreen() {
 
   const loading = restaurantsLoading || locationLoading;
 
-  const {session} = useAuthContext();
+  const { session } = useAuthContext();
 
   const handleGetDirections = () => {
     if (selectedRestaurant) {
@@ -48,7 +48,7 @@ export default function MapScreen() {
     setSigningOut(true);
     try {
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         Alert.alert(
           'Sign Out Failed',
@@ -156,12 +156,7 @@ export default function MapScreen() {
 
       {selectedRestaurant && (
         <>
-          {/* Overlay to close card when tapping outside - must be behind the card */}
-          <TouchableOpacity
-            style={styles.mapOverlay}
-            activeOpacity={1}
-            onPress={() => restaurantCardRef.current?.closeWithAnimation()}
-          />
+
           <RestaurantDetailCard
             ref={restaurantCardRef}
             restaurant={selectedRestaurant}
@@ -173,11 +168,11 @@ export default function MapScreen() {
         </>
       )}
       {session && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.signOutButton,
             signingOut && styles.signOutButtonDisabled
-          ]} 
+          ]}
           onPress={handleSignOut}
           disabled={signingOut}
         >
@@ -195,16 +190,7 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  mapOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    zIndex: 1,
-    // This overlay is behind the card, so taps on the card won't reach here
-  },
+
   signOutButton: {
     position: 'absolute',
     top: 50,
