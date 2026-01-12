@@ -8,7 +8,7 @@ import { useDirections } from "@/hooks/useDirections";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
 
@@ -25,6 +25,7 @@ export default function MapScreen() {
   const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [isShowingDirections, setIsShowingDirections] = useState(false);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -36,6 +37,7 @@ export default function MapScreen() {
 
   const handleGetDirections = () => {
     if (selectedRestaurant) {
+      setIsShowingDirections(true);
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
     }
   };
@@ -66,12 +68,19 @@ export default function MapScreen() {
 
   const handleCloseRestaurant = () => {
     setSelectedRestaurant(null);
+    setIsShowingDirections(false);
     clearRoute();
   };
 
   const handleRestaurantSelect = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
   };
+
+    useEffect(() => {
+    if (isShowingDirections && selectedRestaurant && userLocation) {
+      getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
+    }
+  }, [userLocation, isShowingDirections, selectedRestaurant]);
 
   if (loading) {
     return (

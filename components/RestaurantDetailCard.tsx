@@ -1,22 +1,22 @@
+import { supabase } from "@/app/lib/supabase";
 import DealCard from "@/components/DealCard";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  PanResponder,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View
+    ActivityIndicator,
+    Animated,
+    Image,
+    PanResponder,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View
 } from "react-native";
-import { supabase } from "@/app/lib/supabase";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
