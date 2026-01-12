@@ -2,6 +2,7 @@ import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from "@/app/providers/auth";
 import MapTypeSelector from "@/components/MapTypeSelector";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
+import RestaurantList from "@/components/listView";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
 import { useDirections } from "@/hooks/useDirections";
@@ -26,6 +27,7 @@ export default function MapScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [isShowingDirections, setIsShowingDirections] = useState(false);
+  const [viewMode, setViewMode] = useState<"map" | "list">("map");
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -76,7 +78,7 @@ export default function MapScreen() {
     setSelectedRestaurant(restaurant);
   };
 
-    useEffect(() => {
+  useEffect(() => {
     if (isShowingDirections && selectedRestaurant && userLocation) {
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
     }
@@ -92,47 +94,65 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <MapView
-        ref={(r) => {
-          mapRef.current = r;
-        }}
-        style={{ flex: 1 }}
-        initialRegion={region ?? fallbackRegion}
-        showsMyLocationButton={true}
-        mapType={mapType}
-        onPress={(e) => {
-          // Close restaurant card when tapping on map (not on markers)
-          if (e.nativeEvent.action === 'marker-press') {
-            return; // Don't close if tapping a marker
-          }
-          if (selectedRestaurant) {
-            // Use the animated close method
-            restaurantCardRef.current?.closeWithAnimation();
-          }
-        }}
-      >
-        {userLocation && <UserLocationMarker location={userLocation} />}
+      {viewMode === "map" ? (
+        <MapView
+          ref={(r) => {
+            mapRef.current = r;
+          }}
+          style={{ flex: 1 }}
+          initialRegion={region ?? fallbackRegion}
+          showsMyLocationButton={true}
+          mapType={mapType}
+          onPress={(e) => {
+            // Close restaurant card when tapping on map (not on markers)
+            if (e.nativeEvent.action === 'marker-press') {
+              return; // Don't close if tapping a marker
+            }
+            if (selectedRestaurant) {
+              // Use the animated close method
+              restaurantCardRef.current?.closeWithAnimation();
+            }
+          }}
+        >
+          {userLocation && <UserLocationMarker location={userLocation} />}
 
-        {restaurants.map((r) => {
-          const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
-          return (
-            <RestaurantMarker
-              key={r.id}
-              restaurant={r}
-              isSelected={isSelected}
-              onPress={handleRestaurantSelect}
+          {restaurants.map((r) => {
+            const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
+            return (
+              <RestaurantMarker
+                key={r.id}
+                restaurant={r}
+                isSelected={isSelected}
+                onPress={handleRestaurantSelect}
+              />
+            );
+          })}
+
+          {routeCoordinates.length > 0 && (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor="#FE902A"
+              strokeWidth={4}
             />
-          );
-        })}
+          )}
+        </MapView>
+      ) : (
+        <RestaurantList
+          restaurants={restaurants}
+          onRestaurantPress={handleRestaurantSelect}
+          selectedRestaurant={selectedRestaurant}
+        />
+      )}
 
-        {routeCoordinates.length > 0 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="#FE902A"
-            strokeWidth={4}
-          />
-        )}
-      </MapView>
+      {/* View Mode Toggle Button */}
+      <TouchableOpacity
+        style={styles.viewToggleButton}
+        onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
+      >
+        <Text style={styles.viewToggleText}>
+          {viewMode === "map" ? "📋 List" : "🗺️ Map"}
+        </Text>
+      </TouchableOpacity>
 
       {selectedRestaurant && (
         <>
@@ -169,10 +189,11 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />
+      {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />}
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   mapOverlay: {
     position: 'absolute',
@@ -201,5 +222,20 @@ const styles = StyleSheet.create({
   },
   signOutButtonDisabled: {
     opacity: 0.6,
+  },
+  viewToggleButton: {
+    position: 'absolute',
+    top: 50,
+    left: 16,
+    backgroundColor: '#FE902A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  viewToggleText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
