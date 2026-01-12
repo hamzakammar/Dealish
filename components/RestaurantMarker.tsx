@@ -1,6 +1,7 @@
-import { Restaurant } from "@/types/restaurant";
+import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
+import { Deal, Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Marker } from "react-native-maps";
 
@@ -10,34 +11,75 @@ type RestaurantMarkerProps = {
   onPress: (restaurant: Restaurant) => void;
 };
 
+// Helper function to extract deal info (percentage or dollar amount) from deal title/description
+function extractDealInfo(deal: Deal | null): string | null {
+  if (!deal) return null;
+  
+  const text = `${deal.title} ${deal.description || ''}`.toLowerCase();
+  
+  // Try to extract percentage (e.g., "50%", "50 percent")
+  const percentMatch = text.match(/(\d+)%|(\d+)\s*percent/);
+  if (percentMatch) {
+    const percentage = percentMatch[1] || percentMatch[2];
+    return `${percentage}%`;
+  }
+  
+  // Try to extract dollar amount (e.g., "$10", "10$", "$10 off", "save $10")
+  const dollarMatch = text.match(/\$(\d+)|(\d+)\$|(\d+)\s*dollar/);
+  if (dollarMatch) {
+    const amount = dollarMatch[1] || dollarMatch[2] || dollarMatch[3];
+    return `$${amount}`;
+  }
+  
+  return null;
+}
+
 export default function RestaurantMarker({
   restaurant,
   isSelected,
   onPress,
 }: RestaurantMarkerProps) {
-  return (
-    <Marker
-      coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
-      onPress={() => onPress(restaurant)}
-      anchor={{ x: 0.5, y: 1 }}
-      tracksViewChanges={true}
-    >
+  const { deals } = useRestaurantDeals(restaurant.id);
+  const firstDeal = deals && deals.length > 0 ? deals[0] : null;
+  const dealInfo = extractDealInfo(firstDeal);
+
+  const markerContent = useMemo(
+    () => (
       <View style={styles.markerWrapper}>
+
         <View
           style={[
             styles.markerContainer,
             isSelected && styles.markerContainerSelected,
           ]}
         >
+        {dealInfo && (
+          <View style={styles.dealBadge}>
+            <Text style={styles.dealText}>{dealInfo}</Text>
+          </View>
+        )}
+        {!dealInfo && (
           <AntDesign
             name="shop"
-            size={isSelected ? 20 : 16}
+            size={18}
             color="#fff"
           />
+        )}
         </View>
         <View style={[styles.markerPin, isSelected && styles.markerPinSelected]} />
-        <View style={styles.markerPinShadow} />
       </View>
+    ),
+    [isSelected, dealInfo]
+  );
+
+  return (
+    <Marker
+      coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
+      onPress={() => onPress(restaurant)}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={true}
+    >
+      {markerContent}
     </Marker>
   );
 }
@@ -46,6 +88,15 @@ const styles = StyleSheet.create({
   markerWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
+  },
+  dealBadge: {
+    borderRadius: 8,
+    elevation: 3,
+  },
+  dealText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#fff",
   },
   titleContainer: {
     backgroundColor: "#fff",
@@ -67,11 +118,11 @@ const styles = StyleSheet.create({
   },
   markerContainer: {
     backgroundColor: "#FE902A",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     borderWidth: 3,
-    borderColor: "#fff",
+    borderColor: "#FE902A",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -82,21 +133,19 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   markerContainerSelected: {
-    backgroundColor: "#FE902A",
-    borderColor: "#fff",
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    transform: [{ scale: 1.1 }],
+    borderWidth: 4,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
   },
   markerPin: {
     width: 0,
     height: 0,
     backgroundColor: "transparent",
     borderStyle: "solid",
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 16,
+    borderLeftWidth: 12,
+    borderRightWidth: 12,
+    borderTopWidth: 18,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#FE902A",
@@ -109,10 +158,8 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   markerPinSelected: {
-    borderTopColor: "#FE902A",
-    borderLeftWidth: 12,
-    borderRightWidth: 12,
-    borderTopWidth: 18,
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
   markerPinShadow: {
     width: 12,

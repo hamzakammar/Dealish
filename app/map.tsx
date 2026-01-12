@@ -1,7 +1,7 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from "@/app/providers/auth";
 import MapTypeSelector from "@/components/MapTypeSelector";
-import RestaurantDetailCard from "@/components/RestaurantDetailCard";
+import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
 import { useDirections } from "@/hooks/useDirections";
@@ -13,14 +13,15 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import MapView, { Polyline, Region } from "react-native-maps";
 
 const fallbackRegion: Region = {
-  latitude: 43.6532,
-  longitude: -79.3832,
+  latitude: 43.46946,
+  longitude: -80.55348,
   latitudeDelta: 0.01,
   longitudeDelta: 0.01,
 };
 
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
+  const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
   const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -96,7 +97,8 @@ export default function MapScreen() {
             return; // Don't close if tapping a marker
           }
           if (selectedRestaurant) {
-            handleCloseRestaurant();
+            // Use the animated close method
+            restaurantCardRef.current?.closeWithAnimation();
           }
         }}
       >
@@ -129,9 +131,10 @@ export default function MapScreen() {
           <TouchableOpacity
             style={styles.mapOverlay}
             activeOpacity={1}
-            onPress={handleCloseRestaurant}
+            onPress={() => restaurantCardRef.current?.closeWithAnimation()}
           />
           <RestaurantDetailCard
+            ref={restaurantCardRef}
             restaurant={selectedRestaurant}
             onClose={handleCloseRestaurant}
             onGetDirections={handleGetDirections}

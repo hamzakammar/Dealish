@@ -2,7 +2,7 @@ import DealCard from "@/components/DealCard";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -16,6 +16,7 @@ import {
   UIManager,
   View
 } from "react-native";
+import { supabase } from "@/app/lib/supabase";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -27,7 +28,7 @@ const SPRING_ANIMATION_TENSION = 65;
 const SPRING_ANIMATION_FRICTION = 11;
 
 // Duration for card slide-out animation when closing
-const CLOSE_ANIMATION_DURATION_MS = 200;
+const CLOSE_ANIMATION_DURATION_MS = 600;
 
 // Vertical offset for card entrance/exit animation (pixels off-screen)
 const CARD_ANIMATION_OFFSET = 600;
@@ -39,6 +40,28 @@ type RestaurantDetailCardProps = {
   isDirectionsAvailable?: boolean;
   userLocation?: UserLocation | null;
 };
+
+export type RestaurantDetailCardRef = {
+  closeWithAnimation: () => void;
+};
+
+async function fetchIsFavourite(restaurantId: string): Promise<boolean> {
+  const user = await supabase.auth.getUser();
+  const profileId = user.data?.user?.id;
+  if (!profileId) return false;
+
+  const { data, error } = await supabase
+    .from("favourites")
+    .select("restaurant_id")
+    .eq("profile_id", profileId)
+    .eq("restaurant_id", restaurantId);
+
+  if (error) {
+    console.warn("favourites fetch error:", error.message);
+    return false;
+  }
+  return !!(data && data.length > 0);
+}
 
 // Calculate distance between two coordinates using Haversine formula
 function calculateDistance(
@@ -72,14 +95,58 @@ function formatDistance(distanceKm: number): string {
   }
 }
 
-export default function RestaurantDetailCard({
+const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetailCardProps>(({
   restaurant,
   onClose,
   onGetDirections,
   isDirectionsAvailable = true,
   userLocation,
-}: RestaurantDetailCardProps) {
+}, ref) => {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
+  const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchIsFavourite(restaurant.id)
+      .then((fav) => {
+        if (mounted) setIsFavouriteState(fav);
+      })
+      .catch((e) => console.warn(e));
+    return () => {
+      mounted = false;
+    };
+  }, [restaurant.id]);
+
+  async function toggleFavourite(restaurantId: string): Promise<void> {
+    const user = await supabase.auth.getUser();
+    const profileId = user.data?.user?.id;
+    if (!profileId) {
+      console.warn("Not authenticated");
+      return;
+    }
+
+    const prev = isFavouriteState;
+    setIsFavouriteState(!prev); // optimistic update
+
+    try {
+      if (!prev) {
+        const { error } = await supabase.rpc("append_favourite", {
+          p_profile_id: profileId,
+          p_restaurant_id: restaurantId,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.rpc("remove_favourite", {
+          p_profile_id: profileId,
+          p_restaurant_id: restaurantId,
+        });
+        if (error) throw error;
+      }
+    } catch (e: any) {
+      console.warn("toggleFavourite error:", e.message ?? e);
+      setIsFavouriteState(prev); // rollback
+    }
+  }
 
   // Calculate distance if user location is available
   const distance = useMemo(() => {
@@ -105,11 +172,10 @@ export default function RestaurantDetailCard({
     lastDragY.current = 0;
     isDragging.current = false;
     closingRestaurantIdRef.current = null;
-    Animated.spring(slideAnim, {
+    Animated.timing(slideAnim, {
       toValue: 1,
+      duration: 600,
       useNativeDriver: true,
-      tension: SPRING_ANIMATION_TENSION,
-      friction: SPRING_ANIMATION_FRICTION,
     }).start();
   }, [restaurant.id]);
 
@@ -186,6 +252,11 @@ export default function RestaurantDetailCard({
     });
   };
 
+  // Expose handleClose method to parent via ref
+  useImperativeHandle(ref, () => ({
+    closeWithAnimation: handleClose,
+  }));
+
   const baseTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [CARD_ANIMATION_OFFSET, 0],
@@ -193,6 +264,7 @@ export default function RestaurantDetailCard({
 
   // Combine base animation with drag gesture
   const translateY = Animated.add(baseTranslateY, dragY);
+
 
   return (
     <Animated.View
@@ -297,18 +369,29 @@ export default function RestaurantDetailCard({
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          style={styles.favoriteButton}
+          style={[
+            styles.favoriteButton,
+            {backgroundColor: isFavouriteState ? "#fff" : "#FE902A"}
+          ]}
           onPress={() => {
-            // Handle favorite action
-            console.log("Favorite pressed");
+            toggleFavourite(restaurant.id);
           }}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isFavouriteState ? "Remove from favourites" : "Add to favourites"
+          }
         >
-          <AntDesign name="heart" size={20} color="#FE902A" />
+          <AntDesign
+            name="heart"
+            size={20}
+            color={isFavouriteState ? "#FF0000" : "#fff"}
+          />
         </TouchableOpacity>
+
       </View>
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -494,3 +577,5 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 });
+
+export default RestaurantDetailCard;
