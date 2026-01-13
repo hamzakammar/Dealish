@@ -8,6 +8,8 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
+  Easing,
   Image,
   PanResponder,
   Platform,
@@ -24,6 +26,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+/**
+ * Animation configuration constants
+ */
 // Spring animation configuration for card slide-in
 const SPRING_ANIMATION_TENSION = 65;
 const SPRING_ANIMATION_FRICTION = 11;
@@ -31,8 +36,36 @@ const SPRING_ANIMATION_FRICTION = 11;
 // Duration for card slide-out animation when closing
 const CLOSE_ANIMATION_DURATION_MS = 600;
 
+// Duration for state transitions (peek/half/full) - matches entrance animation timing
+const STATE_TRANSITION_DURATION_MS = 800;
+
 // Vertical offset for card entrance/exit animation (pixels off-screen)
 const CARD_ANIMATION_OFFSET = 600;
+
+/**
+ * Bottom Sheet State Heights
+ * These define the three states of the restaurant detail card:
+ * - PEEK: Minimal preview with just name, logo, and basic info
+ * - HALF: Current default view with deals and description
+ * - FULL: Expanded view with all details, photos, menu, etc.
+ */
+const SHEET_HEIGHT = {
+  PEEK: 200,  // Minimal preview
+  HALF: 500,  // Current default state
+  FULL: 0.9,  // 90% of screen height (calculated dynamically)
+};
+
+/**
+ * Gesture thresholds for state transitions
+ */
+const DRAG_THRESHOLD = 80;  // Pixels to drag before triggering state change
+const VELOCITY_THRESHOLD = 0.5;  // Velocity for quick swipe gestures
+
+/**
+ * Sheet state type definition
+ * Represents the three possible states of the bottom sheet
+ */
+export type SheetState = 'peek' | 'half' | 'full';
 
 type RestaurantDetailCardProps = {
   restaurant: Restaurant;
@@ -40,6 +73,8 @@ type RestaurantDetailCardProps = {
   onGetDirections: () => void;
   isDirectionsAvailable?: boolean;
   userLocation?: UserLocation | null;
+  /** Initial state of the sheet. Defaults to 'half' for backward compatibility */
+  initialState?: SheetState;
 };
 
 export type RestaurantDetailCardRef = {
@@ -72,9 +107,21 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   onGetDirections,
   isDirectionsAvailable = true,
   userLocation,
+  initialState = 'half', // Default to 'half' for backward compatibility
 }, ref) => {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
+  
+  /**
+   * Sheet state management
+   * Controls which view state the bottom sheet is currently in
+   */
+  const [sheetState, setSheetState] = useState<SheetState>(initialState);
+  
+  /**
+   * Get screen dimensions for calculating full state height
+   */
+  const screenHeight = Dimensions.get('window').height;
 
   useEffect(() => {
     let mounted = true;
@@ -130,36 +177,83 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     );
     return formatDistance(dist);
   }, [userLocation, restaurant.lat, restaurant.lng]);
+  
+  /**
+   * Calculate target heights and offsets for each state
+   */
+  const getSheetHeight = (state: SheetState = sheetState): number => {
+    switch (state) {
+      case 'peek':
+        return SHEET_HEIGHT.PEEK;
+      case 'half':
+        return SHEET_HEIGHT.HALF;
+      case 'full':
+        return screenHeight * SHEET_HEIGHT.FULL;
+      default:
+        return SHEET_HEIGHT.HALF;
+    }
+  };
+
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+  /**
+   * Animated height for smooth state transitions while keeping footer anchored.
+   */
+  const sheetHeightAnim = useRef(new Animated.Value(getSheetHeight(initialState))).current;
   const closingRestaurantIdRef = useRef<string | null>(null);
   const lastDragY = useRef(0);
   const isDragging = useRef(false);
+  /**
+   * Prevents multiple state transitions from happening simultaneously
+   * Set to true during animation, false when complete
+   */
+  const isAnimating = useRef(false);
 
   useEffect(() => {
-    // Reset animation when restaurant changes
+    // Reset animation and sheet state when restaurant changes
     slideAnim.setValue(0);
     dragY.setValue(0);
+    sheetHeightAnim.setValue(getSheetHeight(initialState));
     lastDragY.current = 0;
     isDragging.current = false;
     closingRestaurantIdRef.current = null;
+    setSheetState(initialState); // Reset to initial state
+    
+    // Animate card entrance
     Animated.timing(slideAnim, {
       toValue: 1,
       duration: 600,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
-  }, [restaurant.id]);
+  }, [restaurant.id, initialState]);
 
-  // Pan responder for drag gesture on the handle/header area
-  const panResponder = useRef(
-    PanResponder.create({
+  /**
+   * Animate vertical offset when sheet state changes
+   */
+  useEffect(() => {
+    Animated.timing(sheetHeightAnim, {
+      toValue: getSheetHeight(sheetState),
+      duration: STATE_TRANSITION_DURATION_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [sheetState, screenHeight]);
+
+  /**
+   * Pan responder for drag gestures on the handle/header area
+   * Handles both upward expansion and downward collapse/dismissal
+   * Recreated when sheet state changes to ensure correct state is captured
+   */
+  const panResponder = useMemo(() => {
+    return PanResponder.create({
       onStartShouldSetPanResponder: () => {
         // Always allow starting the pan responder on the draggable area
         return true;
       },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond if moving down significantly (swiping down to close)
-        return gestureState.dy > 5 && Math.abs(gestureState.dx) < 50;
+        // Respond to both upward and downward swipes
+        const isVerticalSwipe = Math.abs(gestureState.dy) > 5 && Math.abs(gestureState.dx) < 50;
+        return isVerticalSwipe;
       },
       onPanResponderGrant: () => {
         isDragging.current = true;
@@ -167,45 +261,125 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         dragY.setValue(0);
       },
       onPanResponderMove: (evt, gestureState) => {
-        // Only allow dragging down (positive dy)
-        if (gestureState.dy > 0) {
-          dragY.setValue(gestureState.dy);
-        }
+        // Allow both upward (negative) and downward (positive) dragging
+        dragY.setValue(gestureState.dy);
       },
       onPanResponderRelease: (evt, gestureState) => {
         isDragging.current = false;
         dragY.flattenOffset();
 
-        // If dragged down more than 100px or fast swipe down, close the card
-        const threshold = 100;
-        if (gestureState.dy > threshold || gestureState.vy > 0.5) {
-          // Close the card
-          closingRestaurantIdRef.current = restaurant.id;
-          Animated.timing(dragY, {
-            toValue: CARD_ANIMATION_OFFSET,
-            duration: CLOSE_ANIMATION_DURATION_MS,
-            useNativeDriver: true,
-          }).start(() => {
-            dragY.setValue(0);
-            lastDragY.current = 0;
-            if (closingRestaurantIdRef.current === restaurant.id) {
-              handleClose();
-            }
-          });
-        } else {
-          // Snap back to original position
+        /**
+         * Prevent state transitions if an animation is already in progress
+         * This prevents multiple state changes from a single gesture
+         */
+        if (isAnimating.current) {
+          // Snap back to original position if animating
           Animated.spring(dragY, {
             toValue: 0,
-            useNativeDriver: true,
-            tension: 65,
-            friction: 11,
+            useNativeDriver: false,
+            tension: SPRING_ANIMATION_TENSION,
+            friction: SPRING_ANIMATION_FRICTION,
+          }).start(() => {
+            lastDragY.current = 0;
+          });
+          return;
+        }
+
+        /**
+         * Handle state transitions based on drag direction and distance
+         * Upward swipe (negative dy): Expand to next state
+         * Downward swipe (positive dy): Collapse to previous state or close
+         */
+        
+        // Downward swipe - collapse or close
+        if (gestureState.dy > DRAG_THRESHOLD || gestureState.vy > VELOCITY_THRESHOLD) {
+          // Determine action based on current state
+          if (sheetState === 'peek') {
+            // From peek, swipe down closes the card
+            closingRestaurantIdRef.current = restaurant.id;
+            Animated.timing(dragY, {
+              toValue: CARD_ANIMATION_OFFSET,
+              duration: CLOSE_ANIMATION_DURATION_MS,
+              useNativeDriver: false,
+            }).start(() => {
+              dragY.setValue(0);
+              lastDragY.current = 0;
+              if (closingRestaurantIdRef.current === restaurant.id) {
+                handleClose();
+              }
+            });
+          } else if (sheetState === 'half') {
+            // From half, swipe down goes to peek
+            isAnimating.current = true;
+            setSheetState('peek');
+            Animated.timing(dragY, {
+              toValue: 0,
+              duration: STATE_TRANSITION_DURATION_MS,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: false,
+            }).start(() => {
+              lastDragY.current = 0;
+              isAnimating.current = false;
+            });
+          } else if (sheetState === 'full') {
+            // From full, swipe down goes to half
+            isAnimating.current = true;
+            setSheetState('half');
+            Animated.timing(dragY, {
+              toValue: 0,
+              duration: STATE_TRANSITION_DURATION_MS,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: false,
+            }).start(() => {
+              lastDragY.current = 0;
+              isAnimating.current = false;
+            });
+          }
+        } 
+        // Upward swipe - expand to next state
+        else if (gestureState.dy < -DRAG_THRESHOLD || gestureState.vy < -VELOCITY_THRESHOLD) {
+          if (sheetState === 'peek') {
+            // From peek, swipe up goes to half
+            isAnimating.current = true;
+            setSheetState('half');
+            Animated.timing(dragY, {
+              toValue: 0,
+              duration: STATE_TRANSITION_DURATION_MS,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: false,
+            }).start(() => {
+              lastDragY.current = 0;
+              isAnimating.current = false;
+            });
+          } else if (sheetState === 'half') {
+            // From half, swipe up goes to full
+            isAnimating.current = true;
+            setSheetState('full');
+            Animated.timing(dragY, {
+              toValue: 0,
+              duration: STATE_TRANSITION_DURATION_MS,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: false,
+            }).start(() => {
+              lastDragY.current = 0;
+              isAnimating.current = false;
+            });
+          }
+          // From full, swipe up does nothing (already at max)
+        } else {
+          // Snap back to original position (drag was too small)
+          Animated.timing(dragY, {
+            toValue: 0,
+            duration: STATE_TRANSITION_DURATION_MS,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: false,
           }).start(() => {
             lastDragY.current = 0;
           });
         }
       },
-    })
-  ).current;
+    });
+  }, [sheetState]);  // Recreate when sheet state changes to capture current state
 
   const handleClose = () => {
     // Store the restaurant ID when close animation starts
@@ -213,7 +387,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: CLOSE_ANIMATION_DURATION_MS,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       // Only call onClose if the restaurant hasn't changed
       if (closingRestaurantIdRef.current === restaurant.id) {
@@ -233,15 +407,15 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     outputRange: [CARD_ANIMATION_OFFSET, 0],
   });
 
-  // Combine base animation with drag gesture
+  // Combine base animation with drag gesture and state offset
   const translateY = Animated.add(baseTranslateY, dragY);
-
 
   return (
     <Animated.View
       style={[
         styles.container,
         {
+          height: sheetHeightAnim,
           transform: [{ translateY }],
         },
       ]}
@@ -272,17 +446,22 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             </View>
             <View style={styles.headerContent}>
               <Text style={styles.restaurantName}>{restaurant.name}</Text>
-              {restaurant.address && (
+              {/* Show address and distance in half and full states */}
+              {sheetState !== 'peek' && restaurant.address && (
                 <View style={styles.addressRow}>
                   <AntDesign name="environment" size={14} color="#666" />
                   <Text style={styles.addressText}>{restaurant.address}</Text>
                 </View>
               )}
-              {distance && (
+              {sheetState !== 'peek' && distance && (
                 <View style={styles.distanceRow}>
                   <AntDesign name="environment" size={14} color="#FE902A" />
                   <Text style={styles.distanceText}>{distance} away</Text>
                 </View>
+              )}
+              {/* Show distance only in peek state */}
+              {sheetState === 'peek' && distance && (
+                <Text style={styles.peekDistanceText}>{distance} away</Text>
               )}
             </View>
           </View>
@@ -295,40 +474,69 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         </View>
       </Animated.View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        pointerEvents="auto"
-      >
-        {restaurant.description && (
-          <View style={styles.section}>
-            <Text style={styles.description}>{restaurant.description}</Text>
-          </View>
-        )}
-
-        <View style={styles.dealsSection}>
-          <Text style={styles.sectionTitle}>Available Deals</Text>
-          {dealsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#FE902A" />
-            </View>
-          ) : deals.length > 0 ? (
-            deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
-          ) : (
-            <View style={styles.emptyState}>
-              <AntDesign name="inbox" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No deals available</Text>
+      {/* Content area - only show in half and full states */}
+      {sheetState !== 'peek' && (
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          pointerEvents="auto"
+          scrollEnabled={sheetState === 'full'} // Only allow scrolling in full state
+        >
+          {/* Description - show in half and full */}
+          {restaurant.description && (
+            <View style={styles.section}>
+              <Text style={styles.description}>{restaurant.description}</Text>
             </View>
           )}
-        </View>
-      </ScrollView>
 
+          {/* Deals section */}
+          <View style={styles.dealsSection}>
+            <Text style={styles.sectionTitle}>Available Deals</Text>
+            {dealsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FE902A" />
+              </View>
+            ) : deals.length > 0 ? (
+              deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
+            ) : (
+              <View style={styles.emptyState}>
+                <AntDesign name="inbox" size={48} color="#ccc" />
+                <Text style={styles.emptyText}>No deals available</Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Additional content for full state only */}
+          {sheetState === 'full' && (
+            <View style={styles.fullStateContent}>
+              {/* Placeholder for future full state content */}
+              {/* This is where we'll add: */}
+              {/* - Photo gallery */}
+              {/* - Operating hours */}
+              {/* - Contact information */}
+              {/* - Reviews */}
+              {/* - Full menu */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Restaurant Information</Text>
+                <Text style={styles.infoText}>
+                  Additional details coming soon...
+                </Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Footer - always visible */}
       <View style={styles.footer} pointerEvents="auto">
         {isDirectionsAvailable && (
           <TouchableOpacity
             style={styles.directionsButton}
-            onPress={onGetDirections}
+            onPress={() => {
+              setSheetState('peek');
+              onGetDirections();
+            }}
           >
             <AntDesign
               name="arrow-right"
@@ -358,13 +566,27 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             color={isFavouriteState ? "#FF0000" : "#fff"}
           />
         </TouchableOpacity>
-
       </View>
     </Animated.View>
   );
 });
 
+/**
+ * Component Styles
+ * 
+ * Key styling notes:
+ * - Container uses dynamic height based on sheet state
+ * - Fixed height removed in favor of calculated height
+ * - Drag handle provides visual affordance for gestures
+ * - Header remains visible in all states
+ * - Content area conditionally renders based on state
+ * - Footer with actions always visible
+ */
 const styles = StyleSheet.create({
+  /**
+   * Main container - positioned at bottom with dynamic height
+   * Height changes based on sheet state (peek/half/full)
+   */
   container: {
     position: "absolute",
     bottom: 0,
@@ -373,7 +595,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: 600,
+    // Height is set dynamically via inline style based on sheetState
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
@@ -381,9 +603,15 @@ const styles = StyleSheet.create({
     elevation: 10,
     zIndex: 2, // Above the overlay
   },
+  /**
+   * Draggable area - wraps drag handle and header for gesture recognition
+   */
   draggableArea: {
     // Wraps drag handle and header for drag gesture
   },
+  /**
+   * Visual drag handle - indicates draggable area
+   */
   dragHandle: {
     width: 40,
     height: 4,
@@ -453,6 +681,15 @@ const styles = StyleSheet.create({
     color: "#FE902A",
     fontWeight: "600",
   },
+  /**
+   * Peek state styles - simplified distance display
+   */
+  peekDistanceText: {
+    fontSize: 13,
+    color: "#FE902A",
+    fontWeight: "500",
+    marginTop: 4,
+  },
   closeButton: {
     padding: 4,
   },
@@ -503,6 +740,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: "#999",
+  },
+  /**
+   * Full state content styles
+   */
+  fullStateContent: {
+    marginTop: 16,
   },
   footer: {
     padding: 20,
