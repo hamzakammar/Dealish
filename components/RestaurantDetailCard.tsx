@@ -88,20 +88,22 @@ export type RestaurantDetailCardRef = {
 
 async function fetchIsFavourite(restaurantId: string): Promise<boolean> {
   const user = await supabase.auth.getUser();
-  const profileId = user.data?.user?.id;
-  if (!profileId) return false;
+  const userId = user.data?.user?.id;
+  if (!userId) return false;
 
   const { data, error } = await supabase
-    .from("favourites")
-    .select("restaurant_id")
-    .eq("profile_id", profileId)
-    .eq("restaurant_id", restaurantId);
+    .from("profiles")
+    .select("favourites")
+    .eq("id", userId)
+    .single();
 
   if (error) {
-    console.warn("favourites fetch error:", error.message);
+    console.warn("profiles fetch error:", error.message);
     return false;
   }
-  return !!(data && data.length > 0);
+
+  const favoriteIds = data?.favourites || [];
+  return favoriteIds.includes(restaurantId);
 }
 
 

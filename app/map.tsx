@@ -1,7 +1,6 @@
-import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from "@/app/providers/auth";
+import AccountPanel from "@/components/AccountPanel";
 import RestaurantList from "@/components/listView";
-import MapTypeSelector from "@/components/MapTypeSelector";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
@@ -9,8 +8,9 @@ import { useDirections } from "@/hooks/useDirections";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Polyline, Region } from "react-native-maps";
 
 const fallbackRegion: Region = {
@@ -25,9 +25,10 @@ export default function MapScreen() {
   const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
   const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
   const [isShowingDirections, setIsShowingDirections] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
+  const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState(true);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -37,34 +38,19 @@ export default function MapScreen() {
 
   const { session } = useAuthContext();
 
+  // Check if location permission was denied and set initial view to list
+  useEffect(() => {
+    if (!locationLoading && !userLocation) {
+      // No location available - switch to list view
+      setHasLocationPermission(false);
+      setViewMode("list");
+    }
+  }, [locationLoading, userLocation]);
+
   const handleGetDirections = () => {
     if (selectedRestaurant) {
       setIsShowingDirections(true);
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
-    }
-  };
-
-  const handleSignOut = async () => {
-    setSigningOut(true);
-    try {
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        Alert.alert(
-          'Sign Out Failed',
-          error.message || 'Unable to sign out. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
-      // If successful, the AuthProvider will automatically update the session state
-    } catch (error: any) {
-      Alert.alert(
-        'Sign Out Failed',
-        error?.message || 'An unexpected error occurred while signing out. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setSigningOut(false);
     }
   };
 
@@ -144,19 +130,32 @@ export default function MapScreen() {
         />
       )}
 
-      {/* View Mode Toggle Button */}
-      <TouchableOpacity
-        style={styles.viewToggleButton}
-        onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
-      >
-        <Text style={styles.viewToggleText}>
-          {viewMode === "map" ? "📋 List" : "🗺️ Map"}
-        </Text>
-      </TouchableOpacity>
+      {/* Menu Button (opens account panel) - hidden when panel is open */}
+      {!isAccountPanelOpen && (
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setIsAccountPanelOpen(!isAccountPanelOpen)}
+          activeOpacity={0.8}
+        >
+          <AntDesign name="menu" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* View Mode Toggle Button - disabled when no location */}
+      {hasLocationPermission && (
+        <TouchableOpacity
+          style={styles.viewToggleButton}
+          onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.viewToggleText}>
+            {viewMode === "map" ? "📋 List" : "🗺️ Map"}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {selectedRestaurant && (
         <>
-
           <RestaurantDetailCard
             ref={restaurantCardRef}
             restaurant={selectedRestaurant}
@@ -167,52 +166,48 @@ export default function MapScreen() {
           />
         </>
       )}
-      {session && (
-        <TouchableOpacity
-          style={[
-            styles.signOutButton,
-            signingOut && styles.signOutButtonDisabled
-          ]}
-          onPress={handleSignOut}
-          disabled={signingOut}
-        >
-          {signingOut ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.signOutText}>Sign Out</Text>
-          )}
-        </TouchableOpacity>
-      )}
 
-      {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />}
+      {/* {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />} */}
+
+      {/* Account Panel */}
+      <AccountPanel
+        isOpen={isAccountPanelOpen}
+        onClose={() => setIsAccountPanelOpen(false)}
+        onSelectRestaurant={(restaurant) => {
+          setSelectedRestaurant(restaurant);
+          setViewMode("map");
+        }}
+        onPanToRestaurant={(lat, lng) => {
+          mapRef.current?.animateToRegion(
+            {
+              latitude: lat - 0.002,
+              longitude: lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            },
+            800
+          );
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-
-  signOutButton: {
+  menuButton: {
     position: 'absolute',
     top: 50,
-    right: 16,
+    left: 16,
     backgroundColor: '#FE902A',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 8,
     zIndex: 10,
-  },
-  signOutText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  signOutButtonDisabled: {
-    opacity: 0.6,
   },
   viewToggleButton: {
     position: 'absolute',
     top: 50,
-    left: 16,
+    right: 16,
     backgroundColor: '#FE902A',
     paddingHorizontal: 16,
     paddingVertical: 8,
