@@ -15,7 +15,7 @@ export function useRestaurants() {
       try {
         const { data, error } = await supabase
           .from("restaurants")
-          .select("id,name,lat,lng,address,phone,hero_image_url")
+          .select("id,name,lat,lng,address,phone,hero_image_url,display_image")
           .eq("is_active", true)
           .limit(500);
 
@@ -33,6 +33,7 @@ export function useRestaurants() {
             cuisine_type: r.cuisine_type ?? undefined,
             image_url: r.hero_image_url ?? undefined,
             logo_url: r.hero_image_url ?? undefined,
+            display_image: r.display_image ?? undefined,
           })) ?? [];
 
         if (mounted) setRestaurants(parsed);

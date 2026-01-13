@@ -11,6 +11,7 @@ export type Restaurant = {
   rating_count?: number;
   image_url?: string;
   logo_url?: string;
+  display_image?: string;
 };
 
 export type Deal = {

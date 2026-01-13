@@ -50,9 +50,14 @@ const CARD_ANIMATION_OFFSET = 600;
  * - FULL: Expanded view with all details, photos, menu, etc.
  */
 const SHEET_HEIGHT = {
-  PEEK: 200,  // Minimal preview
-  HALF: 500,  // Current default state
-  FULL: 0.9,  // 90% of screen height (calculated dynamically)
+  PEEK_RATIO: 0.22, // ~22% of screen height
+  HALF_RATIO: 0.55, // ~55% of screen height
+  FULL_RATIO: 0.95, // target ~95% of screen height
+  MIN_PEEK: 180,
+  MAX_PEEK_RATIO: 0.32, // cap peek on very tall screens
+  MIN_HALF: 420,
+  MAX_HALF_RATIO: 0.75, // cap half to avoid covering too much on small screens
+  FULL_TOP_GAP: 56, // leave breathing room at top when fully expanded
 };
 
 /**
@@ -179,18 +184,46 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   }, [userLocation, restaurant.lat, restaurant.lng]);
   
   /**
-   * Calculate target heights and offsets for each state
+   * Clamp helper for height bounds
+   */
+  const clampHeight = (value: number, min: number, max: number): number => {
+    return Math.min(Math.max(value, min), max);
+  };
+
+  /**
+   * Calculate adaptive heights for each state based on device size
    */
   const getSheetHeight = (state: SheetState = sheetState): number => {
+    const peekBase = screenHeight * SHEET_HEIGHT.PEEK_RATIO;
+    const peek = clampHeight(
+      peekBase,
+      SHEET_HEIGHT.MIN_PEEK,
+      screenHeight * SHEET_HEIGHT.MAX_PEEK_RATIO,
+    );
+
+    const halfBase = screenHeight * SHEET_HEIGHT.HALF_RATIO;
+    const half = clampHeight(
+      halfBase,
+      Math.max(SHEET_HEIGHT.MIN_HALF, peek + 40), // keep some gap above peek
+      screenHeight * SHEET_HEIGHT.MAX_HALF_RATIO,
+    );
+
+    const fullBase = screenHeight * SHEET_HEIGHT.FULL_RATIO;
+    const full = clampHeight(
+      fullBase,
+      screenHeight * 0.9, // ensure we stay near-full on short screens
+      screenHeight - SHEET_HEIGHT.FULL_TOP_GAP, // leave breathing room for status/safe area
+    );
+
     switch (state) {
       case 'peek':
-        return SHEET_HEIGHT.PEEK;
+        return peek;
       case 'half':
-        return SHEET_HEIGHT.HALF;
+        return half;
       case 'full':
-        return screenHeight * SHEET_HEIGHT.FULL;
+        return full;
       default:
-        return SHEET_HEIGHT.HALF;
+        return half;
     }
   };
 
@@ -218,7 +251,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     isDragging.current = false;
     closingRestaurantIdRef.current = null;
     setSheetState(initialState); // Reset to initial state
-    
+  
     // Animate card entrance
     Animated.timing(slideAnim, {
       toValue: 1,
@@ -421,39 +454,67 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       ]}
       pointerEvents="box-none"
     >
+      {/* Hero image section - full state only, positioned absolutely to fill from top */}
+      {sheetState === 'full' && (restaurant.display_image || restaurant.image_url) && (
+        <View style={styles.heroFullContainer}>
+          <Image
+            source={{ uri: restaurant.display_image || restaurant.image_url }}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.heroOverlay} />
+          <View style={styles.heroContent}>
+            <Text style={styles.heroTitle}>{restaurant.name}</Text>
+            {restaurant.address && (
+              <View style={styles.heroAddressRow}>
+                <AntDesign name="environment" size={14} color="#fff" />
+                <Text style={styles.heroAddressText}>{restaurant.address}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Draggable area: handle + header */}
       <Animated.View
         {...panResponder.panHandlers}
-        style={styles.draggableArea}
+        style={[
+          styles.draggableArea,
+          sheetState === 'full' && styles.draggableAreaOverlayFull,
+        ]}
         pointerEvents="box-none"
       >
         <View style={styles.dragHandle} />
 
-        <View style={styles.header} pointerEvents="auto">
+        <View style={[styles.header, sheetState === 'full' && styles.headerOverlayFull]} pointerEvents="auto">
           <View style={styles.headerMain}>
-            <View style={styles.logoContainer}>
-              {(restaurant.logo_url || restaurant.image_url) ? (
-                <Image
-                  source={{ uri: restaurant.logo_url || restaurant.image_url }}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={[styles.logo, styles.logoPlaceholder]}>
-                  <AntDesign name="picture" size={24} color="#ccc" />
-                </View>
-              )}
-            </View>
+            {sheetState !== 'full' && (
+              <View style={styles.logoContainer}>
+                {(restaurant.logo_url || restaurant.image_url) ? (
+                  <Image
+                    source={{ uri: restaurant.logo_url || restaurant.image_url }}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={[styles.logo, styles.logoPlaceholder]}>
+                    <AntDesign name="picture" size={24} color="#ccc" />
+                  </View>
+                )}
+              </View>
+            )}
             <View style={styles.headerContent}>
-              <Text style={styles.restaurantName}>{restaurant.name}</Text>
+              <Text style={[styles.restaurantName, sheetState === 'full' && styles.restaurantNameOverlayFull]}>
+                {restaurant.name}
+              </Text>
               {/* Show address and distance in half and full states */}
-              {sheetState !== 'peek' && restaurant.address && (
+              {sheetState !== 'peek' && sheetState !== 'full' && restaurant.address && (
                 <View style={styles.addressRow}>
                   <AntDesign name="environment" size={14} color="#666" />
                   <Text style={styles.addressText}>{restaurant.address}</Text>
                 </View>
               )}
-              {sheetState !== 'peek' && distance && (
+              {sheetState !== 'peek' && sheetState !== 'full' && distance && (
                 <View style={styles.distanceRow}>
                   <AntDesign name="environment" size={14} color="#FE902A" />
                   <Text style={styles.distanceText}>{distance} away</Text>
@@ -466,10 +527,10 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             </View>
           </View>
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.closeButton, sheetState === 'full' && styles.closeButtonOverlayFull]}
             onPress={handleClose}
           >
-            <AntDesign name="close" size={20} color="#333" />
+            <AntDesign name="close" size={20} color={sheetState === 'full' ? '#fff' : '#333'} />
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -477,21 +538,21 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       {/* Content area - only show in half and full states */}
       {sheetState !== 'peek' && (
         <ScrollView
-          style={styles.content}
+          style={[styles.content, sheetState === 'full' && styles.contentFullState]}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={sheetState === 'full' ? styles.fullScrollContent : styles.scrollContent}
           pointerEvents="auto"
           scrollEnabled={sheetState === 'full'} // Only allow scrolling in full state
         >
-          {/* Description - show in half and full */}
-          {restaurant.description && (
+          {/* Description - show in half state only */}
+          {sheetState === 'half' && restaurant.description && (
             <View style={styles.section}>
               <Text style={styles.description}>{restaurant.description}</Text>
             </View>
           )}
 
           {/* Deals section */}
-          <View style={styles.dealsSection}>
+          <View style={sheetState === 'full' ? styles.fullDealsSection : styles.dealsSection}>
             <Text style={styles.sectionTitle}>Available Deals</Text>
             {dealsLoading ? (
               <View style={styles.loadingContainer}>
@@ -511,18 +572,6 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
           {sheetState === 'full' && (
             <View style={styles.fullStateContent}>
               {/* Placeholder for future full state content */}
-              {/* This is where we'll add: */}
-              {/* - Photo gallery */}
-              {/* - Operating hours */}
-              {/* - Contact information */}
-              {/* - Reviews */}
-              {/* - Full menu */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Restaurant Information</Text>
-                <Text style={styles.infoText}>
-                  Additional details coming soon...
-                </Text>
-              </View>
             </View>
           )}
         </ScrollView>
@@ -609,6 +658,13 @@ const styles = StyleSheet.create({
   draggableArea: {
     // Wraps drag handle and header for drag gesture
   },
+  draggableAreaOverlayFull: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
   /**
    * Visual drag handle - indicates draggable area
    */
@@ -629,6 +685,11 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
+  },
+  headerOverlayFull: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+    backgroundColor: 'transparent',
   },
   headerMain: {
     flexDirection: "row",
@@ -658,6 +719,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginBottom: 6,
+  },
+  restaurantNameOverlayFull: {
+    color: 'transparent',
   },
   addressRow: {
     flexDirection: "row",
@@ -693,12 +757,78 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
+  closeButtonOverlayFull: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 20,
+    padding: 8,
+  },
   content: {
     flex: 1,
+  },
+  contentFullState: {
+    marginTop: 280, // account for hero image height
   },
   scrollContent: {
     padding: 20,
     paddingBottom: 10,
+  },
+  fullScrollContent: {
+    paddingBottom: 10,
+  },
+  /**
+   * Hero section for full state - positioned absolutely
+   */
+  heroFullContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 280,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    zIndex: 0,
+  },
+  /**
+   * Hero section for full state
+   */
+  heroSection: {
+    position: 'relative',
+    height: 280,
+    marginBottom: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  heroContent: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    padding: 20,
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  heroAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroAddressText: {
+    fontSize: 14,
+    color: '#fff',
+    flex: 1,
   },
   section: {
     marginBottom: 16,
@@ -721,6 +851,10 @@ const styles = StyleSheet.create({
   },
   dealsSection: {
     marginTop: 8,
+  },
+  fullDealsSection: {
+    marginTop: 30,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontSize: 20,
@@ -746,6 +880,7 @@ const styles = StyleSheet.create({
    */
   fullStateContent: {
     marginTop: 16,
+    paddingHorizontal: 20,
   },
   footer: {
     padding: 20,
