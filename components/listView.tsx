@@ -1,3 +1,4 @@
+import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import React, { useMemo } from "react";
@@ -53,44 +54,48 @@ function RestaurantCard({
         style={styles.image}
       />
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>
-          {restaurant.name}
-        </Text>
-        <View style={styles.metaRow}>
-          {formattedDistance && (
-            <>
-              <Text style={styles.distance}>{formattedDistance}</Text>
-              <Text style={styles.separator}>•</Text>
-            </>
-          )}
-          <Text style={styles.cuisine} numberOfLines={1}>
-            {restaurant.cuisine_type}
+        <View>
+          <Text style={styles.name} numberOfLines={1}>
+            {restaurant.name}
           </Text>
-          {restaurant.address && (
-            <>
-              <Text style={styles.separator}>•</Text>
-              <Text style={styles.location} numberOfLines={1}>
-                {restaurant.address.split(',').pop()?.trim()}
-              </Text>
-            </>
-          )}
+          <View style={styles.metaRow}>
+            {formattedDistance && (
+              <>
+                <Text style={styles.distance}>{formattedDistance}</Text>
+                <Text style={styles.separator}>•</Text>
+              </>
+            )}
+            <Text style={styles.cuisine} numberOfLines={1}>
+              {restaurant.cuisine_type}
+            </Text>
+            {restaurant.address && (
+              <>
+                <Text style={styles.separator}>•</Text>
+                <Text style={styles.location} numberOfLines={1}>
+                  {restaurant.address.split(',').pop()?.trim()}
+                </Text>
+              </>
+            )}
+          </View>
         </View>
 
-        {dealsLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#FE902A" />
-          </View>
-        ) : deals.length > 0 ? (
-          <View style={styles.dealsRow}>
-            {deals.slice(0, 2).map((deal, index) => (
-              <View key={deal.id} style={styles.dealPill}>
-                <Text style={styles.dealPillText} numberOfLines={1}>
-                  {deal.title}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        <View style={styles.cardFooter}>
+          {dealsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#FE902A" />
+            </View>
+          ) : deals.length > 0 ? (
+            <View style={styles.dealsRow}>
+              {deals.slice(0, 2).map((deal, index) => (
+                <View key={deal.id} style={styles.dealPill}>
+                  <Text style={styles.dealPillText} numberOfLines={1}>
+                    {deal.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -146,9 +151,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-    minHeight: 140,
+    height: 140, // Fixed height instead of minHeight
     borderWidth: 2,
     borderColor: "transparent",
+    overflow: "hidden", // Ensure content doesn't overflow
   },
   cardSelected: {
     borderColor: "#FE902A",
@@ -163,19 +169,22 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
-    justifyContent: "flex-start",
+    justifyContent: "flex-start", // Keep content at the top
+  },
+  cardFooter: {
+    marginTop: "auto", // Push to bottom - This container ALWAYS exists
   },
   name: {
     fontSize: 18,
     fontWeight: "700",
     color: "#1a1a1a",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
-    flexWrap: "wrap",
+    marginBottom: 8,
+    // Removed flexWrap to prevent height expansion
   },
   distance: {
     fontSize: 13,
@@ -185,20 +194,24 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     fontWeight: "500",
+    marginRight: 6,
   },
   separator: {
     fontSize: 13,
     color: "#ccc",
-    marginHorizontal: 6,
+    marginHorizontal: 0, // Handled by gap/margin
+    marginRight: 6,
   },
   cuisine: {
     fontSize: 13,
     color: "#666",
     fontWeight: "500",
+    maxWidth: 80, // Limit width
   },
   location: {
     fontSize: 13,
     color: "#999",
+    flex: 1, // Take remaining space
   },
   loadingContainer: {
     paddingVertical: 4,
