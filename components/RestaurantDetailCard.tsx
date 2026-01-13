@@ -2,20 +2,21 @@ import { supabase } from "@/app/lib/supabase";
 import DealCard from "@/components/DealCard";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
+import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    PanResponder,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    UIManager,
-    View
+  ActivityIndicator,
+  Animated,
+  Image,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View
 } from "react-native";
 
 // Enable LayoutAnimation on Android
@@ -63,37 +64,7 @@ async function fetchIsFavourite(restaurantId: string): Promise<boolean> {
   return !!(data && data.length > 0);
 }
 
-// Calculate distance between two coordinates using Haversine formula
-function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Radius of the Earth in kilometers
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Distance in kilometers
-  return distance;
-}
 
-// Format distance for display
-function formatDistance(distanceKm: number): string {
-  if (distanceKm < 1) {
-    return `${Math.round(distanceKm * 1000)}m`;
-  } else if (distanceKm < 10) {
-    return `${distanceKm.toFixed(1)}km`;
-  } else {
-    return `${Math.round(distanceKm)}km`;
-  }
-}
 
 const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetailCardProps>(({
   restaurant,
@@ -315,42 +286,42 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               )}
             </View>
           </View>
-          <TouchableOpacity 
-            style={styles.closeButton} 
+          <TouchableOpacity
+            style={styles.closeButton}
             onPress={handleClose}
           >
             <AntDesign name="close" size={20} color="#333" />
           </TouchableOpacity>
         </View>
       </Animated.View>
-      
+
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         pointerEvents="auto"
       >
-          {restaurant.description && (
-            <View style={styles.section}>
-              <Text style={styles.description}>{restaurant.description}</Text>
+        {restaurant.description && (
+          <View style={styles.section}>
+            <Text style={styles.description}>{restaurant.description}</Text>
+          </View>
+        )}
+
+        <View style={styles.dealsSection}>
+          <Text style={styles.sectionTitle}>Available Deals</Text>
+          {dealsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#FE902A" />
+            </View>
+          ) : deals.length > 0 ? (
+            deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
+          ) : (
+            <View style={styles.emptyState}>
+              <AntDesign name="inbox" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>No deals available</Text>
             </View>
           )}
-
-          <View style={styles.dealsSection}>
-            <Text style={styles.sectionTitle}>Available Deals</Text>
-            {dealsLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#FE902A" />
-              </View>
-            ) : deals.length > 0 ? (
-              deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
-            ) : (
-              <View style={styles.emptyState}>
-                <AntDesign name="inbox" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>No deals available</Text>
-              </View>
-            )}
-          </View>
+        </View>
       </ScrollView>
 
       <View style={styles.footer} pointerEvents="auto">
@@ -371,7 +342,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         <TouchableOpacity
           style={[
             styles.favoriteButton,
-            {backgroundColor: isFavouriteState ? "#fff" : "#FE902A"}
+            { backgroundColor: isFavouriteState ? "#fff" : "#FE902A" }
           ]}
           onPress={() => {
             toggleFavourite(restaurant.id);
@@ -409,7 +380,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 10,
     zIndex: 2, // Above the overlay
-    },
+  },
   draggableArea: {
     // Wraps drag handle and header for drag gesture
   },

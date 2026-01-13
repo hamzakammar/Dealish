@@ -1,6 +1,6 @@
-import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
-import { Restaurant } from "@/types/restaurant";
-import React from "react";
+import { Restaurant, UserLocation } from "@/types/restaurant";
+import { calculateDistance, formatDistance } from "@/utils/distance";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,18 +15,32 @@ interface RestaurantListProps {
   restaurants: Restaurant[];
   onRestaurantPress: (restaurant: Restaurant) => void;
   selectedRestaurant: Restaurant | null;
+  userLocation?: UserLocation | null;
 }
 
 function RestaurantCard({
   restaurant,
   isSelected,
   onPress,
+  userLocation,
 }: {
   restaurant: Restaurant;
   isSelected: boolean;
   onPress: () => void;
+  userLocation?: UserLocation | null;
 }) {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
+
+  const formattedDistance = useMemo(() => {
+    if (!userLocation) return null;
+    const dist = calculateDistance(
+      userLocation.lat,
+      userLocation.lng,
+      restaurant.lat,
+      restaurant.lng
+    );
+    return formatDistance(dist);
+  }, [userLocation, restaurant.lat, restaurant.lng]);
 
   return (
     <TouchableOpacity
@@ -43,8 +57,12 @@ function RestaurantCard({
           {restaurant.name}
         </Text>
         <View style={styles.metaRow}>
-          <Text style={styles.distance}>300m</Text>
-          <Text style={styles.separator}>•</Text>
+          {formattedDistance && (
+            <>
+              <Text style={styles.distance}>{formattedDistance}</Text>
+              <Text style={styles.separator}>•</Text>
+            </>
+          )}
           <Text style={styles.cuisine} numberOfLines={1}>
             {restaurant.cuisine_type}
           </Text>
@@ -57,7 +75,7 @@ function RestaurantCard({
             </>
           )}
         </View>
-        
+
         {dealsLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#FE902A" />
@@ -82,15 +100,17 @@ export default function RestaurantList({
   restaurants,
   onRestaurantPress,
   selectedRestaurant,
+  userLocation,
 }: RestaurantListProps) {
   const renderRestaurant = ({ item }: { item: Restaurant }) => {
     const isSelected = selectedRestaurant?.id === item.id;
-    
+
     return (
       <RestaurantCard
         restaurant={item}
         isSelected={isSelected}
         onPress={() => onRestaurantPress(item)}
+        userLocation={userLocation}
       />
     );
   };
