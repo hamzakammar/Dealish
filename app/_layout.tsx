@@ -137,7 +137,8 @@ function RootLayoutNav() {
           {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="map" options={{ headerShown: false }} />
-          {/* <Stack.Screen name="reset-password" options={{ headerShown: false }} /> */}
+          <Stack.Screen name="account" options={{ headerShown: false }} />
+          <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         </Stack>
       </ThemeProvider>
     </AuthProvider>

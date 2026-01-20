@@ -62,6 +62,22 @@ export default function MapScreen() {
 
   const handleRestaurantSelect = (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
+
+    // If we're in list view, switch to map view first
+    if (viewMode === "list") {
+      setViewMode("map");
+    }
+
+    // Pan/animate the map to the selected restaurant
+    mapRef.current?.animateToRegion(
+      {
+        latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
+        longitude: restaurant.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      800 // Animation duration in milliseconds
+    );
   };
 
   useEffect(() => {

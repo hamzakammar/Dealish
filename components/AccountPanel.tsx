@@ -1,19 +1,20 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
+import { useAccountNavigation } from "@/hooks/useAccountNavigation";
 import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    FlatList,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type AccountPanelProps = {
@@ -23,7 +24,7 @@ type AccountPanelProps = {
   onPanToRestaurant?: (lat: number, lng: number) => void;
 };
 
-type PanelView = "menu" | "favorites";
+type PanelView = "menu" | "favourites";
 
 export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPanToRestaurant }: AccountPanelProps) {
   const { session } = useAuthContext();
@@ -33,8 +34,11 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
   const [signingOut, setSigningOut] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [currentView, setCurrentView] = useState<PanelView>("menu");
-  const [favorites, setFavorites] = useState<Restaurant[]>([]);
-  const [loadingFavorites, setLoadingFavorites] = useState(false);
+  const [favourites, setFavourites] = useState<Restaurant[]>([]);
+  const [loadingFavourites, setLoadingFavourites] = useState(false);
+
+  // Dynamic labels based on count
+  const favouritesLabel = favourites.length === 1 ? "Favourite" : "Favourites";
 
   const screenWidth = Dimensions.get("window").width;
   const panelWidth = screenWidth * 0.75;
@@ -81,10 +85,10 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
   }, [session]);
 
   // Load favorites
-  const loadFavorites = async () => {
+  const loadFavourites = async () => {
     if (!session?.user) return;
 
-    setLoadingFavorites(true);
+    setLoadingFavourites(true);
     try {
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
@@ -119,15 +123,15 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
             display_image: r.display_image ?? undefined,
           })) ?? [];
 
-        setFavorites(parsed);
+        setFavourites(parsed);
       } else {
-        setFavorites([]);
+        setFavourites([]);
       }
     } catch (error) {
-      console.error("Error loading favorites:", error);
+      console.error("Error loading favourites:", error);
       Alert.alert("Error", "Failed to load favorites");
     } finally {
-      setLoadingFavorites(false);
+      setLoadingFavourites(false);
     }
   };
 
@@ -154,16 +158,16 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     }
   };
 
-  const handleFavoritesPress = () => {
-    setCurrentView("favorites");
-    loadFavorites();
+  const handleFavouritesPress = () => {
+    setCurrentView("favourites");
+    loadFavourites();
   };
 
   const handleBackToMenu = () => {
     setCurrentView("menu");
   };
 
-  const handleFavoriteSelect = (restaurant: Restaurant) => {
+  const handleFavouriteSelect = (restaurant: Restaurant) => {
     if (onSelectRestaurant) {
       onSelectRestaurant(restaurant);
     }
@@ -171,16 +175,18 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
       onPanToRestaurant(restaurant.lat, restaurant.lng);
     }
     onClose();
-  };
+  };  
+
+  const navigateToAccount = useAccountNavigation();
 
   const menuItems = [
-    { label: "Home", icon: "home", action: () => handleBackToMenu() },
+    { label: "My Account", icon: "user", action: navigateToAccount },
     { label: "Filters", icon: "filter", action: () => {} },
-    { label: "Favorites", icon: "heart", action: handleFavoritesPress },
+    { label: "Favourites", icon: "heart", action: handleFavouritesPress },
     { label: "Settings", icon: "setting", action: () => {} },
     { label: "About", icon: "info", action: () => {} },
     { label: "Help", icon: "question", action: () => {} },
-    { label: "Partner with us", icon: "like1", action: () => {} },
+    { label: "Partner with us", icon: "like", action: () => {} },
   ];
 
   return (
@@ -271,24 +277,24 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
             </TouchableOpacity>
 
             {/* Favorites List */}
-            <Text style={styles.favoritesTitle}>Favorites</Text>
-            {loadingFavorites ? (
+            <Text style={styles.favouritesTitle}>{favouritesLabel}</Text>
+            {loadingFavourites ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FE902A" />
               </View>
             ) : favorites.length === 0 ? (
               <View style={styles.emptyState}>
                 <AntDesign name="heart" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>No favorites yet</Text>
+                <Text style={styles.emptyText}>No favourites yet</Text>
               </View>
             ) : (
               <FlatList
-                data={favorites}
+                    data={favourites}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.favoriteItem}
-                    onPress={() => handleFavoriteSelect(item)}
+                    onPress={() => handleFavouriteSelect(item)}
                   >
                     {item.logo_url && (
                       <Image
@@ -409,7 +415,7 @@ const styles = StyleSheet.create({
     color: "#333",
     fontWeight: "500",
   },
-  favoritesTitle: {
+  favouritesTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#333",

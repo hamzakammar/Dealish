@@ -2,23 +2,24 @@ import { supabase } from "@/app/lib/supabase";
 import DealCard from "@/components/DealCard";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
+import { trackVisit } from "@/utils/activity";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Easing,
-  Image,
-  PanResponder,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Easing,
+    Image,
+    PanResponder,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View
 } from "react-native";
 
 // Enable LayoutAnimation on Android
@@ -132,6 +133,10 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
 
   useEffect(() => {
     let mounted = true;
+
+    // Track visit when restaurant detail is opened
+    trackVisit(restaurant.id);
+
     fetchIsFavourite(restaurant.id)
       .then((fav) => {
         if (mounted) setIsFavouriteState(fav);
