@@ -1,6 +1,7 @@
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { calculateDistance, formatDistance } from "@/utils/distance";
+import RatingDisplay from "@/components/RatingDisplay";
 import React, { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -58,6 +59,12 @@ function RestaurantCard({
           <Text style={styles.name} numberOfLines={1}>
             {restaurant.name}
           </Text>
+          <RatingDisplay
+            rating={restaurant.rating}
+            ratingCount={restaurant.rating_count}
+            size={12}
+            showCount={true}
+          />
           <View style={styles.metaRow}>
             {formattedDistance && (
               <>

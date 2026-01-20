@@ -12,5 +12,7 @@ export type ActivityWithRestaurant = UserActivity & {
     restaurants: {
         name: string;
         logo_url?: string;
+        rating?: number;
+        rating_count?: number;
     };
 };

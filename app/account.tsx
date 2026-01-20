@@ -252,7 +252,7 @@ export default function AccountPage() {
                         try {
                             const { data: restaurant } = await supabase
                                 .from('restaurants')
-                                .select('name, logo_url')
+                                .select('name, logo_url, rating, num_ratings')
                                 .eq('id', activity.restaurant_id)
                                 .single();
 
@@ -260,10 +260,14 @@ export default function AccountPage() {
                                 ...activity,
                                 restaurants: restaurant ? {
                                     name: restaurant.name,
-                                    logo_url: restaurant.logo_url
+                                    logo_url: restaurant.logo_url,
+                                    rating: restaurant.rating,
+                                    rating_count: restaurant.num_ratings
                                 } : {
                                     name: 'Unknown Restaurant',
-                                    logo_url: null
+                                    logo_url: null,
+                                    rating: undefined,
+                                    rating_count: undefined
                                 }
                             };
                         } catch (error) {
@@ -297,22 +301,19 @@ export default function AccountPage() {
         <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 32 }}>
             {/* Orange Header */}
             <View style={styles.headerBg}>
-                {/* Header content container with flexbox for better responsive positioning */}
-                <View style={styles.headerContent}>
-                    <TouchableOpacity style={styles.backButton}>
-                        <View style={styles.backIconBox}>
-                            <AntDesign name="left" size={20} color="#FE902A" onPress={() => router.back()}/>
+                <TouchableOpacity style={styles.backButton}>
+                    <View style={styles.backIconBox}>
+                        <AntDesign name="left" size={20} color="#FE902A" onPress={() => router.back()}/>
+                    </View>
+                </TouchableOpacity>
+
+                {!isEditing && (
+                    <TouchableOpacity style={styles.editButton} onPress={startEditing}>
+                        <View style={styles.editIconBox}>
+                            <AntDesign name="edit" size={20} color="#FE902A" />
                         </View>
                     </TouchableOpacity>
-
-                    {!isEditing && (
-                        <TouchableOpacity style={styles.editButton} onPress={startEditing}>
-                            <View style={styles.editIconBox}>
-                                <AntDesign name="edit" size={20} color="#FE902A" />
-                            </View>
-                        </TouchableOpacity>
-                    )}
-                </View>
+                )}
 
                 <View style={styles.avatarContainer}>
                     {isEditing ? (
@@ -434,6 +435,8 @@ export default function AccountPage() {
                                 name={activity.restaurants?.name || 'Unknown Restaurant'}
                                 description={description}
                                 date={dateString}
+                                rating={activity.restaurants?.rating}
+                                ratingCount={activity.restaurants?.rating_count}
                             />
                         );
                     })
@@ -459,7 +462,10 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     backButton: {
-        // Now positioned relatively within headerContent
+        position: 'absolute',
+        top: '5%',
+        left: '6%',
+        zIndex: 2,
     },
     backIconBox: {
         backgroundColor: '#fff',

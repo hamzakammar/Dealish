@@ -2,6 +2,7 @@ import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import { useAccountNavigation } from "@/hooks/useAccountNavigation";
 import { Restaurant } from "@/types/restaurant";
+import RatingDisplay from "@/components/RatingDisplay";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useState } from "react";
 import {
@@ -118,6 +119,8 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
             address: r.address ?? undefined,
             phone: r.phone ?? undefined,
             cuisine_type: r.cuisine_type ?? undefined,
+            rating: r.rating ?? undefined,
+            rating_count: r.num_ratings ?? undefined,
             image_url: r.hero_image_url ?? undefined,
             logo_url: r.hero_image_url ?? undefined,
             display_image: r.display_image ?? undefined,
@@ -304,6 +307,12 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                     )}
                     <View style={styles.favoriteInfo}>
                       <Text style={styles.favoriteName}>{item.name}</Text>
+                      <RatingDisplay
+                        rating={item.rating}
+                        ratingCount={item.rating_count}
+                        size={10}
+                        showCount={true}
+                      />
                       {item.address && (
                         <Text
                           style={styles.favoriteAddress}

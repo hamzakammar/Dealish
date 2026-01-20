@@ -1,5 +1,6 @@
 import { supabase } from "@/app/lib/supabase";
 import DealCard from "@/components/DealCard";
+import RatingDisplay from "@/components/RatingDisplay";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { trackVisit } from "@/utils/activity";
@@ -7,19 +8,19 @@ import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Easing,
-    Image,
-    PanResponder,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    UIManager,
-    View
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Easing,
+  Image,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View
 } from "react-native";
 
 // Enable LayoutAnimation on Android
@@ -472,6 +473,15 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
             <Text style={styles.heroTitle}>{restaurant.name}</Text>
+            <View style={styles.heroRatingContainer}>
+              <RatingDisplay
+                rating={restaurant.rating}
+                ratingCount={restaurant.rating_count}
+                size={18}
+                showCount={true}
+                textColor="#fff"
+              />
+            </View>
             {restaurant.address && (
               <View style={styles.heroAddressRow}>
                 <AntDesign name="environment" size={14} color="#fff" />
@@ -514,6 +524,14 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               <Text style={[styles.restaurantName, sheetState === 'full' && styles.restaurantNameOverlayFull]}>
                 {restaurant.name}
               </Text>
+              {sheetState === 'half' && (
+                <RatingDisplay
+                  rating={restaurant.rating}
+                  ratingCount={restaurant.rating_count}
+                  size={14}
+                  showCount={true}
+                />
+              )}
               {/* Show address and distance in half and full states */}
               {sheetState !== 'peek' && sheetState !== 'full' && restaurant.address && (
                 <View style={styles.addressRow}>
@@ -825,6 +843,14 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 8,
+  },
+  heroRatingContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
     marginBottom: 8,
   },
   heroAddressRow: {
