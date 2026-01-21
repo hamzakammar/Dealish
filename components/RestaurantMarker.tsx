@@ -42,6 +42,7 @@ export default function RestaurantMarker({
   const { deals } = useRestaurantDeals(restaurant.id);
   const firstDeal = deals && deals.length > 0 ? deals[0] : null;
   const dealInfo = extractDealInfo(firstDeal);
+  const isPartner = Boolean(restaurant.partner);
 
   const markerContent = useMemo(
     () => (
@@ -50,9 +51,15 @@ export default function RestaurantMarker({
         <View
           style={[
             styles.markerContainer,
+            isPartner && styles.markerContainerPartner,
             isSelected && styles.markerContainerSelected,
           ]}
         >
+        {isPartner && (
+          <View style={styles.partnerBadge}>
+            <AntDesign name="check-circle" size={12} color="#2E7D32" />
+          </View>
+        )}
         {dealInfo && (
           <View style={styles.dealBadge}>
             <Text style={styles.dealText}>{dealInfo}</Text>
@@ -66,10 +73,16 @@ export default function RestaurantMarker({
           />
         )}
         </View>
-        <View style={[styles.markerPin, isSelected && styles.markerPinSelected]} />
+        <View
+          style={[
+            styles.markerPin,
+            isPartner && styles.markerPinPartner,
+            isSelected && styles.markerPinSelected,
+          ]}
+        />
       </View>
     ),
-    [isSelected, dealInfo]
+    [isSelected, dealInfo, isPartner]
   );
 
   return (
@@ -132,11 +145,32 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 1,
   },
+  markerContainerPartner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 4,
+    borderColor: "#FFD54F",
+  },
   markerContainerSelected: {
     borderWidth: 4,
     shadowOpacity: 0.5,
     shadowRadius: 6,
     elevation: 8,
+  },
+  partnerBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 2,
   },
   markerPin: {
     width: 0,
@@ -156,6 +190,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
     zIndex: 0,
+  },
+  markerPinPartner: {
+    borderLeftWidth: 13,
+    borderRightWidth: 13,
+    borderTopWidth: 20,
+    borderTopColor: "#FFD54F",
+    marginTop: -4,
   },
   markerPinSelected: {
     shadowOpacity: 0.5,

@@ -15,7 +15,7 @@ export function useRestaurants() {
       try {
         const { data, error } = await supabase
           .from("restaurants")
-          .select("id,name,lat,lng,address,phone,hero_image_url,type,display_image,rating,num_ratings")
+          .select("id,name,lat,lng,address,phone,hero_image_url,type,display_image,rating,num_ratings,partner")
           .eq("is_active", true)
           .limit(500);
 
@@ -27,6 +27,8 @@ export function useRestaurants() {
             name: r.name,
             lat: Number(r.lat),
             lng: Number(r.lng),
+            partner: Boolean(r.partner),
+            description: r.description ?? undefined,
             address: r.address ?? undefined,
             phone: r.phone ?? undefined,
             rating: r.rating ?? undefined,

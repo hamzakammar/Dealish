@@ -3,6 +3,7 @@ export type Restaurant = {
   name: string;
   lat: number;
   lng: number;
+  partner?: boolean;
   description?: string;
   address?: string;
   phone?: string;

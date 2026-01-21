@@ -115,6 +115,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
             name: r.name,
             lat: Number(r.lat),
             lng: Number(r.lng),
+            partner: Boolean(r.partner),
             description: r.description ?? undefined,
             address: r.address ?? undefined,
             phone: r.phone ?? undefined,

@@ -35,6 +35,7 @@ async function getFavouriteCount(userId: string): Promise<number> {
 
 export default function AccountPage() {
     const { session, profile } = useAuthContext();
+    const [loading, setLoading] = useState<boolean>(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [userName, setUserName] = useState<string>("User");
     const [userLocation, setUserLocation] = useState<string>("");
@@ -162,6 +163,7 @@ export default function AccountPage() {
 
     useEffect(() => {
         const loadProfile = async () => {
+            setLoading(true);
             if (!session?.user) {
                 setLoading(false);
                 return;
