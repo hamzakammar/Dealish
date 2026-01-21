@@ -423,16 +423,20 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   }, [sheetState]);  // Recreate when sheet state changes to capture current state
 
   const handleClose = () => {
+    // Prevent double-triggering close while animation is running
+    if (closingRestaurantIdRef.current) return;
+
     // Store the restaurant ID when close animation starts
     closingRestaurantIdRef.current = restaurant.id;
-    // Call onClose immediately so parent (map) can start its own animations sooner
-    onClose();
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: CLOSE_ANIMATION_DURATION_MS,
       useNativeDriver: false,
     }).start(() => {
       closingRestaurantIdRef.current = null;
+      // Only notify parent after the close animation finishes, otherwise the
+      // parent will unmount this component and the animation will be cut off.
+      onClose();
     });
   };
 

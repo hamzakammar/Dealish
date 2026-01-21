@@ -1,7 +1,7 @@
+import RatingDisplay from "@/components/RatingDisplay";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { calculateDistance, formatDistance } from "@/utils/distance";
-import RatingDisplay from "@/components/RatingDisplay";
 import React, { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -73,7 +73,7 @@ function RestaurantCard({
               </>
             )}
             <Text style={styles.cuisine} numberOfLines={1}>
-              {restaurant.cuisine_type}
+              {restaurant.type}
             </Text>
             {restaurant.address && (
               <>

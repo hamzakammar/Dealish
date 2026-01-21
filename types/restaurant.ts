@@ -6,7 +6,7 @@ export type Restaurant = {
   description?: string;
   address?: string;
   phone?: string;
-  cuisine_type?: string;
+  type?: string;
   rating?: number;
   rating_count?: number;
   image_url?: string;

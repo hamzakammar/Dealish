@@ -105,6 +105,19 @@ export default function MapScreen() {
     );
   };
 
+  const handleRecenter = () => {
+    if (!userLocation || viewMode !== "map") return;
+
+    const targetRegion: Region = {
+      latitude: userLocation.lat,
+      longitude: userLocation.lng,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+
+    mapRef.current?.animateToRegion(targetRegion, 600);
+  };
+
   useEffect(() => {
     if (isShowingDirections && selectedRestaurant && userLocation) {
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
@@ -198,6 +211,16 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
+      {viewMode === "map" && userLocation && (
+        <TouchableOpacity
+          style={styles.recenterButton}
+          onPress={handleRecenter}
+          activeOpacity={0.8}
+        >
+          <AntDesign name="aim" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
+
       {selectedRestaurant && (
         <>
           <RestaurantDetailCard
@@ -270,5 +293,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 14,
+  },
+  recenterButton: {
+    position: 'absolute',
+    top: 112,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.23)',
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });
