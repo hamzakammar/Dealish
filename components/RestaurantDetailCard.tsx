@@ -433,10 +433,10 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       duration: CLOSE_ANIMATION_DURATION_MS,
       useNativeDriver: false,
     }).start(() => {
+      if (closingRestaurantIdRef.current === restaurant.id) {
+        onClose();
+      }
       closingRestaurantIdRef.current = null;
-      // Only notify parent after the close animation finishes, otherwise the
-      // parent will unmount this component and the animation will be cut off.
-      onClose();
     });
   };
 
