@@ -1,6 +1,6 @@
-import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from "@/app/providers/auth";
-import MapTypeSelector from "@/components/MapTypeSelector";
+import AccountPanel from "@/components/AccountPanel";
+import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
@@ -8,9 +8,10 @@ import { useDirections } from "@/hooks/useDirections";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
-import React, { useRef, useState, useEffect } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import MapView, { Polyline, Region } from "react-native-maps";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import React, { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import MapView, { Camera, Polyline, Region } from "react-native-maps";
 
 const fallbackRegion: Region = {
   latitude: 43.46946,
@@ -22,10 +23,15 @@ const fallbackRegion: Region = {
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
   const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
+  const currentRegionRef = useRef<Region | null>(null);
+  const regionBeforeSelectRef = useRef<Region | null>(null);
+  const cameraBeforeSelectRef = useRef<Camera | null>(null);
   const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
   const [isShowingDirections, setIsShowingDirections] = useState(false);
+  const [viewMode, setViewMode] = useState<"map" | "list">("map");
+  const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState(true);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -33,7 +39,16 @@ export default function MapScreen() {
 
   const loading = restaurantsLoading || locationLoading;
 
-  const {session} = useAuthContext();
+  const { session } = useAuthContext();
+
+  // Check if location permission was denied and set initial view to list
+  useEffect(() => {
+    if (!locationLoading && !userLocation) {
+      // No location available - switch to list view
+      setHasLocationPermission(false);
+      setViewMode("list");
+    }
+  }, [locationLoading, userLocation]);
 
   const handleGetDirections = () => {
     if (selectedRestaurant) {
@@ -42,41 +57,68 @@ export default function MapScreen() {
     }
   };
 
-  const handleSignOut = async () => {
-    setSigningOut(true);
-    try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        Alert.alert(
-          'Sign Out Failed',
-          error.message || 'Unable to sign out. Please try again.',
-          [{ text: 'OK' }]
-        );
+  const handleCloseRestaurant = async () => {
+    // If we zoomed/panned into a restaurant, restore the previous map view on close.
+    // Prefer restoring the full camera (keeps rotation/bearing + pitch), fallback to region.
+    if (viewMode === "map") {
+      if (cameraBeforeSelectRef.current) {
+        mapRef.current?.animateCamera(cameraBeforeSelectRef.current, { duration: 800 });
+        cameraBeforeSelectRef.current = null;
+        regionBeforeSelectRef.current = null;
+      } else if (regionBeforeSelectRef.current) {
+        mapRef.current?.animateToRegion(regionBeforeSelectRef.current, 800);
+        regionBeforeSelectRef.current = null;
       }
-      // If successful, the AuthProvider will automatically update the session state
-    } catch (error: any) {
-      Alert.alert(
-        'Sign Out Failed',
-        error?.message || 'An unexpected error occurred while signing out. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setSigningOut(false);
     }
-  };
-
-  const handleCloseRestaurant = () => {
     setSelectedRestaurant(null);
     setIsShowingDirections(false);
     clearRoute();
   };
 
   const handleRestaurantSelect = (restaurant: Restaurant) => {
+    // Capture current view before zooming in, so we can restore it on close.
+    if (!regionBeforeSelectRef.current) {
+      regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
+    }
+    if (!cameraBeforeSelectRef.current) {
+      // getCamera is async; fire-and-forget to capture rotation/pitch too
+      mapRef.current?.getCamera?.().then((cam) => {
+        if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
+      }).catch(() => {});
+    }
     setSelectedRestaurant(restaurant);
+
+    // If we're in list view, switch to map view first
+    if (viewMode === "list") {
+      setViewMode("map");
+    }
+
+    // Pan/animate the map to the selected restaurant
+    mapRef.current?.animateToRegion(
+      {
+        latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
+        longitude: restaurant.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      800 // Animation duration in milliseconds
+    );
   };
 
-    useEffect(() => {
+  const handleRecenter = () => {
+    if (!userLocation || viewMode !== "map") return;
+
+    const targetRegion: Region = {
+      latitude: userLocation.lat,
+      longitude: userLocation.lng,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+
+    mapRef.current?.animateToRegion(targetRegion, 600);
+  };
+
+  useEffect(() => {
     if (isShowingDirections && selectedRestaurant && userLocation) {
       getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
     }
@@ -92,56 +134,95 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <MapView
-        ref={(r) => {
-          mapRef.current = r;
-        }}
-        style={{ flex: 1 }}
-        initialRegion={region ?? fallbackRegion}
-        showsMyLocationButton={true}
-        mapType={mapType}
-        onPress={(e) => {
-          // Close restaurant card when tapping on map (not on markers)
-          if (e.nativeEvent.action === 'marker-press') {
-            return; // Don't close if tapping a marker
-          }
-          if (selectedRestaurant) {
-            // Use the animated close method
-            restaurantCardRef.current?.closeWithAnimation();
-          }
-        }}
-      >
-        {userLocation && <UserLocationMarker location={userLocation} />}
+      {viewMode === "map" ? (
+        <MapView
+          ref={(r) => {
+            mapRef.current = r;
+          }}
+          style={{ flex: 1 }}
+          initialRegion={region ?? fallbackRegion}
+          showsMyLocationButton={true}
+          mapType={mapType}
+          onRegionChangeComplete={(r) => {
+            currentRegionRef.current = r;
+          }}
+          onPress={(e) => {
+            // Close restaurant card when tapping on map (not on markers)
+            if (e.nativeEvent.action === 'marker-press') {
+              return; // Don't close if tapping a marker
+            }
+            if (selectedRestaurant) {
+              // Use the animated close method
+              restaurantCardRef.current?.closeWithAnimation();
+            }
+          }}
+        >
+          {userLocation && <UserLocationMarker location={userLocation} />}
 
-        {restaurants.map((r) => {
-          const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
-          return (
-            <RestaurantMarker
-              key={r.id}
-              restaurant={r}
-              isSelected={isSelected}
-              onPress={handleRestaurantSelect}
+          {restaurants.map((r) => {
+            const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
+            return (
+              <RestaurantMarker
+                key={r.id}
+                restaurant={r}
+                isSelected={isSelected}
+                onPress={handleRestaurantSelect}
+              />
+            );
+          })}
+
+          {routeCoordinates.length > 0 && (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor="#FE902A"
+              strokeWidth={4}
             />
-          );
-        })}
+          )}
+        </MapView>
+      ) : (
+        <RestaurantList
+          restaurants={restaurants}
+          onRestaurantPress={handleRestaurantSelect}
+          selectedRestaurant={selectedRestaurant}
+        />
+      )}
 
-        {routeCoordinates.length > 0 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="#FE902A"
-            strokeWidth={4}
-          />
-        )}
-      </MapView>
+      {/* Menu Button (opens account panel) - hidden when panel is open */}
+      {!isAccountPanelOpen && (
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setIsAccountPanelOpen(!isAccountPanelOpen)}
+          activeOpacity={0.8}
+        >
+          <AntDesign name="menu" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* View Mode Toggle Button - disabled when no location */}
+      {hasLocationPermission && (
+        <TouchableOpacity
+          style={styles.viewToggleButton}
+          onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.viewToggleText}>
+            {viewMode === "map" ? "📋 List" : "🗺️ Map"}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {viewMode === "map" && userLocation && (
+        <TouchableOpacity
+          style={styles.recenterButton}
+          onPress={handleRecenter}
+          activeOpacity={0.8}
+        >
+          <AntDesign name="aim" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       {selectedRestaurant && (
         <>
-          {/* Overlay to close card when tapping outside - must be behind the card */}
-          <TouchableOpacity
-            style={styles.mapOverlay}
-            activeOpacity={1}
-            onPress={() => restaurantCardRef.current?.closeWithAnimation()}
-          />
           <RestaurantDetailCard
             ref={restaurantCardRef}
             restaurant={selectedRestaurant}
@@ -152,39 +233,53 @@ export default function MapScreen() {
           />
         </>
       )}
-      {session && (
-        <TouchableOpacity 
-          style={[
-            styles.signOutButton,
-            signingOut && styles.signOutButtonDisabled
-          ]} 
-          onPress={handleSignOut}
-          disabled={signingOut}
-        >
-          {signingOut ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.signOutText}>Sign Out</Text>
-          )}
-        </TouchableOpacity>
-      )}
 
-      <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />
+      {/* {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />} */}
+
+      {/* Account Panel */}
+      <AccountPanel
+        isOpen={isAccountPanelOpen}
+        onClose={() => setIsAccountPanelOpen(false)}
+        onSelectRestaurant={(restaurant) => {
+          setSelectedRestaurant(restaurant);
+          setViewMode("map");
+        }}
+        onPanToRestaurant={(lat, lng) => {
+          if (!regionBeforeSelectRef.current) {
+            regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
+          }
+          if (!cameraBeforeSelectRef.current) {
+            mapRef.current?.getCamera?.().then((cam) => {
+              if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
+            }).catch(() => {});
+          }
+          mapRef.current?.animateToRegion(
+            {
+              latitude: lat - 0.002,
+              longitude: lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            },
+            800
+          );
+        }}
+      />
     </View>
   );
 }
+
 const styles = StyleSheet.create({
-  mapOverlay: {
+  menuButton: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    zIndex: 1,
-    // This overlay is behind the card, so taps on the card won't reach here
+    top: 50,
+    left: 16,
+    backgroundColor: '#FE902A',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    zIndex: 10,
   },
-  signOutButton: {
+  viewToggleButton: {
     position: 'absolute',
     top: 50,
     right: 16,
@@ -194,12 +289,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     zIndex: 10,
   },
-  signOutText: {
+  viewToggleText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 14,
   },
-  signOutButtonDisabled: {
-    opacity: 0.6,
+  recenterButton: {
+    position: 'absolute',
+    top: 112,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.23)',
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });
