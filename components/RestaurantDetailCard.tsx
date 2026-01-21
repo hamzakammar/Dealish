@@ -425,15 +425,13 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   const handleClose = () => {
     // Store the restaurant ID when close animation starts
     closingRestaurantIdRef.current = restaurant.id;
+    // Call onClose immediately so parent (map) can start its own animations sooner
+    onClose();
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: CLOSE_ANIMATION_DURATION_MS,
       useNativeDriver: false,
     }).start(() => {
-      // Only call onClose if the restaurant hasn't changed
-      if (closingRestaurantIdRef.current === restaurant.id) {
-        onClose();
-      }
       closingRestaurantIdRef.current = null;
     });
   };

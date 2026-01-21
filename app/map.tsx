@@ -11,7 +11,7 @@ import { MapType, Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import MapView, { Polyline, Region } from "react-native-maps";
+import MapView, { Camera, Polyline, Region } from "react-native-maps";
 
 const fallbackRegion: Region = {
   latitude: 43.46946,
@@ -23,6 +23,9 @@ const fallbackRegion: Region = {
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
   const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
+  const currentRegionRef = useRef<Region | null>(null);
+  const regionBeforeSelectRef = useRef<Region | null>(null);
+  const cameraBeforeSelectRef = useRef<Camera | null>(null);
   const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [isShowingDirections, setIsShowingDirections] = useState(false);
@@ -54,13 +57,35 @@ export default function MapScreen() {
     }
   };
 
-  const handleCloseRestaurant = () => {
+  const handleCloseRestaurant = async () => {
+    // If we zoomed/panned into a restaurant, restore the previous map view on close.
+    // Prefer restoring the full camera (keeps rotation/bearing + pitch), fallback to region.
+    if (viewMode === "map") {
+      if (cameraBeforeSelectRef.current) {
+        mapRef.current?.animateCamera(cameraBeforeSelectRef.current, { duration: 800 });
+        cameraBeforeSelectRef.current = null;
+        regionBeforeSelectRef.current = null;
+      } else if (regionBeforeSelectRef.current) {
+        mapRef.current?.animateToRegion(regionBeforeSelectRef.current, 800);
+        regionBeforeSelectRef.current = null;
+      }
+    }
     setSelectedRestaurant(null);
     setIsShowingDirections(false);
     clearRoute();
   };
 
   const handleRestaurantSelect = (restaurant: Restaurant) => {
+    // Capture current view before zooming in, so we can restore it on close.
+    if (!regionBeforeSelectRef.current) {
+      regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
+    }
+    if (!cameraBeforeSelectRef.current) {
+      // getCamera is async; fire-and-forget to capture rotation/pitch too
+      mapRef.current?.getCamera?.().then((cam) => {
+        if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
+      }).catch(() => {});
+    }
     setSelectedRestaurant(restaurant);
 
     // If we're in list view, switch to map view first
@@ -105,6 +130,9 @@ export default function MapScreen() {
           initialRegion={region ?? fallbackRegion}
           showsMyLocationButton={true}
           mapType={mapType}
+          onRegionChangeComplete={(r) => {
+            currentRegionRef.current = r;
+          }}
           onPress={(e) => {
             // Close restaurant card when tapping on map (not on markers)
             if (e.nativeEvent.action === 'marker-press') {
@@ -194,6 +222,14 @@ export default function MapScreen() {
           setViewMode("map");
         }}
         onPanToRestaurant={(lat, lng) => {
+          if (!regionBeforeSelectRef.current) {
+            regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
+          }
+          if (!cameraBeforeSelectRef.current) {
+            mapRef.current?.getCamera?.().then((cam) => {
+              if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
+            }).catch(() => {});
+          }
           mapRef.current?.animateToRegion(
             {
               latitude: lat - 0.002,
