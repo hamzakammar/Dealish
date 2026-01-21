@@ -285,7 +285,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FE902A" />
               </View>
-            ) : favorites.length === 0 ? (
+            ) : favourites.length === 0 ? (
               <View style={styles.emptyState}>
                 <AntDesign name="heart" size={48} color="#ccc" />
                 <Text style={styles.emptyText}>No favourites yet</Text>
