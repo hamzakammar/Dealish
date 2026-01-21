@@ -2,7 +2,6 @@ import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import { RecentActivityCard } from "@/components/RecentActivityCard";
 import { ActivityWithRestaurant } from "@/types/activity";
-import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import * as ImagePicker from 'expo-image-picker';
 import { router } from "expo-router";
@@ -10,7 +9,6 @@ import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
-    Dimensions,
     Image,
     ScrollView,
     StyleSheet,
@@ -41,13 +39,10 @@ export default function AccountPage() {
     const [userName, setUserName] = useState<string>("User");
     const [userLocation, setUserLocation] = useState<string>("");
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
-    const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
     const [numFavourites, setNumFavourites] = useState<number>(0);
     const [numVisits, setNumVisits] = useState<number>(0);
     const [dollarsSaved, setDollarsSaved] = useState<number>(0);
     const [recentActivity, setRecentActivity] = useState<ActivityWithRestaurant[]>([]);
-    const screenWidth = Dimensions.get("window").width;
 
     // Edit mode state
     const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -143,7 +138,7 @@ export default function AccountPage() {
             const { error } = await supabase
                 .from('profiles')
                 .update({
-                    display_name: editingName,
+                    full_name: editingName,
                     location: editingLocation,
                     avatar_url: avatarUrl,
                 })
@@ -412,12 +407,20 @@ export default function AccountPage() {
                     recentActivity.map((activity, idx) => {
                         const date = new Date(activity.created_at);
                         const now = new Date();
-                        const diffTime = Math.abs(now.getTime() - date.getTime());
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const diffMs = Math.max(now.getTime() - date.getTime(), 0);
+                        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                        const diffHours = Math.floor(diffMinutes / 60);
+                        const diffDays = Math.floor(diffHours / 24);
 
                         let dateString;
-                        if (diffDays === 1) {
-                            dateString = "1 day ago";
+                        if (diffMinutes < 1) {
+                            dateString = "Just now";
+                        } else if (diffMinutes < 60) {
+                            dateString = `${diffMinutes} min ago`;
+                        } else if (diffHours < 24) {
+                            dateString = diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+                        } else if (diffDays === 1) {
+                            dateString = "Yesterday";
                         } else if (diffDays < 7) {
                             dateString = `${diffDays} days ago`;
                         } else {

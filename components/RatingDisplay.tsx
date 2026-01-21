@@ -1,6 +1,6 @@
+import AntDesign from "@expo/vector-icons/AntDesign";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
 
 interface RatingDisplayProps {
   rating?: number;
@@ -42,13 +42,24 @@ export default function RatingDisplay({
           />
         ))}
 
-        {/* Half star - simplified for React Native */}
+        {/* Half star - visually distinct: grey base with left half filled gold */}
         {hasHalfStar && (
-          <AntDesign
-            name="star"
-            size={size}
-            color="#FFD700"
-          />
+          <View style={styles.halfStarContainer}>
+            {/* Base empty star */}
+            <AntDesign
+              name="star"
+              size={size}
+              color="#E0E0E0"
+            />
+            {/* Left half filled in gold */}
+            <View style={[styles.halfStarOverlay, { width: size / 2 }]}>
+              <AntDesign
+                name="star"
+                size={size}
+                color="#FFD700"
+              />
+            </View>
+          </View>
         )}
 
         {/* Empty stars - show all 5 if rating is 0 but has counts, or remaining empty stars */}
@@ -80,6 +91,15 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  halfStarContainer: {
+    position: "relative",
+  },
+  halfStarOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    overflow: "hidden",
   },
   ratingCount: {
     color: "#666",
