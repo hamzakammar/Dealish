@@ -1,13 +1,14 @@
 import { supabase } from '@/app/lib/supabase'
 import type { Profile } from '@/types/user'
 import type { Session } from '@supabase/supabase-js'
-import { createContext, PropsWithChildren, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react'
 
 type AuthContextType = {
   session: Session | null | undefined;
   isLoading: boolean;
   profile: Profile | null | undefined;
   isLoggedIn: boolean;
+  refetchProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,6 +35,81 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
   // Combined loading state - true if either session or profile is loading
   const isLoading = isLoadingSession || isLoadingProfile
+
+  // Function to fetch profile - can be called manually to refresh
+  const fetchProfile = useCallback(async () => {
+    const sessionId = session?.user?.id || null
+    currentFetchSessionIdRef.current = sessionId
+    
+    setIsLoadingProfile(true)
+
+    try {
+      if (session && sessionId) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', sessionId)
+          .single()
+        
+        // Check if this fetch is still valid (session hasn't changed)
+        if (!isMountedRef.current || currentFetchSessionIdRef.current !== sessionId) {
+          return
+        }
+        
+        if (error) {
+          console.error('Error fetching user profile:', error)
+          setProfile(null)
+        } else {
+          // Sync avatar_url from Google auth metadata if profile doesn't have one
+          const googleAvatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture
+          const profileAvatarUrl = data?.avatar_url
+          
+          // If profile has no avatar but Google auth does, sync it
+          if (googleAvatarUrl && !profileAvatarUrl) {
+            try {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: googleAvatarUrl })
+                .eq('id', sessionId)
+              
+              if (updateError) {
+                console.error('Error syncing avatar from Google auth:', updateError)
+              } else {
+                // Update the profile data with the synced avatar
+                data.avatar_url = googleAvatarUrl
+              }
+            } catch (syncErr) {
+              console.error('Error syncing avatar:', syncErr)
+            }
+          }
+          
+          setProfile(data as Profile)
+        }
+      } else {
+        setProfile(null)
+      }
+    } catch (err) {
+      // Only handle errors if this fetch is still valid
+      if (!isMountedRef.current || currentFetchSessionIdRef.current !== sessionId) {
+        return
+      }
+      
+      console.error('Unexpected error while fetching user profile:', err)
+      setProfile(null)
+    } finally {
+      // Only update loading state if this fetch is still valid
+      if (isMountedRef.current && currentFetchSessionIdRef.current === sessionId) {
+        setIsLoadingProfile(false)
+      }
+    }
+  }, [session])
+
+  // Manual refetch function exposed to consumers
+  const refetchProfile = useCallback(async () => {
+    if (session?.user?.id) {
+      await fetchProfile()
+    }
+  }, [session, fetchProfile])
 
   // Fetch the session once, and subscribe to auth state changes
   // This effect MUST always run to maintain hook consistency
@@ -115,58 +191,13 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
   // Fetch the profile when the session changes
   useEffect(() => {
-    const fetchProfile = async () => {
-      // Track which session we're fetching for
-      const sessionId = session?.user?.id || null
-      currentFetchSessionIdRef.current = sessionId
-      
-      setIsLoadingProfile(true)
-
-      try {
-        if (session && sessionId) {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', sessionId)
-            .single()
-          
-          // Check if this fetch is still valid (session hasn't changed)
-          if (!isMountedRef.current || currentFetchSessionIdRef.current !== sessionId) {
-            return
-          }
-          
-          if (error) {
-            console.error('Error fetching user profile:', error)
-            setProfile(null)
-          } else {
-            setProfile(data as Profile)
-          }
-        } else {
-          setProfile(null)
-        }
-      } catch (err) {
-        // Only handle errors if this fetch is still valid
-        if (!isMountedRef.current || currentFetchSessionIdRef.current !== sessionId) {
-          return
-        }
-        
-        console.error('Unexpected error while fetching user profile:', err)
-        setProfile(null)
-      } finally {
-        // Only update loading state if this fetch is still valid
-        if (isMountedRef.current && currentFetchSessionIdRef.current === sessionId) {
-          setIsLoadingProfile(false)
-        }
-      }
-    }
-
     fetchProfile()
 
     // Cleanup: mark that this fetch is no longer valid
     return () => {
       currentFetchSessionIdRef.current = null
     }
-  }, [session])
+  }, [fetchProfile])
 
   return (
     <AuthContext.Provider
@@ -175,6 +206,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         isLoading,
         profile,
         isLoggedIn: session !== undefined && session !== null,
+        refetchProfile,
       }}
     >
       {children}

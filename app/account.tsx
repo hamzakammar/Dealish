@@ -34,7 +34,7 @@ async function getFavouriteCount(userId: string): Promise<number> {
 
 
 export default function AccountPage() {
-    const { session, profile } = useAuthContext();
+    const { session, profile, refetchProfile } = useAuthContext();
     const [loading, setLoading] = useState<boolean>(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [userName, setUserName] = useState<string>("User");
@@ -136,22 +136,30 @@ export default function AccountPage() {
             }
 
             // Update profile
+            // avatar_url is stored in profiles table and synced from Google auth on sign-in
+            const updateData: { full_name: string; location: string; avatar_url?: string } = {
+                full_name: editingName,
+                location: editingLocation,
+            };
+            
+            // Only update avatar_url if a new avatar was uploaded
+            if (avatarUrl && avatarUrl !== userAvatar) {
+                updateData.avatar_url = avatarUrl;
+            }
+            
             const { error } = await supabase
                 .from('profiles')
-                .update({
-                    full_name: editingName,
-                    location: editingLocation,
-                    avatar_url: avatarUrl,
-                })
+                .update(updateData)
                 .eq('id', session.user.id);
 
             if (error) {
                 console.error('Error updating profile:', error);
                 Alert.alert('Error', 'Failed to update profile');
             } else {
+                // Refresh profile from database to get updated data
+                await refetchProfile();
                 Alert.alert('Success', 'Profile updated successfully!');
                 setIsEditing(false);
-                // The profile will be refreshed via the auth context
             }
         } catch (error) {
             console.error('Error saving profile:', error);
@@ -172,7 +180,31 @@ export default function AccountPage() {
             try {
                 setUserEmail(session.user.email || "");
 
+                // Sync avatar from Google auth for existing users if profile doesn't have one
+                if (profile && !profile.avatar_url) {
+                    const googleAvatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture;
+                    if (googleAvatarUrl && session.user.id) {
+                        try {
+                            // Silently sync in background - don't block UI
+                            supabase
+                                .from('profiles')
+                                .update({ avatar_url: googleAvatarUrl })
+                                .eq('id', session.user.id)
+                                .then(({ error }) => {
+                                    if (error) {
+                                        console.error('Error syncing avatar for existing user:', error);
+                                    }
+                                });
+                        } catch (syncErr) {
+                            console.error('Error syncing avatar:', syncErr);
+                        }
+                    }
+                }
+
                 // Load from profile object if available, fallback to session metadata
+                // Note: profile.avatar_url is prioritized - it contains either:
+                // 1. Custom uploaded avatar, or
+                // 2. Google auth avatar (synced automatically on sign-in)
                 if (profile) {
                     setUserName(profile.full_name || session.user.user_metadata?.name || "User");
                     setUserAvatar(profile.avatar_url || session.user.user_metadata?.avatar_url || null);
@@ -298,9 +330,9 @@ export default function AccountPage() {
         <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 32 }}>
             {/* Orange Header */}
             <View style={styles.headerBg}>
-                <TouchableOpacity style={styles.backButton}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
                     <View style={styles.backIconBox}>
-                        <AntDesign name="left" size={20} color="#FE902A" onPress={() => router.back()}/>
+                        <AntDesign name="left" size={20} color="#FE902A"/>
                     </View>
                 </TouchableOpacity>
 
@@ -468,7 +500,7 @@ const styles = StyleSheet.create({
     },
     backButton: {
         position: 'absolute',
-        top: '5%',
+        top: '30%',
         left: '6%',
         zIndex: 2,
     },
@@ -555,7 +587,7 @@ const styles = StyleSheet.create({
     },
     editButton: {
         position: 'absolute',
-        top: '5%', // Use percentage values for better zoom scaling
+        top: '30%', // Use percentage values for better zoom scaling
         right: '6%', // Percentage of header width
         zIndex: 2,
     },

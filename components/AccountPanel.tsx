@@ -1,8 +1,8 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
+import RatingDisplay from "@/components/RatingDisplay";
 import { useAccountNavigation } from "@/hooks/useAccountNavigation";
 import { Restaurant } from "@/types/restaurant";
-import RatingDisplay from "@/components/RatingDisplay";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { useEffect, useState } from "react";
 import {
@@ -28,7 +28,7 @@ type AccountPanelProps = {
 type PanelView = "menu" | "favourites";
 
 export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPanToRestaurant }: AccountPanelProps) {
-  const { session } = useAuthContext();
+  const { session, profile } = useAuthContext();
   const [userEmail, setUserEmail] = useState<string>("");
   const [userName, setUserName] = useState<string>("User");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
@@ -65,15 +65,24 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
       try {
         setUserEmail(session.user.email || "");
 
-        const metadata = session.user.user_metadata;
-        if (metadata?.full_name) {
-          setUserName(metadata.full_name);
-        } else if (metadata?.name) {
-          setUserName(metadata.name);
-        }
+        // Load from profile object if available, fallback to session metadata
+        // Note: profile.avatar_url is prioritized - it contains either:
+        // 1. Custom uploaded avatar, or
+        // 2. Google auth avatar (synced automatically on sign-in)
+        if (profile) {
+          setUserName(profile.full_name || session.user.user_metadata?.name || "User");
+          setUserAvatar(profile.avatar_url || session.user.user_metadata?.avatar_url || null);
+        } else {
+          const metadata = session.user.user_metadata;
+          if (metadata?.full_name) {
+            setUserName(metadata.full_name);
+          } else if (metadata?.name) {
+            setUserName(metadata.name);
+          }
 
-        if (metadata?.avatar_url) {
-          setUserAvatar(metadata.avatar_url);
+          if (metadata?.avatar_url) {
+            setUserAvatar(metadata.avatar_url);
+          }
         }
       } catch (error) {
         console.error("Error loading profile:", error);
@@ -83,7 +92,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     };
 
     loadProfile();
-  }, [session]);
+  }, [session, profile]);
 
   // Load favorites
   const loadFavourites = async () => {

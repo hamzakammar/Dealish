@@ -20,6 +20,42 @@ export default function DealCard({ deal }: DealCardProps) {
     return timeString.replace(/:\d{2}\s/, ''); // Remove ":00 " or ":30 " etc.
   };
 
+  const formatTimeFromString = (timeString?: string) => {
+    if (!timeString) return null;
+    // timeString is in format "HH:MM:SS" or "HH:MM"
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes || 0, 0);
+    const formatted = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return formatted.replace(/:\d{2}\s/, '');
+  };
+
+  const getDayNames = (dayNumbers: number[]): string => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const sortedDays = [...dayNumbers].sort((a, b) => a - b);
+    const names = sortedDays.map(day => dayNames[day]);
+    
+    // Format ranges like "Mon-Fri" or "Mon, Wed, Fri"
+    if (names.length <= 2) {
+      return names.join(', ');
+    }
+    
+    // Check if it's a consecutive range
+    const isConsecutive = sortedDays.every((day, index) => 
+      index === 0 || day === sortedDays[index - 1] + 1
+    );
+    
+    if (isConsecutive && names.length > 2) {
+      return `${names[0]}-${names[names.length - 1]}`;
+    }
+    
+    return names.join(', ');
+  };
+
   const isToday = (dateString?: string) => {
     if (!dateString) return false;
     const date = new Date(dateString);
@@ -30,6 +66,19 @@ export default function DealCard({ deal }: DealCardProps) {
   };
 
   const formatTimeRange = () => {
+    // Handle recurring deals
+    if (deal.is_recurring && deal.recurrence_days && deal.recurrence_start_time && deal.recurrence_end_time) {
+      const startTime = formatTimeFromString(deal.recurrence_start_time);
+      const endTime = formatTimeFromString(deal.recurrence_end_time);
+      const dayNames = getDayNames(deal.recurrence_days);
+      
+      if (startTime && endTime) {
+        return `${dayNames} ${startTime} - ${endTime}`;
+      }
+      return null;
+    }
+    
+    // Handle one-time deals
     if (!deal.start_at && !deal.end_at) return null;
     
     const startTime = deal.start_at ? formatTime(deal.start_at) : null;
@@ -67,12 +116,46 @@ export default function DealCard({ deal }: DealCardProps) {
   const getDealStatus = (): 'active' | 'upcoming' | 'expired' => {
     const now = new Date();
     
-    // Check if deal has ended
+    // Check overall validity period if set
     if (deal.end_at && new Date(deal.end_at) < now) {
       return 'expired';
     }
     
-    // Check if deal hasn't started yet
+    if (deal.start_at && new Date(deal.start_at) > now) {
+      return 'upcoming';
+    }
+    
+    // For recurring deals, check if it's active right now
+    if (deal.is_recurring) {
+      if (!deal.recurrence_days || !deal.recurrence_start_time || !deal.recurrence_end_time) {
+        return 'active'; // If recurring but missing fields, assume active
+      }
+      
+      const currentDay = now.getDay();
+      const currentTime = now.toTimeString().slice(0, 8);
+      
+      // Check if today is in recurrence days
+      if (!deal.recurrence_days.includes(currentDay)) {
+        return 'upcoming'; // Not today, but might be active on another day
+      }
+      
+      // Check if current time is within range
+      if (currentTime < deal.recurrence_start_time) {
+        return 'upcoming'; // Will be active later today
+      }
+      
+      if (currentTime > deal.recurrence_end_time) {
+        return 'upcoming'; // Was active earlier today, will be active again on next occurrence
+      }
+      
+      return 'active';
+    }
+    
+    // For one-time deals
+    if (deal.end_at && new Date(deal.end_at) < now) {
+      return 'expired';
+    }
+    
     if (deal.start_at && new Date(deal.start_at) > now) {
       return 'upcoming';
     }
