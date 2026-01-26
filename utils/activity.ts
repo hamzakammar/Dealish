@@ -1,6 +1,6 @@
 import { supabase } from "@/app/lib/supabase";
 
-export async function trackVisit(restaurantId: string): Promise<void> {
+export async function trackVisit(restaurantId: string, dealId?: string): Promise<void> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -30,6 +30,7 @@ export async function trackVisit(restaurantId: string): Promise<void> {
     const newActivity = {
       restaurant_id: restaurantId,
       activity_type: 'visit',
+      deal_id: dealId, // Optional: track which deal was scanned
       created_at: new Date().toISOString(),
     };
 

@@ -1,5 +1,6 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
+import { useProfileSetup } from "@/hooks/useProfileSetup";
 import { RecentActivityCard } from "@/components/RecentActivityCard";
 import { ActivityWithRestaurant } from "@/types/activity";
 import AntDesign from "@expo/vector-icons/AntDesign";
@@ -35,6 +36,7 @@ async function getFavouriteCount(userId: string): Promise<number> {
 
 export default function AccountPage() {
     const { session, profile, refetchProfile } = useAuthContext();
+    const { needsSetup } = useProfileSetup();
     const [loading, setLoading] = useState<boolean>(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [userName, setUserName] = useState<string>("User");
@@ -170,6 +172,12 @@ export default function AccountPage() {
     };
 
     useEffect(() => {
+        // Redirect to onboarding if profile is incomplete
+        if (needsSetup && session) {
+            router.replace('/onboarding');
+            return;
+        }
+
         const loadProfile = async () => {
             setLoading(true);
             if (!session?.user) {
@@ -323,7 +331,7 @@ export default function AccountPage() {
         loadFavourites();
         loadStats();
         loadRecentActivity();
-    }, [session, profile]);
+    }, [session, profile, needsSetup]);
 
 
     return (

@@ -32,7 +32,13 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Dealish to access your camera to scan QR codes for tracking visits."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

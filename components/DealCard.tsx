@@ -1,13 +1,15 @@
 import { Deal } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import DealQRCode from "./DealQRCode";
 
 type DealCardProps = {
   deal: Deal;
 };
 
 export default function DealCard({ deal }: DealCardProps) {
+  const [showQRCode, setShowQRCode] = useState(false);
   const formatTime = (dateString?: string) => {
     if (!dateString) return null;
     const date = new Date(dateString);
@@ -167,7 +169,8 @@ export default function DealCard({ deal }: DealCardProps) {
   const dealStatus = getDealStatus();
 
   return (
-    <View style={styles.dealCard}>
+    <>
+      <View style={styles.dealCard}>
       <View style={styles.dealHeader}>
         <Text style={styles.dealTitle}>{deal.title}</Text>
         {dealStatus === 'expired' && (
@@ -206,7 +209,23 @@ export default function DealCard({ deal }: DealCardProps) {
           </View>
         </View>
       )}
+
+      {/* QR Code Button - Users can show QR codes for restaurants to scan */}
+      <TouchableOpacity
+        style={styles.qrButton}
+        onPress={() => setShowQRCode(true)}
+      >
+        <Ionicons name="qr-code-outline" size={18} color="#FE902A" />
+        <Text style={styles.qrButtonText}>Show QR Code</Text>
+      </TouchableOpacity>
     </View>
+
+    <DealQRCode
+      deal={deal}
+      visible={showQRCode}
+      onClose={() => setShowQRCode(false)}
+    />
+    </>
   );
 }
 
@@ -294,5 +313,23 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: "#666",
+  },
+  qrButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFF5EB",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FE902A",
+    gap: 6,
+  },
+  qrButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FE902A",
   },
 });

@@ -1,10 +1,12 @@
 import { useAuthContext } from '@/app/providers/auth';
+import { useProfileSetup } from '@/hooks/useProfileSetup';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
   const { session, isLoading } = useAuthContext();
+  const { needsSetup, loading: profileLoading } = useProfileSetup();
   const router = useRouter();
 
   // Use useEffect for navigation to avoid mounting/unmounting issues with Redirect
@@ -14,12 +16,17 @@ export default function Index() {
     let isMounted = true;
 
     // Wait until loading is complete before redirecting
-    if (!isLoading) {
+    if (!isLoading && !profileLoading) {
       // Use requestAnimationFrame to ensure redirect happens after render completes
       timeoutId = setTimeout(() => {
         if (isMounted) {
           if (session) {
-            router.replace('/map');
+            // Check if profile needs setup
+            if (needsSetup) {
+              router.replace('/onboarding');
+            } else {
+              router.replace('/map');
+            }
           } else {
             router.replace('/auth');
           }
@@ -34,7 +41,7 @@ export default function Index() {
         clearTimeout(timeoutId);
       }
     };
-  }, [session, isLoading, router]);
+  }, [session, isLoading, profileLoading, needsSetup, router]);
 
   // Show loading while checking auth or during redirect
   return (
