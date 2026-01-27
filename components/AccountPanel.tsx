@@ -4,6 +4,7 @@ import RatingDisplay from "@/components/RatingDisplay";
 import { useAccountNavigation } from "@/hooks/useAccountNavigation";
 import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,11 +24,12 @@ type AccountPanelProps = {
   onClose: () => void;
   onSelectRestaurant?: (restaurant: Restaurant) => void;
   onPanToRestaurant?: (lat: number, lng: number) => void;
+  onOpenFilters?: () => void;
 };
 
 type PanelView = "menu" | "favourites";
 
-export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPanToRestaurant }: AccountPanelProps) {
+export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPanToRestaurant, onOpenFilters }: AccountPanelProps) {
   const { session, profile } = useAuthContext();
   const [userEmail, setUserEmail] = useState<string>("");
   const [userName, setUserName] = useState<string>("User");
@@ -159,6 +161,11 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
           error.message || "Unable to sign out. Please try again.",
           [{ text: "OK" }]
         );
+        setSigningOut(false);
+      } else {
+        // Successfully signed out - redirect to auth screen
+        onClose();
+        router.replace('/auth');
       }
     } catch (error: any) {
       Alert.alert(
@@ -166,7 +173,6 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
         error?.message || "An unexpected error occurred while signing out.",
         [{ text: "OK" }]
       );
-    } finally {
       setSigningOut(false);
     }
   };
@@ -192,11 +198,24 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
 
   const navigateToAccount = useAccountNavigation();
 
+  const handleSettingsPress = () => {
+    onClose();
+    router.push('/settings' as '/account');
+  };
+
+  const handleFiltersPress = () => {
+    onClose();
+    // Open filter panel if callback provided
+    if (onOpenFilters) {
+      onOpenFilters();
+    }
+  };
+
   const menuItems = [
     { label: "My Account", icon: "user", action: navigateToAccount },
-    { label: "Filters", icon: "filter", action: () => {} },
+    { label: "Filters", icon: "filter", action: handleFiltersPress },
     { label: "Favourites", icon: "heart", action: handleFavouritesPress },
-    { label: "Settings", icon: "setting", action: () => {} },
+    { label: "Settings", icon: "setting", action: handleSettingsPress },
     { label: "About", icon: "info", action: () => {} },
     { label: "Help", icon: "question", action: () => {} },
     { label: "Partner with us", icon: "like", action: () => {} },

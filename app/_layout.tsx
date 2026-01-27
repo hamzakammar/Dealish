@@ -4,12 +4,13 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -132,6 +133,7 @@ function RootLayoutNav() {
   
   return (
     <AuthProvider>
+      <NotificationHandler />
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
@@ -143,4 +145,25 @@ function RootLayoutNav() {
       </ThemeProvider>
     </AuthProvider>
   );
+}
+
+// Component to handle push notifications inside AuthProvider context
+function NotificationHandler() {
+  const router = useRouter();
+  
+  // Initialize push notifications (now inside AuthProvider)
+  const { notification, lastNotificationResponse } = usePushNotifications();
+
+  // Handle notification taps (both foreground and background)
+  useEffect(() => {
+    const notificationData = lastNotificationResponse?.notification.request.content.data || 
+                           notification?.request.content.data;
+    
+    if (notificationData?.screen) {
+      // Navigate to the screen specified in notification data
+      router.push(notificationData.screen as any);
+    }
+  }, [notification, lastNotificationResponse, router]);
+
+  return null; // This component doesn't render anything
 }

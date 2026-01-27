@@ -47,7 +47,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       if (session && sessionId) {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('*, settings')
           .eq('id', sessionId)
           .single()
         

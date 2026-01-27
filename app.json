@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Dealish"
+      "bundleIdentifier": "com.anonymous.Dealish",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +27,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Dealish"
+      "package": "com.anonymous.Dealish",
+      "useNextNotificationsApi": true
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +41,14 @@
         "expo-camera",
         {
           "cameraPermission": "Allow Dealish to access your camera to scan QR codes for tracking visits."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#FE902A",
+          "sounds": []
         }
       ]
     ],

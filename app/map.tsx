@@ -1,10 +1,12 @@
 import { useAuthContext } from "@/app/providers/auth";
 import AccountPanel from "@/components/AccountPanel";
+import FilterPanel from "@/components/FilterPanel";
 import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
 import UserLocationMarker from "@/components/UserLocationMarker";
 import { useDirections } from "@/hooks/useDirections";
+import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
@@ -36,6 +38,17 @@ export default function MapScreen() {
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
   const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
+  
+  // Filter restaurants
+  const {
+    filters,
+    updateFilters,
+    clearFilters,
+    filteredRestaurants,
+    isFilterPanelOpen,
+    setIsFilterPanelOpen,
+    activeFilterCount,
+  } = useRestaurantFilters(restaurants, userLocation);
 
   const loading = restaurantsLoading || locationLoading;
 
@@ -159,7 +172,7 @@ export default function MapScreen() {
         >
           {userLocation && <UserLocationMarker location={userLocation} />}
 
-          {restaurants.map((r) => {
+          {filteredRestaurants.map((r) => {
             const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
             return (
               <RestaurantMarker
@@ -181,14 +194,15 @@ export default function MapScreen() {
         </MapView>
       ) : (
         <RestaurantList
-          restaurants={restaurants}
+          restaurants={filteredRestaurants}
           onRestaurantPress={handleRestaurantSelect}
           selectedRestaurant={selectedRestaurant}
+          userLocation={userLocation}
         />
       )}
 
-      {/* Menu Button (opens account panel) - hidden when panel is open */}
-      {!isAccountPanelOpen && (
+      {/* Menu Button (opens account panel) - hidden when any panel is open */}
+      {!isAccountPanelOpen && !isFilterPanelOpen && (
         <TouchableOpacity
           style={styles.menuButton}
           onPress={() => setIsAccountPanelOpen(!isAccountPanelOpen)}
@@ -198,30 +212,36 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      {/* View Mode Toggle Button - disabled when no location */}
-      {hasLocationPermission && (
-        <TouchableOpacity
-          style={styles.viewToggleButton}
-          onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.viewToggleText}>
-            {viewMode === "map" ? "📋 List" : "🗺️ Map"}
-          </Text>
-        </TouchableOpacity>
+      {/* Hide view toggle and recenter button when filter panel is open */}
+      {!isFilterPanelOpen && (
+        <>
+          {/* View Mode Toggle Button - disabled when no location */}
+          {hasLocationPermission && (
+            <TouchableOpacity
+              style={styles.viewToggleButton}
+              onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewToggleText}>
+                {viewMode === "map" ? "📋 List" : "🗺️ Map"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {viewMode === "map" && userLocation && (
+            <TouchableOpacity
+              style={styles.recenterButton}
+              onPress={handleRecenter}
+              activeOpacity={0.8}
+            >
+              <AntDesign name="aim" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
-      {viewMode === "map" && userLocation && (
-        <TouchableOpacity
-          style={styles.recenterButton}
-          onPress={handleRecenter}
-          activeOpacity={0.8}
-        >
-          <AntDesign name="aim" size={18} color="#fff" />
-        </TouchableOpacity>
-      )}
-
-      {selectedRestaurant && (
+      {/* Hide restaurant detail card when filter panel is open */}
+      {selectedRestaurant && !isFilterPanelOpen && (
         <>
           <RestaurantDetailCard
             ref={restaurantCardRef}
@@ -263,6 +283,18 @@ export default function MapScreen() {
             800
           );
         }}
+        onOpenFilters={() => setIsFilterPanelOpen(true)}
+      />
+
+      {/* Filter Panel */}
+      <FilterPanel
+        isOpen={isFilterPanelOpen}
+        onClose={() => setIsFilterPanelOpen(false)}
+        filters={filters}
+        onFiltersChange={updateFilters}
+        onClearFilters={clearFilters}
+        restaurants={restaurants}
+        activeFilterCount={activeFilterCount}
       />
     </View>
   );
@@ -306,7 +338,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 2, // Lower than restaurant full screen (zIndex: 10)
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,

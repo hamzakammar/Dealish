@@ -151,6 +151,38 @@ export async function recordQRCodeScan(
       user_id: userId,
       scanned_at: new Date().toISOString(),
     });
+
+    // Send push notification for deal redemption
+    try {
+      const { sendPushNotification } = await import('./notifications');
+      const { data: deal } = await supabase
+        .from('deals')
+        .select('title, restaurant_id')
+        .eq('id', dealId)
+        .single();
+      
+      const { data: restaurant } = await supabase
+        .from('restaurants')
+        .select('name')
+        .eq('id', restaurantId)
+        .single();
+
+      if (deal && restaurant) {
+        await sendPushNotification(userId, {
+          type: 'deal_redeemed',
+          title: 'Deal Redeemed!',
+          body: `You redeemed: ${deal.title} at ${restaurant.name}`,
+          data: {
+            deal_id: dealId,
+            restaurant_id: restaurantId,
+            screen: '/account',
+          },
+        });
+      }
+    } catch (notifError) {
+      // Don't fail the scan if notification fails
+      console.error('Error sending redemption notification:', notifError);
+    }
   } catch (error) {
     console.error("Error recording QR code scan:", error);
     // Don't throw - this is for analytics, shouldn't block the flow
