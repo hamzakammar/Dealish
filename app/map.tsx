@@ -11,8 +11,9 @@ import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import MapView, { Camera, Polyline, Region } from "react-native-maps";
 
 const fallbackRegion: Region = {
@@ -34,6 +35,7 @@ export default function MapScreen() {
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -44,11 +46,43 @@ export default function MapScreen() {
     filters,
     updateFilters,
     clearFilters,
-    filteredRestaurants,
+    filteredRestaurants: filteredByFilters,
     isFilterPanelOpen,
     setIsFilterPanelOpen,
     activeFilterCount,
   } = useRestaurantFilters(restaurants, userLocation);
+
+  // Apply search filter on top of existing filters
+  const filteredRestaurants = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return filteredByFilters;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return filteredByFilters.filter((restaurant) =>
+      restaurant.name.toLowerCase().includes(query) ||
+      restaurant.address?.toLowerCase().includes(query) ||
+      restaurant.type?.toLowerCase().includes(query)
+    );
+  }, [filteredByFilters, searchQuery]);
+
+  // Get search suggestions (limited to top 5)
+  const searchSuggestions = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return [];
+    }
+    const query = searchQuery.toLowerCase().trim();
+    const matches = filteredByFilters.filter((restaurant) =>
+      restaurant.name.toLowerCase().includes(query) ||
+      restaurant.address?.toLowerCase().includes(query) ||
+      restaurant.type?.toLowerCase().includes(query)
+    );
+    return matches.slice(0, 5); // Limit to 5 suggestions
+  }, [filteredByFilters, searchQuery]);
+
+  const handleSuggestionPress = (restaurant: Restaurant) => {
+    setSearchQuery("");
+    handleRestaurantSelect(restaurant);
+  };
 
   const loading = restaurantsLoading || locationLoading;
 
@@ -296,6 +330,69 @@ export default function MapScreen() {
         restaurants={restaurants}
         activeFilterCount={activeFilterCount}
       />
+
+      {/* Search Bar at Bottom */}
+      {!isAccountPanelOpen && !isFilterPanelOpen && (
+        <View style={styles.searchContainer}>
+          {/* Suggestions List */}
+          {searchSuggestions.length > 0 && (
+            <View style={styles.suggestionsContainer}>
+              <FlatList
+                data={searchSuggestions}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.suggestionItem,
+                      index === searchSuggestions.length - 1 && styles.suggestionItemLast
+                    ]}
+                    onPress={() => handleSuggestionPress(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.suggestionIcon}>
+                      <Ionicons name="restaurant" size={18} color="#FE902A" />
+                    </View>
+                    <View style={styles.suggestionContent}>
+                      <Text style={styles.suggestionName}>{item.name}</Text>
+                      {item.address && (
+                        <Text style={styles.suggestionAddress} numberOfLines={1}>
+                          {item.address}
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                  </TouchableOpacity>
+                )}
+                scrollEnabled={false}
+              />
+            </View>
+          )}
+          
+          <View style={styles.searchBar}>
+            <View style={styles.searchIconContainer}>
+              <Ionicons name="search" size={20} color="#FE902A" />
+            </View>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search restaurants..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                style={styles.clearButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <AntDesign name="closecircle" size={18} color="#999" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -344,5 +441,98 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 3,
+  },
+  searchContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    paddingTop: 8,
+    backgroundColor: 'transparent',
+    zIndex: 5, // Above map, below panels
+  },
+  suggestionsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 8,
+    maxHeight: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: '#FE902A',
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  suggestionItemLast: {
+    borderBottomWidth: 0,
+  },
+  suggestionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FFF5EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  suggestionContent: {
+    flex: 1,
+  },
+  suggestionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  suggestionAddress: {
+    fontSize: 13,
+    color: '#666',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: '#FE902A',
+  },
+  searchIconContainer: {
+    padding: 10,
+    marginLeft: 4,
+    borderRadius: 10,
+    backgroundColor: '#FFF5EB',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    fontWeight: '500',
+  },
+  clearButton: {
+    marginRight: 8,
+    padding: 6,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
   },
 });
