@@ -25,7 +25,7 @@ const validateEmail = (email: string) => {
   
 
 export default function AuthScreen() {
-  const { session, isLoading } = useAuthContext();
+  const { session, isLoading, refetchProfile } = useAuthContext();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -204,6 +204,9 @@ export default function AuthScreen() {
               // Continue anyway - role can be updated later
             }
 
+            // Refresh profile in auth context to ensure it's up to date
+            await refetchProfile();
+
             // User is signed in immediately, redirect based on role
             setTimeout(() => {
               if (selectedRole === 'owner') {
@@ -211,7 +214,7 @@ export default function AuthScreen() {
               } else {
                 router.replace('/map');
               }
-            }, 100);
+            }, 200);
           } else {
             // Email confirmation required
             // Store role preference in user metadata so we can set it after confirmation
@@ -230,7 +233,7 @@ export default function AuthScreen() {
           }
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -250,11 +253,26 @@ export default function AuthScreen() {
         } else {
           // Clear rate limit on success
           await clearRateLimit();
-          // Immediately redirect after successful sign-in
-          // Small delay to ensure session is fully set
+          
+          // Fetch profile to check role
+          await refetchProfile();
+          
+          // Get updated profile to check role
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', signInData.user.id)
+            .single();
+          
+          // Redirect based on role after successful sign-in
+          // Small delay to ensure session is fully set and profile is refreshed
           setTimeout(() => {
-            router.replace('/map');
-          }, 100);
+            if (profile?.role === 'owner' || profile?.role === 'admin') {
+              router.replace('/admin');
+            } else {
+              router.replace('/map');
+            }
+          }, 200);
         }
       }
     } catch (error: any) {
@@ -379,11 +397,25 @@ export default function AuthScreen() {
                         .eq('id', sessionData.user.id);
                     }
 
-                    // Immediately redirect after OAuth success
-                    // Small delay to ensure session is fully set
+                    // Fetch updated profile to get the correct role
+                    const { data: updatedProfile } = await supabase
+                      .from('profiles')
+                      .select('role')
+                      .eq('id', sessionData.user.id)
+                      .single();
+
+                    // Refresh profile in auth context to ensure it's up to date
+                    await refetchProfile();
+
+                    // Redirect based on role after OAuth success
+                    // Small delay to ensure session is fully set and profile is refreshed
                     setTimeout(() => {
-                      router.replace('/map');
-                    }, 100);
+                      if (updatedProfile?.role === 'owner' || updatedProfile?.role === 'admin') {
+                        router.replace('/admin');
+                      } else {
+                        router.replace('/map');
+                      }
+                    }, 200);
                 } else {
                     console.warn('No session data returned after setSession');
                     Alert.alert('Error', 'Failed to create session. Please try again.');

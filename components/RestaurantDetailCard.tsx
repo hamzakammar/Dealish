@@ -784,6 +784,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginRight: 12,
+    overflow: "hidden",
   },
   logo: {
     width: 64,

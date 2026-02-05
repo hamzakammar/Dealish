@@ -11,19 +11,21 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FE902A"
     },
+    "icon": "./assets/images/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Dealish",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "NSAllowsLocalNetworking": true,
+        "NSBonjourServices": ["_http._tcp"]
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FE902A"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -43,14 +45,16 @@
           "cameraPermission": "Allow Dealish to access your camera to scan QR codes for tracking visits."
         }
       ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/icon.png",
-          "color": "#FE902A",
-          "sounds": []
-        }
-      ]
+      "./plugins/withEntitlementsModification"
+      // Temporarily disabled - requires paid Apple Developer account for Push Notifications
+      // [
+      //   "expo-notifications",
+      //   {
+      //     "icon": "./assets/images/icon.png",
+      //     "color": "#FE902A",
+      //     "sounds": []
+      //   }
+      // ]
     ],
     "experiments": {
       "typedRoutes": true

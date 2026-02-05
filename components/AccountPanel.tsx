@@ -349,6 +349,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                       <Image
                         source={{ uri: item.logo_url }}
                         style={styles.favoriteImage}
+                        resizeMode="contain"
                       />
                     )}
                     <View style={styles.favoriteInfo}>
@@ -491,6 +492,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 6,
     backgroundColor: "#f0f0f0",
+    overflow: "hidden",
   },
   favoriteInfo: {
     flex: 1,

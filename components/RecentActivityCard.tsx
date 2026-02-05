@@ -1,7 +1,7 @@
 // This is a placeholder for the RecentActivityCard component
+import RatingDisplay from "@/components/RatingDisplay";
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
-import RatingDisplay from "@/components/RatingDisplay";
 
 interface RecentActivityCardProps {
   logo: string;
@@ -55,6 +55,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 16,
+    overflow: "hidden",
   },
   logo: {
     width: 44,

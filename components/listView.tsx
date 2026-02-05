@@ -57,6 +57,7 @@ function RestaurantCard({
       <Image
         source={{ uri: restaurant.logo_url || restaurant.image_url }}
         style={styles.image}
+        resizeMode="contain"
       />
       <View style={styles.content}>
         <View>
@@ -357,6 +358,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f0f0",
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
+    overflow: "hidden",
   },
   content: {
     flex: 1,
