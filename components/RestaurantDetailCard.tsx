@@ -8,19 +8,20 @@ import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Easing,
-  Image,
-  PanResponder,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    Easing,
+    Image,
+    PanResponder,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View
 } from "react-native";
 
 // Enable LayoutAnimation on Android
@@ -120,6 +121,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
 }, ref) => {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
+  const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
   
   /**
    * Sheet state management
@@ -176,6 +178,43 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     } catch (e: any) {
       console.warn("toggleFavourite error:", e.message ?? e);
       setIsFavouriteState(prev); // rollback
+    }
+  }
+
+  async function handlePartnerRequest(): Promise<void> {
+    const user = await supabase.auth.getUser();
+    const userId = user.data?.user?.id;
+    if (!userId) {
+      Alert.alert("Authentication Required", "Please sign in to request this restaurant to become a partner.");
+      return;
+    }
+
+    setIsRequestingPartner(true);
+
+    try {
+      const { error } = await supabase
+        .from("partner_requests")
+        .insert({
+          restaurant_id: restaurant.id,
+          user_id: userId,
+          status: "pending",
+        });
+
+      if (error) {
+        // Check if it's a duplicate request
+        if (error.code === "23505") {
+          Alert.alert("Request Already Submitted", "You have already requested this restaurant to become a partner.");
+        } else {
+          throw error;
+        }
+      } else {
+        Alert.alert("Request Submitted", "Your request has been submitted successfully!");
+      }
+    } catch (e: any) {
+      console.error("Partner request error:", e.message ?? e);
+      Alert.alert("Error", "Failed to submit partner request. Please try again.");
+    } finally {
+      setIsRequestingPartner(false);
     }
   }
 
@@ -578,6 +617,26 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             </View>
           )}
 
+          {/* Partner request button - show for non-partner restaurants in half and full states */}
+          {!restaurant.partner && (
+            <View style={styles.partnerRequestSection}>
+              <TouchableOpacity
+                style={[styles.partnerRequestButton, isRequestingPartner && styles.partnerRequestButtonDisabled]}
+                onPress={handlePartnerRequest}
+                disabled={isRequestingPartner}
+              >
+                {isRequestingPartner ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <AntDesign name="star" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.partnerRequestButtonText}>Request this restaurant to be a partner</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Deals section */}
           <View style={sheetState === 'full' ? styles.fullDealsSection : styles.dealsSection}>
             <Text style={styles.sectionTitle}>Available Deals</Text>
@@ -872,6 +931,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#555",
     lineHeight: 22,
+  },
+  partnerRequestSection: {
+    marginBottom: 20,
+  },
+  partnerRequestButton: {
+    backgroundColor: "#FE902A",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  partnerRequestButtonDisabled: {
+    opacity: 0.6,
+  },
+  partnerRequestButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
   },
   infoRow: {
     flexDirection: "row",

@@ -29,9 +29,11 @@ export function useUserLocation(mapRef: React.RefObject<any>) {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert(
-            "Location required",
-            "We need location to show navigation and nearby deals."
+          const { showSettingsAlert, getPermissionInfo } = require('@/utils/permissions');
+          const info = getPermissionInfo('location');
+          showSettingsAlert(
+            info.title,
+            info.settingsDescription
           );
           if (mounted) setLoading(false);
           return;

@@ -10,8 +10,8 @@ import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
-import AntDesign from "@expo/vector-icons/AntDesign";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import MapView, { Camera, Polyline, Region } from "react-native-maps";
@@ -25,6 +25,7 @@ const fallbackRegion: Region = {
 
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
+  const blurredMapRef = useRef<MapView | null>(null);
   const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
   const currentRegionRef = useRef<Region | null>(null);
   const regionBeforeSelectRef = useRef<Region | null>(null);
@@ -181,97 +182,183 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      {viewMode === "map" ? (
-        <MapView
-          ref={(r) => {
-            mapRef.current = r;
-          }}
-          style={{ flex: 1 }}
-          initialRegion={region ?? fallbackRegion}
-          showsMyLocationButton={true}
-          mapType={mapType}
-          onRegionChangeComplete={(r) => {
-            currentRegionRef.current = r;
-          }}
-          onPress={(e) => {
-            // Close restaurant card when tapping on map (not on markers)
-            if (e.nativeEvent.action === 'marker-press') {
-              return; // Don't close if tapping a marker
-            }
-            if (selectedRestaurant) {
-              // Use the animated close method
-              restaurantCardRef.current?.closeWithAnimation();
-            }
-          }}
-        >
-          {userLocation && <UserLocationMarker location={userLocation} />}
+      <View style={styles.contentWrapper}>
+        {viewMode === "map" ? (
+          <MapView
+            ref={(r) => {
+              mapRef.current = r;
+            }}
+            style={{ flex: 1 }}
+            initialRegion={region ?? fallbackRegion}
+            showsMyLocationButton={true}
+            mapType={mapType}
+            onRegionChangeComplete={(r) => {
+              currentRegionRef.current = r;
+              // Sync blurred map background with main map
+              if (blurredMapRef.current) {
+                blurredMapRef.current.animateToRegion(r, 0);
+              }
+            }}
+            onPress={(e) => {
+              // Close restaurant card when tapping on map (not on markers)
+              if (e.nativeEvent.action === 'marker-press') {
+                return; // Don't close if tapping a marker
+              }
+              if (selectedRestaurant) {
+                // Use the animated close method
+                restaurantCardRef.current?.closeWithAnimation();
+              }
+            }}
+          >
+            {userLocation && <UserLocationMarker location={userLocation} />}
 
-          {filteredRestaurants.map((r) => {
-            const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
-            return (
-              <RestaurantMarker
-                key={r.id}
-                restaurant={r}
-                isSelected={isSelected}
-                onPress={handleRestaurantSelect}
+            {filteredRestaurants.map((r) => {
+              const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
+              return (
+                <RestaurantMarker
+                  key={r.id}
+                  restaurant={r}
+                  isSelected={isSelected}
+                  onPress={handleRestaurantSelect}
+                />
+              );
+            })}
+
+            {routeCoordinates.length > 0 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#FE902A"
+                strokeWidth={4}
               />
-            );
-          })}
+            )}
+          </MapView>
+        ) : (
+          <RestaurantList
+            restaurants={filteredRestaurants}
+            onRestaurantPress={handleRestaurantSelect}
+            selectedRestaurant={selectedRestaurant}
+            userLocation={userLocation}
+          />
+        )}
+      </View>
 
-          {routeCoordinates.length > 0 && (
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor="#FE902A"
-              strokeWidth={4}
-            />
-          )}
-        </MapView>
-      ) : (
-        <RestaurantList
-          restaurants={filteredRestaurants}
-          onRestaurantPress={handleRestaurantSelect}
-          selectedRestaurant={selectedRestaurant}
-          userLocation={userLocation}
-        />
-      )}
-
-      {/* Menu Button (opens account panel) - hidden when any panel is open */}
+      {/* Top Search and Controls Bar */}
       {!isAccountPanelOpen && !isFilterPanelOpen && (
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => setIsAccountPanelOpen(!isAccountPanelOpen)}
-          activeOpacity={0.8}
-        >
-          <AntDesign name="menu" size={24} color="#fff" />
-        </TouchableOpacity>
-      )}
-
-      {/* Hide view toggle and recenter button when filter panel is open */}
-      {!isFilterPanelOpen && (
-        <>
-          {/* View Mode Toggle Button - disabled when no location */}
-          {hasLocationPermission && (
+        <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: '#fff' }]}>
+          {/* Blurred Map Background - only show in map view */}
+          {viewMode === "map" && region && (
+            <View style={styles.blurredMapBackground}>
+              <MapView
+                ref={(r) => {
+                  blurredMapRef.current = r;
+                }}
+                style={StyleSheet.absoluteFillObject}
+                region={currentRegionRef.current || region || fallbackRegion}
+                mapType={mapType}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                pitchEnabled={false}
+                rotateEnabled={false}
+                toolbarEnabled={false}
+              />
+              <BlurView intensity={60} style={StyleSheet.absoluteFillObject} tint="light" />
+            </View>
+          )}
+          <View style={styles.topBarContent}>
+            <View style={styles.topBar}>
+            {/* Settings Button */}
             <TouchableOpacity
-              style={styles.viewToggleButton}
-              onPress={() => setViewMode(viewMode === "map" ? "list" : "map")}
-              activeOpacity={0.8}
+              style={styles.topActionButton}
+              onPress={() => setIsAccountPanelOpen(true)}
+              activeOpacity={0.7}
             >
-              <Text style={styles.viewToggleText}>
-                {viewMode === "map" ? "📋 List" : "🗺️ Map"}
+              <Ionicons name="settings-outline" size={20} color="#666" />
+            </TouchableOpacity>
+
+            {/* Search Bar */}
+            <View style={styles.topSearchBar}>
+              <Ionicons name="search" size={18} color="#999" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.topSearchInput}
+                placeholder="Search"
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery("")}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#999" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Filter and Location Buttons */}
+            <TouchableOpacity
+              style={[styles.topActionButton, activeFilterCount > 0 && styles.topActionButtonActive]}
+              onPress={() => setIsFilterPanelOpen(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="options" size={18} color={activeFilterCount > 0 ? "#FE902A" : "#666"} />
+              {activeFilterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.topActionButton}
+              onPress={handleRecenter}
+              activeOpacity={0.7}
+              disabled={!userLocation || viewMode !== "map"}
+            >
+              <Ionicons 
+                name="location" 
+                size={18} 
+                color={userLocation && viewMode === "map" ? "#666" : "#CCC"} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* List/Map Toggle */}
+          <View style={styles.viewToggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.viewToggleSegment,
+                viewMode === "list" && styles.viewToggleSegmentActive
+              ]}
+              onPress={() => setViewMode("list")}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.viewToggleText,
+                viewMode === "list" && styles.viewToggleTextActive
+              ]}>
+                List
               </Text>
             </TouchableOpacity>
-          )}
-
-          {viewMode === "map" && userLocation && (
             <TouchableOpacity
-              style={styles.recenterButton}
-              onPress={handleRecenter}
-              activeOpacity={0.8}
+              style={[
+                styles.viewToggleSegment,
+                viewMode === "map" && styles.viewToggleSegmentActive
+              ]}
+              onPress={() => setViewMode("map")}
+              activeOpacity={0.7}
+              disabled={!hasLocationPermission}
             >
-              <AntDesign name="aim" size={18} color="#fff" />
+              <Text style={[
+                styles.viewToggleText,
+                viewMode === "map" && styles.viewToggleTextActive,
+                !hasLocationPermission && styles.viewToggleTextDisabled
+              ]}>
+                Map
+              </Text>
             </TouchableOpacity>
-          )}
-        </>
+          </View>
+          </View>
+        </View>
       )}
 
       {/* Hide restaurant detail card when filter panel is open */}
@@ -289,6 +376,11 @@ export default function MapScreen() {
       )}
 
       {/* {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />} */}
+
+      {/* White overlay when account panel is open */}
+      {isAccountPanelOpen && (
+        <View style={styles.accountPanelOverlay} />
+      )}
 
       {/* Account Panel */}
       <AccountPanel
@@ -331,66 +423,37 @@ export default function MapScreen() {
         activeFilterCount={activeFilterCount}
       />
 
-      {/* Search Bar at Bottom */}
-      {!isAccountPanelOpen && !isFilterPanelOpen && (
-        <View style={styles.searchContainer}>
-          {/* Suggestions List */}
-          {searchSuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              <FlatList
-                data={searchSuggestions}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item, index }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.suggestionItem,
-                      index === searchSuggestions.length - 1 && styles.suggestionItemLast
-                    ]}
-                    onPress={() => handleSuggestionPress(item)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.suggestionIcon}>
-                      <Ionicons name="restaurant" size={18} color="#FE902A" />
-                    </View>
-                    <View style={styles.suggestionContent}>
-                      <Text style={styles.suggestionName}>{item.name}</Text>
-                      {item.address && (
-                        <Text style={styles.suggestionAddress} numberOfLines={1}>
-                          {item.address}
-                        </Text>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#ccc" />
-                  </TouchableOpacity>
-                )}
-                scrollEnabled={false}
-              />
-            </View>
-          )}
-          
-          <View style={styles.searchBar}>
-            <View style={styles.searchIconContainer}>
-              <Ionicons name="search" size={20} color="#FE902A" />
-            </View>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search restaurants..."
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {searchQuery.length > 0 && (
+      {/* Search Suggestions Dropdown */}
+      {!isAccountPanelOpen && !isFilterPanelOpen && searchSuggestions.length > 0 && (
+        <View style={styles.suggestionsContainer}>
+          <FlatList
+            data={searchSuggestions}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
               <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                style={styles.clearButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[
+                  styles.suggestionItem,
+                  index === searchSuggestions.length - 1 && styles.suggestionItemLast
+                ]}
+                onPress={() => handleSuggestionPress(item)}
+                activeOpacity={0.7}
               >
-                <AntDesign name="closecircle" size={18} color="#999" />
+                <View style={styles.suggestionIcon}>
+                  <Ionicons name="restaurant" size={18} color="#FE902A" />
+                </View>
+                <View style={styles.suggestionContent}>
+                  <Text style={styles.suggestionName}>{item.name}</Text>
+                  {item.address && (
+                    <Text style={styles.suggestionAddress} numberOfLines={1}>
+                      {item.address}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#ccc" />
               </TouchableOpacity>
             )}
-          </View>
+            scrollEnabled={false}
+          />
         </View>
       )}
     </View>
@@ -408,20 +471,111 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     zIndex: 10,
   },
-  viewToggleButton: {
+  topBarContainer: {
     position: 'absolute',
-    top: 50,
-    right: 16,
-    backgroundColor: '#FE902A',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  blurredMapBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  topBarContent: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  topSearchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingLeft: 12,
+    paddingRight: 12,
+    height: 44,
+  },
+  topSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    padding: 0,
+    margin: 0,
+  },
+  topActionButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  topActionButtonActive: {
+    backgroundColor: '#FFF5EB',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FE902A',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  filterBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  viewToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#E9EAEB',
+    borderRadius: 10,
+    padding: 4,
+    height: 44,
+  },
+  viewToggleSegment: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    height: '100%',
+  },
+  viewToggleSegmentActive: {
+    backgroundColor: '#FE902A',
   },
   viewToggleText: {
-    color: '#fff',
+    fontSize: 15,
     fontWeight: '600',
-    fontSize: 14,
+    color: '#666',
+  },
+  viewToggleTextActive: {
+    color: '#fff',
+  },
+  viewToggleTextDisabled: {
+    color: '#CCC',
   },
   recenterButton: {
     position: 'absolute',
@@ -454,9 +608,13 @@ const styles = StyleSheet.create({
     zIndex: 5, // Above map, below panels
   },
   suggestionsContainer: {
+    position: 'absolute',
+    top: 110,
+    left: 16,
+    right: 16,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 8,
+    borderRadius: 12,
+    marginTop: 8,
     maxHeight: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -466,6 +624,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#FE902A',
     overflow: 'hidden',
+    zIndex: 11,
   },
   suggestionItem: {
     flexDirection: 'row',
@@ -534,5 +693,18 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 12,
     backgroundColor: '#f5f5f5',
+  },
+  contentWrapper: {
+    flex: 1,
+    paddingTop: 160, // Space for top bar container
+  },
+  accountPanelOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    zIndex: 5,
   },
 });

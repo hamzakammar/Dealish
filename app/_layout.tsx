@@ -137,10 +137,17 @@ function RootLayoutNav() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
+          <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="map" options={{ headerShown: false }} />
           <Stack.Screen name="account" options={{ headerShown: false }} />
           <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+          <Stack.Screen name="admin" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/deals" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/deal-form" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/restaurant" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/analytics" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/create-restaurant" options={{ headerShown: false }} />
         </Stack>
       </ThemeProvider>
     </AuthProvider>

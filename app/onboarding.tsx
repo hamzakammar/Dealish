@@ -1,18 +1,18 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
 
 type OnboardingStep = "welcome" | "name" | "location" | "complete";
 
@@ -41,9 +41,29 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     // Allow skipping onboarding, but mark that it was skipped
-    router.replace("/map");
+    // Check role before redirecting
+    if (session?.user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+      
+      try {
+        if (profile?.role === 'owner' || profile?.role === 'admin') {
+          router.replace("/admin");
+        } else {
+          router.replace("/map");
+        }
+      } catch (error) {
+        console.error("Navigation error:", error);
+        router.replace("/map");
+      }
+    } else {
+      router.replace("/map");
+    }
   };
 
   const handleComplete = async () => {
@@ -55,8 +75,8 @@ export default function OnboardingScreen() {
     setSaving(true);
 
     try {
-      const updateData: { full_name: string; location: string } = {
-        full_name: name.trim(),
+      const updateData: { display_name: string; location: string } = {
+        display_name: name.trim(),
         location: location.trim(),
       };
 
@@ -72,13 +92,29 @@ export default function OnboardingScreen() {
         return;
       }
 
-      // Refresh profile
+      // Refresh profile to get updated role
       await refetchProfile();
+      
+      // Get updated profile to check role
+      const { data: updatedProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
 
-      // Show completion step briefly, then navigate
+      // Show completion step briefly, then navigate based on role
       setCurrentStep("complete");
       setTimeout(() => {
-        router.replace("/map");
+        try {
+          if (updatedProfile?.role === 'owner' || updatedProfile?.role === 'admin') {
+            router.replace("/admin");
+          } else {
+            router.replace("/map");
+          }
+        } catch (error) {
+          console.error("Navigation error:", error);
+          router.replace("/map");
+        }
       }, 1500);
     } catch (error: any) {
       console.error("Error completing onboarding:", error);
@@ -148,7 +184,7 @@ export default function OnboardingScreen() {
         return (
           <View style={styles.stepContainer}>
             <View style={styles.iconContainer}>
-              <AntDesign name="checkcircle" size={64} color="#4CAF50" />
+              <AntDesign name="check-circle" size={64} color="#4CAF50" />
             </View>
             <Text style={styles.title}>All set!</Text>
             <Text style={styles.description}>

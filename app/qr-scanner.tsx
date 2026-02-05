@@ -1,14 +1,15 @@
+import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import QRScanner from "@/components/QRScanner";
-import { parseQRCodeData, validateQRCode, recordQRCodeScan } from "@/utils/qrCode";
 import { trackVisit } from "@/utils/activity";
+import { parseQRCodeData, recordQRCodeScan, validateQRCode } from "@/utils/qrCode";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
-import { supabase } from "@/app/lib/supabase";
+import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function QRScannerScreen() {
-  const { session } = useAuthContext();
+  const { session, profile } = useAuthContext();
   const [processing, setProcessing] = useState(false);
 
   const handleScan = async (data: string) => {
@@ -71,7 +72,12 @@ export default function QRScannerScreen() {
             style: "cancel",
             onPress: () => {
               setProcessing(false);
-              router.back();
+              try {
+                router.back();
+              } catch (error) {
+                console.error('Navigation error:', error);
+                router.replace('/map');
+              }
             },
           },
           {
@@ -79,7 +85,12 @@ export default function QRScannerScreen() {
             onPress: () => {
               // Could navigate to redemption tracking in the future
               setProcessing(false);
-              router.back();
+              try {
+                router.back();
+              } catch (error) {
+                console.error('Navigation error:', error);
+                router.replace('/map');
+              }
             },
           },
         ]
@@ -92,12 +103,36 @@ export default function QRScannerScreen() {
   };
 
   const handleClose = () => {
-    router.back();
+    try {
+      // Return to admin dashboard for owners/admins, otherwise go back
+      if (profile?.role === 'owner' || profile?.role === 'admin') {
+        router.replace('/admin');
+      } else {
+        router.back();
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback navigation
+      try {
+        router.replace('/map');
+      } catch (fallbackError) {
+        console.error('Fallback navigation failed:', fallbackError);
+      }
+    }
   };
 
   return (
     <View style={styles.container}>
       <QRScanner onScan={handleScan} onClose={handleClose} />
+      {/* Back button for admin users */}
+      {(profile?.role === 'owner' || profile?.role === 'admin') && (
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleClose}
+        >
+          <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -106,5 +141,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });

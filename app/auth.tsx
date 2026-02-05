@@ -36,6 +36,8 @@ export default function AuthScreen() {
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<'user' | 'owner'>('user');
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
   const redirectingRef = useRef(false);
 
   // ALL hooks must be called BEFORE any conditional returns, in consistent order
@@ -63,6 +65,33 @@ export default function AuthScreen() {
     // Only redirect if we're loaded, have a session, and haven't already initiated redirect
     if (!isLoading && session && !redirectingRef.current) {
       redirectingRef.current = true;
+      
+      // Check if user has preferred_role in metadata and set it to profile
+      const checkAndSetRole = async () => {
+        try {
+          const preferredRole = session.user.user_metadata?.preferred_role;
+          if (preferredRole && (preferredRole === 'user' || preferredRole === 'owner')) {
+            // Check current profile role
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .single();
+            
+            // If profile doesn't have a role set, use the preferred role from metadata
+            if (profile && !profile.role) {
+              await supabase
+                .from('profiles')
+                .update({ role: preferredRole })
+                .eq('id', session.user.id);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking/setting role:', error);
+        }
+      };
+      
+      checkAndSetRole();
       
       // Use setTimeout with 0 delay to ensure redirect happens after render completes
       timeoutId = setTimeout(() => {
@@ -139,11 +168,17 @@ export default function AuthScreen() {
       setPasswordError('Password must be at least 6 characters');
       return;
     }
+
+    // For sign-up, show role selection if not already shown
+    if (isSignUp && !showRoleSelection) {
+      setShowRoleSelection(true);
+      return;
+    }
   
     setLoading(true);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { error, data } = await supabase.auth.signUp({
           email,
           password,
         });
@@ -154,10 +189,45 @@ export default function AuthScreen() {
         } else {
           // Clear rate limit on success
           await clearRateLimit();
-          Alert.alert(
-            'Success', 
-            'Check your email for the confirmation link!'
-          );
+          // For sign-up, check if email confirmation is required
+          // If not required, user is automatically signed in
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && data.user) {
+            // Update profile with selected role
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .update({ role: selectedRole })
+              .eq('id', data.user.id);
+
+            if (profileError) {
+              console.error('Error updating profile role:', profileError);
+              // Continue anyway - role can be updated later
+            }
+
+            // User is signed in immediately, redirect based on role
+            setTimeout(() => {
+              if (selectedRole === 'owner') {
+                router.replace('/admin');
+              } else {
+                router.replace('/map');
+              }
+            }, 100);
+          } else {
+            // Email confirmation required
+            // Store role preference in user metadata so we can set it after confirmation
+            if (data.user) {
+              const { error: metadataError } = await supabase.auth.updateUser({
+                data: { preferred_role: selectedRole }
+              });
+              if (metadataError) {
+                console.error('Error storing role preference:', metadataError);
+              }
+            }
+            Alert.alert(
+              'Success', 
+              'Check your email for the confirmation link!'
+            );
+          }
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -180,6 +250,11 @@ export default function AuthScreen() {
         } else {
           // Clear rate limit on success
           await clearRateLimit();
+          // Immediately redirect after successful sign-in
+          // Small delay to ensure session is fully set
+          setTimeout(() => {
+            router.replace('/map');
+          }, 100);
         }
       }
     } catch (error: any) {
@@ -284,9 +359,31 @@ export default function AuthScreen() {
                     return;
                 }
                 
-                if (sessionData?.session) {
+                if (sessionData?.session && sessionData.user) {
                     console.log('OAuth authentication successful - session created');
-                    // Session is set, AuthProvider will handle navigation automatically
+                    
+                    // Check if this is a new user (first time OAuth sign-in)
+                    // For new users, we'll default to 'user' role, but they can change it later
+                    // For existing users, keep their existing role
+                    const { data: existingProfile } = await supabase
+                      .from('profiles')
+                      .select('role')
+                      .eq('id', sessionData.user.id)
+                      .single();
+
+                    // If no profile exists or role is not set, default to 'user'
+                    if (!existingProfile || !existingProfile.role) {
+                      await supabase
+                        .from('profiles')
+                        .update({ role: 'user' })
+                        .eq('id', sessionData.user.id);
+                    }
+
+                    // Immediately redirect after OAuth success
+                    // Small delay to ensure session is fully set
+                    setTimeout(() => {
+                      router.replace('/map');
+                    }, 100);
                 } else {
                     console.warn('No session data returned after setSession');
                     Alert.alert('Error', 'Failed to create session. Please try again.');
@@ -428,8 +525,65 @@ export default function AuthScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Role selection for sign-up */}
+        {isSignUp && showRoleSelection && (
+          <View style={styles.roleSelectionContainer}>
+            <Text style={styles.roleSelectionTitle}>I am a...</Text>
+            <View style={styles.roleButtonsContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.roleButton,
+                  selectedRole === 'user' && styles.roleButtonSelected
+                ]}
+                onPress={() => setSelectedRole('user')}
+              >
+                <Ionicons 
+                  name="person" 
+                  size={24} 
+                  color={selectedRole === 'user' ? '#fff' : '#666'} 
+                />
+                <Text style={[
+                  styles.roleButtonText,
+                  selectedRole === 'user' && styles.roleButtonTextSelected
+                ]}>
+                  Customer
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.roleButton,
+                  selectedRole === 'owner' && styles.roleButtonSelected
+                ]}
+                onPress={() => setSelectedRole('owner')}
+              >
+                <Ionicons 
+                  name="restaurant" 
+                  size={24} 
+                  color={selectedRole === 'owner' ? '#fff' : '#666'} 
+                />
+                <Text style={[
+                  styles.roleButtonText,
+                  selectedRole === 'owner' && styles.roleButtonTextSelected
+                ]}>
+                  Restaurant Owner
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setShowRoleSelection(false)}
+            >
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <TouchableOpacity 
-          onPress={() => setIsSignUp(!isSignUp)}
+          onPress={() => {
+            setIsSignUp(!isSignUp);
+            setShowRoleSelection(false);
+            setSelectedRole('user');
+          }}
           style={styles.toggleButton}
           accessibilityLabel={isSignUp ? "Switch to Sign In" : "Switch to Sign Up"}
           accessibilityHint={isSignUp ? "Switches to the sign in form for existing users" : "Switches to the sign up form to create a new account"}
@@ -662,5 +816,58 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  roleSelectionContainer: {
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  roleSelectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  roleButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  roleButton: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+  },
+  roleButtonSelected: {
+    borderColor: '#FE902A',
+    backgroundColor: '#FE902A',
+  },
+  roleButtonText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
+  },
+  roleButtonTextSelected: {
+    color: '#fff',
+  },
+  backButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  backButtonText: {
+    color: '#FE902A',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

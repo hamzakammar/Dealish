@@ -1,18 +1,18 @@
-import { useUserSettings } from "@/hooks/useUserSettings";
-import { useAuthContext } from "@/app/providers/auth";
 import { supabase } from "@/app/lib/supabase";
+import { useAuthContext } from "@/app/providers/auth";
 import PasswordChangeModal from "@/components/PasswordChangeModal";
-import { router } from "expo-router";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function SettingsScreen() {
@@ -88,7 +88,11 @@ export default function SettingsScreen() {
               // Sign out and redirect
               const { error: signOutError } = await supabase.auth.signOut();
               if (!signOutError) {
-                router.replace("/auth");
+                try {
+                  router.replace("/auth");
+                } catch (navError) {
+                  console.error('Navigation error:', navError);
+                }
               } else {
                 throw signOutError;
               }
@@ -136,7 +140,17 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => {
+            try {
+              router.back();
+            } catch (error) {
+              console.error('Navigation error:', error);
+              router.replace('/map');
+            }
+          }}
+        >
           <View style={styles.backIconBox}>
             <AntDesign name="left" size={20} color="#FE902A" />
           </View>
@@ -309,6 +323,25 @@ export default function SettingsScreen() {
             ))}
           </View>
         </View>
+      </View>
+
+      {/* Permissions Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Permissions</Text>
+        <TouchableOpacity 
+          style={styles.accountButton} 
+          onPress={() => {
+            try {
+              router.push('/permissions');
+            } catch (error) {
+              console.error('Navigation error:', error);
+              Alert.alert('Error', 'Failed to open permissions screen');
+            }
+          }}
+        >
+          <Text style={styles.accountButtonText}>Manage Permissions</Text>
+          <AntDesign name="right" size={16} color="#666" />
+        </TouchableOpacity>
       </View>
 
       {/* Account Section */}

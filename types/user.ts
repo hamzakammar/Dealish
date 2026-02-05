@@ -3,7 +3,9 @@ import { UserSettings } from "./settings";
 export type Profile = {
     id: string;
     email?: string;
-    full_name?: string;
+    display_name?: string;
+    role: 'user' | 'owner' | 'admin';
+    restaurant_ids?: string[]; // For 'owner' role
     avatar_url?: string;
     location?: string;
     recents?: any[]; // Array of recent activities

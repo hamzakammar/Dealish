@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -88,6 +88,15 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      
+      // If permission was denied, show guidance (but don't block - notifications are optional)
+      if (status !== 'granted') {
+        const { getPermissionInfo } = require('@/utils/permissions');
+        const info = getPermissionInfo('notifications');
+        console.warn(`Notification permission ${status}. ${info.settingsDescription}`);
+        // Note: We don't show an alert here as notifications are optional
+        // Users can enable them later from the permissions screen
+      }
     }
     
     if (finalStatus !== 'granted') {

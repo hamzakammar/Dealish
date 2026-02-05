@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
 import { useAuthContext } from "@/app/providers/auth";
+import { useEffect, useState } from "react";
 
 export function useProfileSetup() {
   const { profile, session } = useAuthContext();
@@ -15,7 +15,7 @@ export function useProfileSetup() {
 
     // Check if profile is complete
     // Profile is considered complete if both name and location are set
-    const hasName = !!profile.full_name && profile.full_name.trim().length > 0;
+    const hasName = !!profile.display_name && profile.display_name.trim().length > 0;
     const hasLocation = !!profile.location && profile.location.trim().length > 0;
 
     setIsProfileComplete(hasName && hasLocation);

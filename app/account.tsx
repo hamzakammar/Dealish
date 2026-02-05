@@ -1,7 +1,7 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
-import { useProfileSetup } from "@/hooks/useProfileSetup";
 import { RecentActivityCard } from "@/components/RecentActivityCard";
+import { useProfileSetup } from "@/hooks/useProfileSetup";
 import { ActivityWithRestaurant } from "@/types/activity";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import * as ImagePicker from 'expo-image-picker';
@@ -62,7 +62,12 @@ export default function AccountPage() {
         try {
             const { status } = await imagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission needed', 'Please grant permission to access your photos');
+                const { showSettingsAlert, getPermissionInfo } = require('@/utils/permissions');
+                const info = getPermissionInfo('mediaLibrary');
+                showSettingsAlert(
+                    info.title,
+                    info.settingsDescription
+                );
                 return;
             }
 
@@ -139,8 +144,8 @@ export default function AccountPage() {
 
             // Update profile
             // avatar_url is stored in profiles table and synced from Google auth on sign-in
-            const updateData: { full_name: string; location: string; avatar_url?: string } = {
-                full_name: editingName,
+            const updateData: { display_name: string; location: string; avatar_url?: string } = {
+                display_name: editingName,
                 location: editingLocation,
             };
             
@@ -174,7 +179,11 @@ export default function AccountPage() {
     useEffect(() => {
         // Redirect to onboarding if profile is incomplete
         if (needsSetup && session) {
-            router.replace('/onboarding');
+            try {
+              router.replace('/onboarding');
+            } catch (error) {
+              console.error('Navigation error:', error);
+            }
             return;
         }
 
@@ -214,13 +223,13 @@ export default function AccountPage() {
                 // 1. Custom uploaded avatar, or
                 // 2. Google auth avatar (synced automatically on sign-in)
                 if (profile) {
-                    setUserName(profile.full_name || session.user.user_metadata?.name || "User");
+                    setUserName(profile.display_name || session.user.user_metadata?.name || "User");
                     setUserAvatar(profile.avatar_url || session.user.user_metadata?.avatar_url || null);
                     setUserLocation(profile.location || "");
                 } else {
                     const metadata = session.user.user_metadata;
-                    if (metadata?.full_name) {
-                        setUserName(metadata.full_name);
+                    if (metadata?.display_name) {
+                        setUserName(metadata.display_name);
                     } else if (metadata?.name) {
                         setUserName(metadata.name);
                     }
@@ -338,7 +347,17 @@ export default function AccountPage() {
         <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 32 }}>
             {/* Orange Header */}
             <View style={styles.headerBg}>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={() => {
+                    try {
+                      router.back();
+                    } catch (error) {
+                      console.error('Navigation error:', error);
+                      router.replace('/map');
+                    }
+                  }}
+                >
                     <View style={styles.backIconBox}>
                         <AntDesign name="left" size={20} color="#FE902A"/>
                     </View>
@@ -348,6 +367,25 @@ export default function AccountPage() {
                     <TouchableOpacity style={styles.editButton} onPress={startEditing}>
                         <View style={styles.editIconBox}>
                             <AntDesign name="edit" size={20} color="#FE902A" />
+                        </View>
+                    </TouchableOpacity>
+                )}
+
+                {/* Admin Dashboard Link */}
+                {(profile?.role === 'owner' || profile?.role === 'admin') && !isEditing && (
+                    <TouchableOpacity 
+                        style={styles.adminButton}
+                        onPress={() => {
+                          try {
+                            router.push('/admin');
+                          } catch (error) {
+                            console.error('Navigation error:', error);
+                            Alert.alert('Error', 'Failed to navigate. Please try again.');
+                          }
+                        }}
+                    >
+                        <View style={styles.adminIconBox}>
+                            <AntDesign name="setting" size={20} color="#FE902A" />
                         </View>
                     </TouchableOpacity>
                 )}
@@ -598,6 +636,22 @@ const styles = StyleSheet.create({
         top: '30%', // Use percentage values for better zoom scaling
         right: '6%', // Percentage of header width
         zIndex: 2,
+    },
+    adminButton: {
+        position: 'absolute',
+        top: '30%',
+        right: '20%', // Position to the left of edit button
+        zIndex: 2,
+    },
+    adminIconBox: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 8,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     editIconBox: {
         backgroundColor: '#fff',

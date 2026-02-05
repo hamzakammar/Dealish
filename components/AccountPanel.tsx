@@ -7,16 +7,16 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 type AccountPanelProps = {
@@ -72,12 +72,12 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
         // 1. Custom uploaded avatar, or
         // 2. Google auth avatar (synced automatically on sign-in)
         if (profile) {
-          setUserName(profile.full_name || session.user.user_metadata?.name || "User");
+          setUserName(profile.display_name || session.user.user_metadata?.name || "User");
           setUserAvatar(profile.avatar_url || session.user.user_metadata?.avatar_url || null);
         } else {
           const metadata = session.user.user_metadata;
-          if (metadata?.full_name) {
-            setUserName(metadata.full_name);
+          if (metadata?.display_name) {
+            setUserName(metadata.display_name);
           } else if (metadata?.name) {
             setUserName(metadata.name);
           }
@@ -165,7 +165,19 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
       } else {
         // Successfully signed out - redirect to auth screen
         onClose();
-        router.replace('/auth');
+        try {
+          router.replace('/auth');
+        } catch (error) {
+          console.error('Navigation error:', error);
+          // Fallback - try again after a delay
+          setTimeout(() => {
+            try {
+              router.replace('/auth');
+            } catch (retryError) {
+              console.error('Retry navigation failed:', retryError);
+            }
+          }, 100);
+        }
       }
     } catch (error: any) {
       Alert.alert(
@@ -200,7 +212,12 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
 
   const handleSettingsPress = () => {
     onClose();
-    router.push('/settings' as '/account');
+    try {
+      router.push('/settings' as '/account');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      Alert.alert('Error', 'Failed to navigate to settings. Please try again.');
+    }
   };
 
   const handleFiltersPress = () => {

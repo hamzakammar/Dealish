@@ -1,7 +1,7 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
 import { MapType } from "@/types/restaurant";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type MapTypeSelectorProps = {
   mapType: MapType;
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f0f0f0",
   },
   menuItemActive: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#FE902A",
   },
   menuItemText: {
     fontSize: 14,
