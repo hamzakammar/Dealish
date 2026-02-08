@@ -95,8 +95,16 @@ export default function MapScreen() {
       // No location available - switch to list view
       setHasLocationPermission(false);
       setViewMode("list");
+      setSelectedRestaurant(null); // Deselect restaurant when switching to list view
     }
   }, [locationLoading, userLocation]);
+  
+  // Deselect restaurant when switching to list view
+  useEffect(() => {
+    if (viewMode === "list") {
+      setSelectedRestaurant(null);
+    }
+  }, [viewMode]);
 
   const handleGetDirections = () => {
     if (selectedRestaurant) {
@@ -136,21 +144,33 @@ export default function MapScreen() {
     }
     setSelectedRestaurant(restaurant);
 
-    // If we're in list view, switch to map view first
+    // If we're in list view, switch to map view first, then pan after a short delay
     if (viewMode === "list") {
       setViewMode("map");
+      // Wait for map view to be ready before panning
+      setTimeout(() => {
+        mapRef.current?.animateToRegion(
+          {
+            latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
+            longitude: restaurant.lng,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          },
+          800 // Animation duration in milliseconds
+        );
+      }, 100);
+    } else {
+      // Already in map view, pan immediately
+      mapRef.current?.animateToRegion(
+        {
+          latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
+          longitude: restaurant.lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        800 // Animation duration in milliseconds
+      );
     }
-
-    // Pan/animate the map to the selected restaurant
-    mapRef.current?.animateToRegion(
-      {
-        latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
-        longitude: restaurant.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      },
-      800 // Animation duration in milliseconds
-    );
   };
 
   const handleRecenter = () => {
@@ -244,7 +264,7 @@ export default function MapScreen() {
 
       {/* Top Search and Controls Bar */}
       {!isAccountPanelOpen && !isFilterPanelOpen && (
-        <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: '#fff' }]}>
+        <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: '#f5f5f5' }]}>
           {/* Blurred Map Background - only show in map view */}
           {viewMode === "map" && region && (
             <View style={styles.blurredMapBackground}>
@@ -329,7 +349,10 @@ export default function MapScreen() {
                 styles.viewToggleSegment,
                 viewMode === "list" && styles.viewToggleSegmentActive
               ]}
-              onPress={() => setViewMode("list")}
+              onPress={() => {
+                setViewMode("list");
+                setSelectedRestaurant(null); // Deselect restaurant when switching to list view
+              }}
               activeOpacity={0.7}
             >
               <Text style={[
@@ -510,6 +533,11 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 12,
     height: 44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   topSearchInput: {
     flex: 1,
@@ -526,6 +554,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   topActionButtonActive: {
     backgroundColor: '#FFF5EB',

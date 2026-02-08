@@ -1,6 +1,5 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
-import { usePartnerRequests } from '@/hooks/usePartnerRequests';
 import { Restaurant } from '@/types/restaurant';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -13,10 +12,6 @@ export default function AdminDashboard() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [isLoadingRestaurants, setIsLoadingRestaurants] = useState(true);
-  
-  // Fetch partner request counts for all restaurants
-  const restaurantIds = restaurants.map(r => r.id);
-  const { getRequestCount } = usePartnerRequests(restaurantIds);
 
   useEffect(() => {
     // Redirect if not logged in or not an admin/owner
@@ -113,7 +108,6 @@ export default function AdminDashboard() {
             <Text style={styles.sectionTitle}>Select Restaurant</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
               {restaurants.map((restaurant) => {
-                const requestCount = getRequestCount(restaurant.id);
                 return (
                   <TouchableOpacity
                     key={restaurant.id}
@@ -123,31 +117,18 @@ export default function AdminDashboard() {
                     ]}
                     onPress={() => setSelectedRestaurantId(restaurant.id)}
                   >
-                    <View style={styles.locationCardHeader}>
-                      <Text style={[
-                        styles.locationName,
-                        selectedRestaurantId === restaurant.id && styles.locationNameSelected
-                      ]}>
-                        {restaurant.name}
-                      </Text>
-                      {requestCount.pending_count > 0 && (
-                        <View style={styles.requestBadge}>
-                          <Text style={styles.requestBadgeText}>{requestCount.pending_count}</Text>
-                        </View>
-                      )}
-                    </View>
+                    <Text style={[
+                      styles.locationName,
+                      selectedRestaurantId === restaurant.id && styles.locationNameSelected
+                    ]}>
+                      {restaurant.name}
+                    </Text>
                     {restaurant.address && (
                       <Text style={[
                         styles.locationAddress,
                         selectedRestaurantId === restaurant.id && styles.locationAddressSelected
                       ]}>
                         {restaurant.address}
-                      </Text>
-                    )}
-                    {requestCount.count > 0 && (
-                      <Text style={styles.requestCountText}>
-                        {requestCount.count} partner request{requestCount.count !== 1 ? 's' : ''}
-                        {requestCount.pending_count > 0 && ` (${requestCount.pending_count} pending)`}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -158,40 +139,20 @@ export default function AdminDashboard() {
         )}
 
         {/* Current restaurant info */}
-        {selectedRestaurant && (() => {
-          const requestCount = getRequestCount(selectedRestaurant.id);
-          return (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Current Location</Text>
-              <View style={styles.restaurantCard}>
-                <View style={styles.restaurantCardHeader}>
-                  <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
-                  {requestCount.pending_count > 0 && (
-                    <View style={styles.requestBadgeLarge}>
-                      <Ionicons name="people" size={16} color="#fff" />
-                      <Text style={styles.requestBadgeLargeText}>{requestCount.pending_count}</Text>
-                    </View>
-                  )}
-                </View>
-                {selectedRestaurant.address && (
-                  <Text style={styles.restaurantAddress}>{selectedRestaurant.address}</Text>
-                )}
-                {selectedRestaurant.phone && (
-                  <Text style={styles.restaurantPhone}>{selectedRestaurant.phone}</Text>
-                )}
-                {requestCount.count > 0 && (
-                  <View style={styles.requestInfoContainer}>
-                    <Ionicons name="star" size={16} color="#FE902A" />
-                    <Text style={styles.requestInfoText}>
-                      {requestCount.count} partner request{requestCount.count !== 1 ? 's' : ''}
-                      {requestCount.pending_count > 0 && ` • ${requestCount.pending_count} pending`}
-                    </Text>
-                  </View>
-                )}
-              </View>
+        {selectedRestaurant && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Current Location</Text>
+            <View style={styles.restaurantCard}>
+              <Text style={styles.restaurantName}>{selectedRestaurant.name}</Text>
+              {selectedRestaurant.address && (
+                <Text style={styles.restaurantAddress}>{selectedRestaurant.address}</Text>
+              )}
+              {selectedRestaurant.phone && (
+                <Text style={styles.restaurantPhone}>{selectedRestaurant.phone}</Text>
+              )}
             </View>
-          );
-        })()}
+          </View>
+        )}
 
         {/* Action buttons */}
         <View style={styles.section}>
@@ -284,45 +245,6 @@ export default function AdminDashboard() {
             </View>
             <Ionicons name="chevron-forward" size={24} color="#C7C7CC" />
           </TouchableOpacity>
-
-          {(() => {
-            const requestCount = selectedRestaurantId ? getRequestCount(selectedRestaurantId) : null;
-            if (requestCount && requestCount.count > 0) {
-              return (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => {
-                    try {
-                      router.push({
-                        pathname: '/admin/partner-requests' as any,
-                        params: { restaurantId: selectedRestaurantId }
-                      });
-                    } catch (error) {
-                      console.error('Navigation error:', error);
-                      Alert.alert('Error', 'Failed to navigate. Please try again.');
-                    }
-                  }}
-                  disabled={!selectedRestaurantId}
-                >
-                  <Ionicons name="people" size={24} color="#FE902A" />
-                  <View style={styles.actionButtonText}>
-                    <Text style={styles.actionButtonTitle}>Partner Requests</Text>
-                    <Text style={styles.actionButtonSubtitle}>
-                      {requestCount.count} request{requestCount.count !== 1 ? 's' : ''}
-                      {requestCount.pending_count > 0 && ` • ${requestCount.pending_count} pending`}
-                    </Text>
-                  </View>
-                  {requestCount.pending_count > 0 && (
-                    <View style={styles.actionBadge}>
-                      <Text style={styles.actionBadgeText}>{requestCount.pending_count}</Text>
-                    </View>
-                  )}
-                  <Ionicons name="chevron-forward" size={24} color="#C7C7CC" />
-                </TouchableOpacity>
-              );
-            }
-            return null;
-          })()}
 
           <TouchableOpacity
             style={[styles.actionButton, styles.addRestaurantButton]}
@@ -449,78 +371,15 @@ const styles = StyleSheet.create({
     color: '#FE902A',
     opacity: 0.7,
   },
-  locationCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  requestBadge: {
-    backgroundColor: '#FE902A',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  requestBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  requestCountText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
   restaurantCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
   },
-  restaurantCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
   restaurantName: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
-    flex: 1,
-  },
-  requestBadgeLarge: {
-    backgroundColor: '#FE902A',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  requestBadgeLargeText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  requestInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    gap: 6,
-  },
-  requestInfoText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
   },
   restaurantAddress: {
     fontSize: 14,
@@ -553,21 +412,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
     marginTop: 2,
-  },
-  actionBadge: {
-    backgroundColor: '#FE902A',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  actionBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
   },
   addRestaurantButton: {
     borderWidth: 2,

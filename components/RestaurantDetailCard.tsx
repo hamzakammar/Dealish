@@ -1,6 +1,7 @@
 import { supabase } from "@/app/lib/supabase";
 import DealCard from "@/components/DealCard";
 import RatingDisplay from "@/components/RatingDisplay";
+import { getPartnerRequestCount } from "@/hooks/usePartnerRequests";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { trackVisit } from "@/utils/activity";
@@ -8,20 +9,20 @@ import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    Easing,
-    Image,
-    PanResponder,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    UIManager,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Easing,
+  Image,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View
 } from "react-native";
 
 // Enable LayoutAnimation on Android
@@ -54,20 +55,20 @@ const CARD_ANIMATION_OFFSET = 600;
  */
 const SHEET_HEIGHT = {
   PEEK_RATIO: 0.22, // ~22% of screen height
-  HALF_RATIO: 0.55, // ~55% of screen height
-  FULL_RATIO: 0.95, // target ~95% of screen height
+  HALF_RATIO: 0.45, // ~55% of screen height
+  FULL_RATIO: 0.70, // target ~85% of screen height (reduced from 95% to account for search bar)
   MIN_PEEK: 180,
   MAX_PEEK_RATIO: 0.32, // cap peek on very tall screens
   MIN_HALF: 420,
   MAX_HALF_RATIO: 0.75, // cap half to avoid covering too much on small screens
-  FULL_TOP_GAP: 56, // leave breathing room at top when fully expanded
+  FULL_TOP_GAP: 130, // leave breathing room at top when fully expanded (increased to account for search bar)
 };
 
 /**
  * Gesture thresholds for state transitions
  */
-const DRAG_THRESHOLD = 80;  // Pixels to drag before triggering state change
-const VELOCITY_THRESHOLD = 0.5;  // Velocity for quick swipe gestures
+const DRAG_THRESHOLD = 60;  // Pixels to drag before triggering state change
+const VELOCITY_THRESHOLD = 0.1;  // Velocity for quick swipe gestures
 
 /**
  * Sheet state type definition
@@ -122,6 +123,16 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
   const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
+  const [requestCount, setRequestCount] = useState<number>(0);
+  
+  // Fetch partner request count for this restaurant
+  useEffect(() => {
+    if (!restaurant.partner && restaurant.id) {
+      getPartnerRequestCount(restaurant.id).then((result) => {
+        setRequestCount(result.count);
+      });
+    }
+  }, [restaurant.id, restaurant.partner]);
   
   /**
    * Sheet state management
@@ -209,6 +220,9 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         }
       } else {
         Alert.alert("Request Submitted", "Your request has been submitted successfully!");
+        // Refresh the request count
+        const result = await getPartnerRequestCount(restaurant.id);
+        setRequestCount(result.count);
       }
     } catch (e: any) {
       console.error("Partner request error:", e.message ?? e);
@@ -631,6 +645,11 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
                   <>
                     <AntDesign name="star" size={16} color="#fff" style={{ marginRight: 6 }} />
                     <Text style={styles.partnerRequestButtonText}>Request this restaurant to be a partner</Text>
+                    {requestCount > 0 && (
+                      <View style={styles.requestCountBadge}>
+                        <Text style={styles.requestCountText}>{requestCount}</Text>
+                      </View>
+                    )}
                   </>
                 )}
               </TouchableOpacity>
@@ -952,6 +971,21 @@ const styles = StyleSheet.create({
   },
   partnerRequestButtonDisabled: {
     opacity: 0.6,
+  },
+  requestCountBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  requestCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   partnerRequestButtonText: {
     color: "#fff",
