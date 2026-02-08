@@ -1,5 +1,6 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
+import { geocodeAddress } from '@/utils/geocode';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -20,8 +21,31 @@ export default function CreateRestaurant() {
   const [numReviews, setNumReviews] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+
+  const handleGeocode = async () => {
+    if (!address.trim()) {
+      Alert.alert('Error', 'Please enter an address first');
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const result = await geocodeAddress(address);
+      if (result) {
+        setLatitude(result.lat.toString());
+        setLongitude(result.lng.toString());
+      } else {
+        Alert.alert('Not Found', 'Could not find coordinates for that address. Try a more specific address or enter coordinates manually.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to look up address. Please try again or enter coordinates manually.');
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
 
   const validateForm = () => {
     if (!name.trim()) {
@@ -30,7 +54,7 @@ export default function CreateRestaurant() {
     }
 
     if (!latitude.trim() || !longitude.trim()) {
-      Alert.alert('Error', 'Location (latitude and longitude) is required');
+      Alert.alert('Error', 'Location is required. Enter an address and tap "Look up" or enter coordinates manually.');
       return false;
     }
 
@@ -155,14 +179,30 @@ export default function CreateRestaurant() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={styles.input}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Street address"
-            placeholderTextColor="#C7C7CC"
-          />
+          <Text style={styles.label}>Address *</Text>
+          <View style={styles.addressRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Street address, city, state"
+              placeholderTextColor="#C7C7CC"
+            />
+            <TouchableOpacity
+              style={[styles.geocodeButton, isGeocoding && styles.saveButtonDisabled]}
+              onPress={handleGeocode}
+              disabled={isGeocoding}
+            >
+              {isGeocoding ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="location" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.helpText}>
+            Enter the full address and tap the location button to auto-fill coordinates
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -223,6 +263,18 @@ export default function CreateRestaurant() {
         {/* Location */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Location *</Text>
+          {latitude && longitude ? (
+            <View style={styles.coordsDisplay}>
+              <Ionicons name="checkmark-circle" size={18} color="#34C759" />
+              <Text style={styles.coordsText}>
+                {parseFloat(latitude).toFixed(6)}, {parseFloat(longitude).toFixed(6)}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.coordsMissing}>
+              No coordinates yet - enter an address above and tap the location button
+            </Text>
+          )}
           <View style={styles.locationRow}>
             <View style={styles.locationInputContainer}>
               <Text style={styles.label}>Latitude</Text>
@@ -248,7 +300,7 @@ export default function CreateRestaurant() {
             </View>
           </View>
           <Text style={styles.helpText}>
-            You can find coordinates using Google Maps or your GPS device
+            Auto-filled from address, or enter manually
           </Text>
         </View>
 
@@ -356,11 +408,46 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  addressRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  geocodeButton: {
+    backgroundColor: '#FE902A',
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   locationRow: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
   },
   locationInputContainer: {
     flex: 1,
+  },
+  coordsDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FFF4',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#34C759',
+  },
+  coordsText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  coordsMissing: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+    marginBottom: 4,
   },
 });

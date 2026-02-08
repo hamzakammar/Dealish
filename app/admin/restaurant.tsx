@@ -1,9 +1,10 @@
 import { supabase } from '@/app/lib/supabase';
 import { Restaurant } from '@/types/restaurant';
+import { geocodeAddress } from '@/utils/geocode';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function RestaurantSettings() {
   const router = useRouter();
@@ -22,6 +23,10 @@ export default function RestaurantSettings() {
   const [numReviews, setNumReviews] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [displayImage, setDisplayImage] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
   useEffect(() => {
     if (restaurantId) {
@@ -50,6 +55,9 @@ export default function RestaurantSettings() {
         setNumReviews(data.rating_count?.toString() || '');
         setImageUrl(data.image_url || '');
         setLogoUrl(data.logo_url || '');
+        setDisplayImage(data.display_image || '');
+        setLatitude(data.lat?.toString() || '');
+        setLongitude(data.lng?.toString() || '');
       }
     } catch (error) {
       console.error('Error fetching restaurant:', error);
@@ -62,6 +70,28 @@ export default function RestaurantSettings() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGeocode = async () => {
+    if (!address.trim()) {
+      Alert.alert('Error', 'Please enter an address first');
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const result = await geocodeAddress(address);
+      if (result) {
+        setLatitude(result.lat.toString());
+        setLongitude(result.lng.toString());
+      } else {
+        Alert.alert('Not Found', 'Could not find coordinates for that address. Try a more specific address or enter coordinates manually.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to look up address. Please try again or enter coordinates manually.');
+    } finally {
+      setIsGeocoding(false);
     }
   };
 
@@ -90,7 +120,7 @@ export default function RestaurantSettings() {
     try {
       setIsSaving(true);
 
-      const updates = {
+      const updates: Record<string, unknown> = {
         name: name.trim(),
         address: address.trim() || null,
         phone: phone.trim() || null,
@@ -99,7 +129,17 @@ export default function RestaurantSettings() {
         rating_count: numReviews.trim() ? parseInt(numReviews, 10) : null,
         image_url: imageUrl.trim() || null,
         logo_url: logoUrl.trim() || null,
+        display_image: displayImage.trim() || null,
       };
+
+      if (latitude.trim() && longitude.trim()) {
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          updates.lat = lat;
+          updates.lng = lng;
+        }
+      }
 
       const { error } = await supabase
         .from('restaurants')
@@ -174,13 +214,29 @@ export default function RestaurantSettings() {
 
         <View style={styles.section}>
           <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={styles.input}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Street address"
-            placeholderTextColor="#C7C7CC"
-          />
+          <View style={styles.addressRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Street address, city, state"
+              placeholderTextColor="#C7C7CC"
+            />
+            <TouchableOpacity
+              style={[styles.geocodeButton, isGeocoding && styles.saveButtonDisabled]}
+              onPress={handleGeocode}
+              disabled={isGeocoding}
+            >
+              {isGeocoding ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="location" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.helpText}>
+            Enter the full address and tap the location button to auto-fill coordinates
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -239,18 +295,8 @@ export default function RestaurantSettings() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Image URL</Text>
-          <TextInput
-            style={styles.input}
-            value={imageUrl}
-            onChangeText={setImageUrl}
-            placeholder="https://example.com/image.jpg"
-            placeholderTextColor="#C7C7CC"
-            autoCapitalize="none"
-          />
-        </View>
+          <Text style={styles.sectionTitle}>Images</Text>
 
-        <View style={styles.section}>
           <Text style={styles.label}>Logo URL</Text>
           <TextInput
             style={styles.input}
@@ -260,20 +306,96 @@ export default function RestaurantSettings() {
             placeholderTextColor="#C7C7CC"
             autoCapitalize="none"
           />
+          {logoUrl.trim() !== '' && (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: logoUrl }}
+                style={styles.logoPreview}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+
+          <Text style={[styles.label, { marginTop: 20 }]}>Image URL</Text>
+          <TextInput
+            style={styles.input}
+            value={imageUrl}
+            onChangeText={setImageUrl}
+            placeholder="https://example.com/image.jpg"
+            placeholderTextColor="#C7C7CC"
+            autoCapitalize="none"
+          />
+          {imageUrl.trim() !== '' && (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+            </View>
+          )}
+
+          <Text style={[styles.label, { marginTop: 20 }]}>Hero / Display Image URL</Text>
+          <TextInput
+            style={styles.input}
+            value={displayImage}
+            onChangeText={setDisplayImage}
+            placeholder="https://example.com/hero.jpg"
+            placeholderTextColor="#C7C7CC"
+            autoCapitalize="none"
+          />
+          {displayImage.trim() !== '' && (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: displayImage }}
+                style={styles.heroPreview}
+                resizeMode="cover"
+              />
+            </View>
+          )}
+          <Text style={styles.helpText}>
+            Paste any image URL to use as logo, listing image, or hero banner
+          </Text>
         </View>
 
-        {restaurant && (
-          <View style={styles.section}>
-            <Text style={styles.label}>Location</Text>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoText}>Latitude: {restaurant.lat}</Text>
-              <Text style={styles.infoText}>Longitude: {restaurant.lng}</Text>
-              <Text style={styles.helpText}>
-                Contact support to update location
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Location</Text>
+          {latitude && longitude ? (
+            <View style={styles.coordsDisplay}>
+              <Ionicons name="checkmark-circle" size={18} color="#34C759" />
+              <Text style={styles.coordsText}>
+                {parseFloat(latitude).toFixed(6)}, {parseFloat(longitude).toFixed(6)}
               </Text>
             </View>
+          ) : null}
+          <View style={styles.locationRow}>
+            <View style={styles.locationInputContainer}>
+              <Text style={styles.label}>Latitude</Text>
+              <TextInput
+                style={styles.input}
+                value={latitude}
+                onChangeText={setLatitude}
+                placeholder="e.g., 40.7128"
+                placeholderTextColor="#C7C7CC"
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={styles.locationInputContainer}>
+              <Text style={styles.label}>Longitude</Text>
+              <TextInput
+                style={styles.input}
+                value={longitude}
+                onChangeText={setLongitude}
+                placeholder="e.g., -74.0060"
+                placeholderTextColor="#C7C7CC"
+                keyboardType="decimal-pad"
+              />
+            </View>
           </View>
-        )}
+          <Text style={styles.helpText}>
+            Auto-filled from address, or enter manually
+          </Text>
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -367,16 +489,63 @@ const styles = StyleSheet.create({
   ratingInputContainer: {
     flex: 1,
   },
-  infoCard: {
-    backgroundColor: '#FFFFFF',
+  addressRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  geocodeButton: {
+    backgroundColor: '#FE902A',
+    width: 44,
+    height: 44,
     borderRadius: 8,
-    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  locationInputContainer: {
+    flex: 1,
+  },
+  coordsDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FFF4',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#34C759',
+  },
+  coordsText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    marginTop: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E5E5EA',
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
   },
-  infoText: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 4,
+  logoPreview: {
+    width: 80,
+    height: 80,
+    margin: 12,
+    borderRadius: 8,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 160,
+  },
+  heroPreview: {
+    width: '100%',
+    height: 200,
   },
 });
