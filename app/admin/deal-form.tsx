@@ -12,23 +12,27 @@ const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export default function DealForm() {
   const { profile } = useAuthContext();
   const router = useRouter();
-  const { restaurantId, dealId } = useLocalSearchParams<{ restaurantId: string; dealId?: string }>();
+  const { restaurantId, dealId, recommendationId, suggestedTitle, suggestedDescription, suggestedDiscount } = useLocalSearchParams<{ 
+    restaurantId: string; 
+    dealId?: string;
+    recommendationId?: string;
+    suggestedTitle?: string;
+    suggestedDescription?: string;
+    suggestedDiscount?: string;
+  }>();
   
   const [isLoading, setIsLoading] = useState(!!dealId);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(suggestedTitle || '');
+  const [description, setDescription] = useState(suggestedDescription || '');
   const [tags, setTags] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [isRecurring, setIsRecurring] = useState(false);
   
-  // One-time deal dates
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
-  // Recurring deal settings
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -36,8 +40,18 @@ export default function DealForm() {
   useEffect(() => {
     if (dealId) {
       fetchDeal();
+    } else if (suggestedTitle) {
+      setTitle(suggestedTitle);
+      if (suggestedDescription) {
+        setDescription(suggestedDescription);
+      }
+      const today = new Date();
+      const weekFromNow = new Date(today);
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+      setStartDate(today.toISOString().split('T')[0]);
+      setEndDate(weekFromNow.toISOString().split('T')[0]);
     }
-  }, [dealId]);
+  }, [dealId, suggestedTitle, suggestedDescription]);
 
   const fetchDeal = async () => {
     try {
@@ -147,7 +161,6 @@ export default function DealForm() {
       }
 
       if (dealId) {
-        // Update existing deal
         const { error } = await supabase
           .from('deals')
           .update(dealData)
@@ -156,7 +169,6 @@ export default function DealForm() {
         if (error) throw error;
         Alert.alert('Success', 'Deal updated successfully');
       } else {
-        // Create new deal
         const { data, error } = await supabase
           .from('deals')
           .insert([dealData])
@@ -165,20 +177,31 @@ export default function DealForm() {
 
         if (error) throw error;
 
-        // Send notifications for new deal if active
         if (isActive && data) {
           try {
             await notifyNewDeal(data.id, restaurantId, title, description);
           } catch (notifError) {
             console.error('Error sending notifications:', notifError);
-            // Don't fail the deal creation if notifications fail
           }
         }
 
         Alert.alert('Success', 'Deal created successfully');
+
+        if (recommendationId && data) {
+          try {
+            await supabase
+              .from('deal_recommendations')
+              .update({ 
+                status: 'created',
+                deal_id: data.id 
+              })
+              .eq('id', recommendationId);
+          } catch (error) {
+            console.error('Error updating recommendation:', error);
+          }
+        }
       }
 
-      // Small delay to ensure success message is seen
       setTimeout(() => {
         router.back();
       }, 500);
@@ -200,7 +223,6 @@ export default function DealForm() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => {
@@ -213,7 +235,7 @@ export default function DealForm() {
           }} 
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#FE902A" />
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{dealId ? 'Edit Deal' : 'Create Deal'}</Text>
         <TouchableOpacity
@@ -222,84 +244,89 @@ export default function DealForm() {
           disabled={isSaving}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color="#FE902A" />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.saveButtonText}>Save</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Basic Info */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Deal Title *</Text>
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g., 20% off all pizzas"
-            placeholderTextColor="#C7C7CC"
-          />
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Deal Title *</Text>
+            <TextInput
+              style={styles.input}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g., 20% off all pizzas"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Add details about your deal..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Tags</Text>
+            <Text style={styles.helpText}>Separate tags with commas</Text>
+            <TextInput
+              style={styles.input}
+              value={tags}
+              onChangeText={setTags}
+              placeholder="e.g., pizza, lunch, dinner"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Add details about your deal..."
-            placeholderTextColor="#C7C7CC"
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Tags (comma separated)</Text>
-          <TextInput
-            style={styles.input}
-            value={tags}
-            onChangeText={setTags}
-            placeholder="e.g., pizza, lunch, dinner"
-            placeholderTextColor="#C7C7CC"
-          />
-        </View>
-
-        {/* Active Status */}
-        <View style={styles.section}>
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.label}>Active</Text>
-              <Text style={styles.helpText}>Deal will be visible to customers</Text>
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Active</Text>
+              <Text style={styles.settingDescription}>Deal will be visible to customers</Text>
             </View>
             <Switch
               value={isActive}
               onValueChange={setIsActive}
-              trackColor={{ false: '#E5E5EA', true: '#FE902A' }}
+              trackColor={{ false: '#E2E8F0', true: '#FE902A' }}
+              thumbColor="#FFFFFF"
             />
           </View>
-        </View>
 
-        {/* Recurring Toggle */}
-        <View style={styles.section}>
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.label}>Recurring Deal</Text>
-              <Text style={styles.helpText}>Repeats on specific days/times</Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Recurring Deal</Text>
+              <Text style={styles.settingDescription}>Repeats on specific days/times</Text>
             </View>
             <Switch
               value={isRecurring}
               onValueChange={setIsRecurring}
-              trackColor={{ false: '#E5E5EA', true: '#FE902A' }}
+              trackColor={{ false: '#E2E8F0', true: '#FE902A' }}
+              thumbColor="#FFFFFF"
             />
           </View>
         </View>
 
-        {/* Recurring Settings */}
         {isRecurring ? (
-          <>
-            <View style={styles.section}>
+          <View style={styles.formCard}>
+            <Text style={styles.sectionTitle}>Recurring Schedule</Text>
+            
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Days of Week *</Text>
               <View style={styles.daysContainer}>
                 {DAYS_OF_WEEK.map((day, index) => (
@@ -322,52 +349,56 @@ export default function DealForm() {
               </View>
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.label}>Start Time (HH:MM:SS) *</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Start Time *</Text>
+              <Text style={styles.helpText}>Format: HH:MM:SS (e.g., 11:00:00)</Text>
               <TextInput
                 style={styles.input}
                 value={startTime}
                 onChangeText={setStartTime}
-                placeholder="e.g., 11:00:00"
-                placeholderTextColor="#C7C7CC"
+                placeholder="11:00:00"
+                placeholderTextColor="#94A3B8"
               />
             </View>
 
-            <View style={styles.section}>
-              <Text style={styles.label}>End Time (HH:MM:SS) *</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>End Time *</Text>
+              <Text style={styles.helpText}>Format: HH:MM:SS (e.g., 14:00:00)</Text>
               <TextInput
                 style={styles.input}
                 value={endTime}
                 onChangeText={setEndTime}
-                placeholder="e.g., 14:00:00"
-                placeholderTextColor="#C7C7CC"
+                placeholder="14:00:00"
+                placeholderTextColor="#94A3B8"
               />
             </View>
-          </>
+          </View>
         ) : (
-          <>
-            <View style={styles.section}>
+          <View style={styles.formCard}>
+            <Text style={styles.sectionTitle}>Date Range</Text>
+            
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Start Date *</Text>
               <TextInput
                 style={styles.input}
                 value={startDate}
                 onChangeText={setStartDate}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor="#C7C7CC"
+                placeholderTextColor="#94A3B8"
               />
             </View>
 
-            <View style={styles.section}>
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>End Date *</Text>
               <TextInput
                 style={styles.input}
                 value={endDate}
                 onChangeText={setEndDate}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor="#C7C7CC"
+                placeholderTextColor="#94A3B8"
               />
             </View>
-          </>
+          </View>
         )}
 
         <View style={{ height: 40 }} />
@@ -379,80 +410,117 @@ export default function DealForm() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     padding: 8,
+    marginRight: 8,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+    letterSpacing: -0.5,
   },
   saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FE902A',
   },
   saveButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   saveButtonText: {
-    color: '#FE902A',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
   content: {
     flex: 1,
-    padding: 20,
   },
-  section: {
-    marginBottom: 24,
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#000000',
+    color: '#0F172A',
     marginBottom: 8,
   },
   helpText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 2,
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 8,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#000000',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: '#0F172A',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: '#E2E8F0',
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
   },
-  switchRow: {
+  settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#64748B',
   },
   daysContainer: {
     flexDirection: 'row',
@@ -462,10 +530,10 @@ const styles = StyleSheet.create({
   dayButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
   },
   dayButtonSelected: {
     backgroundColor: '#FE902A',
@@ -473,8 +541,8 @@ const styles = StyleSheet.create({
   },
   dayButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
+    fontWeight: '600',
+    color: '#64748B',
   },
   dayButtonTextSelected: {
     color: '#FFFFFF',

@@ -40,7 +40,6 @@ export default function Analytics() {
       setIsLoading(true);
 
       const now = new Date();
-      // Calculate date range based on timeRange
       const startDate = new Date();
       switch (timeRange) {
         case '1D':
@@ -60,7 +59,6 @@ export default function Analytics() {
           break;
       }
 
-      // First get all deals for this restaurant
       const { data: deals, error: dealsError } = await supabase
         .from('deals')
         .select('id, title')
@@ -79,7 +77,6 @@ export default function Analytics() {
         return;
       }
 
-      // Fetch QR code scans for these deals
       const { data: scans, error: scansError } = await supabase
         .from('qr_code_scans')
         .select('id, scanned_at, deal_id')
@@ -89,13 +86,11 @@ export default function Analytics() {
 
       if (scansError) throw scansError;
 
-      // Create a map of deal IDs to titles
       const dealMap: Record<string, string> = {};
       (deals || []).forEach((deal: any) => {
         dealMap[deal.id] = deal.title;
       });
 
-      // Count scans per deal
       const dealScanMap: Record<string, { title: string; count: number }> = {};
       (scans || []).forEach((scan: any) => {
         const dealId = scan.deal_id;
@@ -120,13 +115,11 @@ export default function Analytics() {
         }))
         .sort((a, b) => b.scan_count - a.scan_count);
 
-      // Generate chart data based on time range (customers over time)
       let chartData: number[] = [];
       let chartLabels: string[] = [];
       
       switch (timeRange) {
         case '1D': {
-          // Hourly data for last 24 hours
           chartData = new Array(24).fill(0);
           chartLabels = Array.from({ length: 24 }, (_, i) => {
             const hour = (now.getHours() - (23 - i) + 24) % 24;
@@ -142,7 +135,6 @@ export default function Analytics() {
           break;
         }
         case '1W': {
-          // Daily data for last 7 days
           chartData = new Array(7).fill(0);
           chartLabels = Array.from({ length: 7 }, (_, i) => {
             const date = new Date(now);
@@ -159,7 +151,6 @@ export default function Analytics() {
           break;
         }
         case '1M': {
-          // Daily data for last 30 days
           chartData = new Array(30).fill(0);
           chartLabels = Array.from({ length: 30 }, (_, i) => {
             const date = new Date(now);
@@ -176,7 +167,6 @@ export default function Analytics() {
           break;
         }
         case '3M': {
-          // Weekly data for last 12 weeks
           chartData = new Array(12).fill(0);
           chartLabels = Array.from({ length: 12 }, (_, i) => {
             const date = new Date(now);
@@ -193,7 +183,6 @@ export default function Analytics() {
           break;
         }
         case '6M': {
-          // Monthly data for last 6 months
           chartData = new Array(6).fill(0);
           chartLabels = Array.from({ length: 6 }, (_, i) => {
             const date = new Date(now);
@@ -227,7 +216,6 @@ export default function Analytics() {
 
   const handleExportReport = async () => {
     try {
-      // Get restaurant name for filename
       const { data: restaurant } = await supabase
         .from('restaurants')
         .select('name')
@@ -238,17 +226,14 @@ export default function Analytics() {
       const dateStr = new Date().toISOString().split('T')[0];
       const filename = `${restaurantName}_Analytics_${dateStr}.csv`;
 
-      // Build CSV content
       let csvContent = 'Performance Analytics Report\n';
       csvContent += `Restaurant: ${restaurantName}\n`;
       csvContent += `Generated: ${new Date().toLocaleString()}\n`;
       csvContent += `Time Range: ${timeRange}\n\n`;
 
-      // Summary section
       csvContent += 'Summary\n';
       csvContent += `Total Scans,${analytics.totalScans}\n\n`;
 
-      // Chart data section
       csvContent += 'Customer Activity Over Time\n';
       csvContent += 'Time Period,Customers\n';
       analytics.chartLabels.forEach((label, index) => {
@@ -256,16 +241,13 @@ export default function Analytics() {
       });
       csvContent += '\n';
 
-      // Deal performance section
       csvContent += 'Deal Performance\n';
       csvContent += 'Deal Title,Scans,Percentage\n';
       analytics.dealStats.forEach((stat) => {
         csvContent += `"${stat.deal_title}",${stat.scan_count},${stat.percentage}%\n`;
       });
 
-      // Share the CSV
       if (Platform.OS === 'web') {
-        // For web, create a download link
         if (typeof document !== 'undefined') {
           const blob = new Blob([csvContent], { type: 'text/csv' });
           const url = URL.createObjectURL(blob);
@@ -278,11 +260,9 @@ export default function Analytics() {
           URL.revokeObjectURL(url);
           Alert.alert('Success', 'Report downloaded successfully!');
         } else {
-          // Fallback: copy to clipboard or show content
           Alert.alert('CSV Content', csvContent.substring(0, 500) + '...');
         }
       } else {
-        // For mobile, use Share API
         const result = await Share.share({
           message: csvContent,
           title: filename,
@@ -308,7 +288,6 @@ export default function Analytics() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => {
@@ -321,101 +300,102 @@ export default function Analytics() {
           }} 
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#FE902A" />
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Performance Analytics</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Analytics</Text>
+          <Text style={styles.headerSubtitle}>{analytics.totalScans} total scans</Text>
+        </View>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Customers Graph Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Customers</Text>
-          
-          {/* Bar Chart */}
-          <View style={styles.chartContainer}>
-            <View style={styles.chart}>
-              {analytics.chartData.map((value, index) => {
-                const maxValue = Math.max(...analytics.chartData, 1);
-                const height = (value / maxValue) * 100;
-                return (
-                  <View key={index} style={styles.barContainer}>
-                    <View style={[styles.bar, { height: `${height}%` }]} />
-                    <Text style={styles.barLabel} numberOfLines={1}>
-                      {value > 0 ? value : ''}
-                    </Text>
-                    <Text style={styles.barDateLabel} numberOfLines={1}>
-                      {analytics.chartLabels[index] || ''}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Time Range Buttons */}
-          <View style={styles.timeRangeContainer}>
-            {(['1D', '1W', '1M', '3M', '6M'] as const).map((range) => (
-              <TouchableOpacity
-                key={range}
-                style={[
-                  styles.timeRangeButton,
-                  timeRange === range && styles.timeRangeButtonActive
-                ]}
-                onPress={() => setTimeRange(range)}
-              >
-                <Text style={[
-                  styles.timeRangeButtonText,
-                  timeRange === range && styles.timeRangeButtonTextActive
-                ]}>
-                  {range}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Deal Performance Section */}
-        {analytics.dealStats.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Customers</Text>
-            {analytics.dealStats.map((stat) => (
-              <View key={stat.deal_id} style={styles.dealPerformanceCard}>
-                <View style={styles.dealPerformanceHeader}>
-                  <Text style={styles.dealPerformanceTitle}>{stat.deal_title}</Text>
-                  <Text style={styles.dealPerformancePercentage}>{stat.percentage}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBar, { width: `${stat.percentage}%` }]} />
-                </View>
-                <Text style={styles.dealPerformanceSubtitle}>
-                  {stat.scan_count} scans
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Empty State */}
-        {analytics.totalScans === 0 && (
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {analytics.totalScans === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="stats-chart-outline" size={64} color="#C7C7CC" />
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="stats-chart-outline" size={48} color="#CBD5E1" />
+            </View>
             <Text style={styles.emptyStateTitle}>No Data Yet</Text>
             <Text style={styles.emptyStateMessage}>
               Analytics will appear once customers start using your deals
             </Text>
           </View>
+        ) : (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Customer Activity</Text>
+              
+              <View style={styles.chartCard}>
+                <View style={styles.chart}>
+                  {analytics.chartData.map((value, index) => {
+                    const maxValue = Math.max(...analytics.chartData, 1);
+                    const height = (value / maxValue) * 100;
+                    return (
+                      <View key={index} style={styles.barContainer}>
+                        <View style={[styles.bar, { height: `${height}%` }]} />
+                        <Text style={styles.barLabel} numberOfLines={1}>
+                          {value > 0 ? value : ''}
+                        </Text>
+                        <Text style={styles.barDateLabel} numberOfLines={1}>
+                          {analytics.chartLabels[index] || ''}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.timeRangeContainer}>
+                {(['1D', '1W', '1M', '3M', '6M'] as const).map((range) => (
+                  <TouchableOpacity
+                    key={range}
+                    style={[
+                      styles.timeRangeButton,
+                      timeRange === range && styles.timeRangeButtonActive
+                    ]}
+                    onPress={() => setTimeRange(range)}
+                  >
+                    <Text style={[
+                      styles.timeRangeButtonText,
+                      timeRange === range && styles.timeRangeButtonTextActive
+                    ]}>
+                      {range}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {analytics.dealStats.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Deal Performance</Text>
+                {analytics.dealStats.map((stat) => (
+                  <View key={stat.deal_id} style={styles.dealPerformanceCard}>
+                    <View style={styles.dealPerformanceHeader}>
+                      <Text style={styles.dealPerformanceTitle}>{stat.deal_title}</Text>
+                      <View style={styles.percentageBadge}>
+                        <Text style={styles.dealPerformancePercentage}>{stat.percentage}%</Text>
+                      </View>
+                    </View>
+                    <View style={styles.progressBarContainer}>
+                      <View style={[styles.progressBar, { width: `${stat.percentage}%` }]} />
+                    </View>
+                    <Text style={styles.dealPerformanceSubtitle}>
+                      {stat.scan_count} scan{stat.scan_count !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.exportSection}>
+              <TouchableOpacity style={styles.exportButton} onPress={handleExportReport}>
+                <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.exportButtonText}>Export Report</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
-
-        {/* Export Report Button */}
-        <View style={styles.exportSection}>
-          <TouchableOpacity style={styles.exportButton} onPress={handleExportReport}>
-            <Text style={styles.exportButtonText}>Export Report</Text>
-            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -424,34 +404,41 @@ export default function Analytics() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     padding: 8,
+    marginRight: 8,
+  },
+  headerContent: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    flex: 1,
-    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 2,
   },
   headerSpacer: {
     width: 40,
@@ -461,51 +448,54 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginTop: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
+    color: '#0F172A',
     marginBottom: 16,
   },
-  chartContainer: {
+  chartCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   chart: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-around',
-    height: 150,
+    height: 160,
     marginBottom: 8,
   },
   barContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginHorizontal: 4,
+    marginHorizontal: 2,
   },
   bar: {
-    width: '80%',
+    width: '85%',
     backgroundColor: '#FE902A',
-    borderRadius: 4,
+    borderRadius: 6,
     minHeight: 4,
   },
   barLabel: {
-    fontSize: 10,
-    color: '#8E8E93',
-    marginTop: 4,
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 6,
     fontWeight: '600',
   },
   barDateLabel: {
-    fontSize: 8,
-    color: '#8E8E93',
-    marginTop: 2,
+    fontSize: 9,
+    color: '#94A3B8',
+    marginTop: 4,
   },
   timeRangeContainer: {
     flexDirection: 'row',
@@ -515,49 +505,59 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#F2F2F7',
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
   },
   timeRangeButtonActive: {
     backgroundColor: '#FE902A',
   },
   timeRangeButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#000000',
+    color: '#64748B',
   },
   timeRangeButtonTextActive: {
     color: '#FFFFFF',
+    fontWeight: '600',
   },
   dealPerformanceCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   dealPerformanceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   dealPerformanceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
+    color: '#0F172A',
     flex: 1,
   },
+  percentageBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#FEF3E2',
+  },
   dealPerformancePercentage: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FE902A',
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F1F5F9',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
@@ -568,35 +568,46 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   dealPerformanceSubtitle: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#000000',
-    marginTop: 16,
+    color: '#0F172A',
+    marginBottom: 8,
   },
   emptyStateMessage: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#64748B',
     textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 40,
+    lineHeight: 20,
   },
   exportSection: {
     paddingHorizontal: 20,
     marginTop: 8,
+    marginBottom: 40,
   },
   exportButton: {
     backgroundColor: '#FE902A',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,7 +616,7 @@ const styles = StyleSheet.create({
   },
   exportButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
 });

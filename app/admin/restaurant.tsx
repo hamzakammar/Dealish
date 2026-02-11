@@ -14,7 +14,6 @@ export default function RestaurantSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   
-  // Form state
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -149,7 +148,6 @@ export default function RestaurantSettings() {
       if (error) throw error;
 
       Alert.alert('Success', 'Restaurant updated successfully');
-      // Small delay to ensure success message is seen
       setTimeout(() => {
         router.back();
       }, 500);
@@ -171,7 +169,6 @@ export default function RestaurantSettings() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => {
@@ -184,7 +181,7 @@ export default function RestaurantSettings() {
           }} 
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#FE902A" />
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Restaurant Settings</Text>
         <TouchableOpacity
@@ -193,78 +190,82 @@ export default function RestaurantSettings() {
           disabled={isSaving}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color="#FE902A" />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.saveButtonText}>Save</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.label}>Restaurant Name *</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Enter restaurant name"
-            placeholderTextColor="#C7C7CC"
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Address</Text>
-          <View style={styles.addressRow}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Restaurant Name *</Text>
             <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Street address, city, state"
-              placeholderTextColor="#C7C7CC"
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Enter restaurant name"
+              placeholderTextColor="#94A3B8"
             />
-            <TouchableOpacity
-              style={[styles.geocodeButton, isGeocoding && styles.saveButtonDisabled]}
-              onPress={handleGeocode}
-              disabled={isGeocoding}
-            >
-              {isGeocoding ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="location" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
           </View>
-          <Text style={styles.helpText}>
-            Enter the full address and tap the location button to auto-fill coordinates
-          </Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Address</Text>
+            <View style={styles.addressRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Street address, city, state"
+                placeholderTextColor="#94A3B8"
+              />
+              <TouchableOpacity
+                style={[styles.geocodeButton, isGeocoding && styles.geocodeButtonDisabled]}
+                onPress={handleGeocode}
+                disabled={isGeocoding}
+              >
+                {isGeocoding ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="location" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.helpText}>
+              Enter address and tap location icon to auto-fill coordinates
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Phone</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="Phone number"
+              placeholderTextColor="#94A3B8"
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Type</Text>
+            <TextInput
+              style={styles.input}
+              value={type}
+              onChangeText={setType}
+              placeholder="e.g., Italian, Fast Food, Cafe"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Phone</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="Phone number"
-            placeholderTextColor="#C7C7CC"
-            keyboardType="phone-pad"
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Type</Text>
-          <TextInput
-            style={styles.input}
-            value={type}
-            onChangeText={setType}
-            placeholder="e.g., Italian, Fast Food, Cafe"
-            placeholderTextColor="#C7C7CC"
-          />
-        </View>
-
-        {/* Rating & Reviews */}
-        <View style={styles.section}>
+        <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Rating & Reviews</Text>
+          
           <View style={styles.ratingRow}>
             <View style={styles.ratingInputContainer}>
               <Text style={styles.label}>Rating</Text>
@@ -272,8 +273,8 @@ export default function RestaurantSettings() {
                 style={styles.input}
                 value={rating}
                 onChangeText={setRating}
-                placeholder="e.g., 4.5"
-                placeholderTextColor="#C7C7CC"
+                placeholder="0-5"
+                placeholderTextColor="#94A3B8"
                 keyboardType="decimal-pad"
               />
             </View>
@@ -283,91 +284,17 @@ export default function RestaurantSettings() {
                 style={styles.input}
                 value={numReviews}
                 onChangeText={setNumReviews}
-                placeholder="e.g., 150"
-                placeholderTextColor="#C7C7CC"
+                placeholder="0"
+                placeholderTextColor="#94A3B8"
                 keyboardType="number-pad"
               />
             </View>
           </View>
-          <Text style={styles.helpText}>
-            Rating should be between 0 and 5
-          </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Images</Text>
-
-          <Text style={styles.label}>Logo URL</Text>
-          <TextInput
-            style={styles.input}
-            value={logoUrl}
-            onChangeText={setLogoUrl}
-            placeholder="https://example.com/logo.jpg"
-            placeholderTextColor="#C7C7CC"
-            autoCapitalize="none"
-          />
-          {logoUrl.trim() !== '' && (
-            <View style={styles.imagePreviewContainer}>
-              <Image
-                source={{ uri: logoUrl }}
-                style={styles.logoPreview}
-                resizeMode="contain"
-              />
-            </View>
-          )}
-
-          <Text style={[styles.label, { marginTop: 20 }]}>Image URL</Text>
-          <TextInput
-            style={styles.input}
-            value={imageUrl}
-            onChangeText={setImageUrl}
-            placeholder="https://example.com/image.jpg"
-            placeholderTextColor="#C7C7CC"
-            autoCapitalize="none"
-          />
-          {imageUrl.trim() !== '' && (
-            <View style={styles.imagePreviewContainer}>
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.imagePreview}
-                resizeMode="cover"
-              />
-            </View>
-          )}
-
-          <Text style={[styles.label, { marginTop: 20 }]}>Hero / Display Image URL</Text>
-          <TextInput
-            style={styles.input}
-            value={displayImage}
-            onChangeText={setDisplayImage}
-            placeholder="https://example.com/hero.jpg"
-            placeholderTextColor="#C7C7CC"
-            autoCapitalize="none"
-          />
-          {displayImage.trim() !== '' && (
-            <View style={styles.imagePreviewContainer}>
-              <Image
-                source={{ uri: displayImage }}
-                style={styles.heroPreview}
-                resizeMode="cover"
-              />
-            </View>
-          )}
-          <Text style={styles.helpText}>
-            Paste any image URL to use as logo, listing image, or hero banner
-          </Text>
-        </View>
-
-        <View style={styles.section}>
+        <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Location</Text>
-          {latitude && longitude ? (
-            <View style={styles.coordsDisplay}>
-              <Ionicons name="checkmark-circle" size={18} color="#34C759" />
-              <Text style={styles.coordsText}>
-                {parseFloat(latitude).toFixed(6)}, {parseFloat(longitude).toFixed(6)}
-              </Text>
-            </View>
-          ) : null}
+          
           <View style={styles.locationRow}>
             <View style={styles.locationInputContainer}>
               <Text style={styles.label}>Latitude</Text>
@@ -375,8 +302,8 @@ export default function RestaurantSettings() {
                 style={styles.input}
                 value={latitude}
                 onChangeText={setLatitude}
-                placeholder="e.g., 40.7128"
-                placeholderTextColor="#C7C7CC"
+                placeholder="Auto-filled from address"
+                placeholderTextColor="#94A3B8"
                 keyboardType="decimal-pad"
               />
             </View>
@@ -386,15 +313,72 @@ export default function RestaurantSettings() {
                 style={styles.input}
                 value={longitude}
                 onChangeText={setLongitude}
-                placeholder="e.g., -74.0060"
-                placeholderTextColor="#C7C7CC"
+                placeholder="Auto-filled from address"
+                placeholderTextColor="#94A3B8"
                 keyboardType="decimal-pad"
               />
             </View>
           </View>
-          <Text style={styles.helpText}>
-            Auto-filled from address, or enter manually
-          </Text>
+          {(latitude || longitude) && (
+            <View style={styles.coordsDisplay}>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.coordsText}>
+                Coordinates: {latitude}, {longitude}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Images</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Logo URL</Text>
+            <TextInput
+              style={styles.input}
+              value={logoUrl}
+              onChangeText={setLogoUrl}
+              placeholder="https://..."
+              placeholderTextColor="#94A3B8"
+            />
+            {logoUrl && (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: logoUrl }} style={styles.logoPreview} />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Image URL</Text>
+            <TextInput
+              style={styles.input}
+              value={imageUrl}
+              onChangeText={setImageUrl}
+              placeholder="https://..."
+              placeholderTextColor="#94A3B8"
+            />
+            {imageUrl && (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: imageUrl }} style={styles.imagePreview} />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Display Image URL</Text>
+            <TextInput
+              style={styles.input}
+              value={displayImage}
+              onChangeText={setDisplayImage}
+              placeholder="https://..."
+              placeholderTextColor="#94A3B8"
+            />
+            {displayImage && (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: displayImage }} style={styles.heroPreview} />
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={{ height: 40 }} />
@@ -406,88 +390,92 @@ export default function RestaurantSettings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     padding: 8,
+    marginRight: 8,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+    letterSpacing: -0.5,
   },
   saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FE902A',
   },
   saveButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   saveButtonText: {
-    color: '#FE902A',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
   content: {
     flex: 1,
-    padding: 20,
   },
-  section: {
-    marginBottom: 24,
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#000000',
+    color: '#0F172A',
     marginBottom: 8,
   },
   helpText: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 12,
+    color: '#64748B',
     marginTop: 8,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#000000',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: '#0F172A',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 12,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  ratingInputContainer: {
-    flex: 1,
+    borderColor: '#E2E8F0',
   },
   addressRow: {
     flexDirection: 'row',
@@ -498,14 +486,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FE902A',
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  geocodeButtonDisabled: {
+    opacity: 0.6,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  ratingInputContainer: {
+    flex: 1,
   },
   locationRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
   },
   locationInputContainer: {
     flex: 1,
@@ -513,25 +510,26 @@ const styles = StyleSheet.create({
   coordsDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F0FFF4',
-    padding: 10,
-    borderRadius: 8,
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#34C759',
+    borderColor: '#10B981',
+    marginTop: 12,
   },
   coordsText: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: 13,
+    color: '#0F172A',
     fontWeight: '500',
   },
   imagePreviewContainer: {
     marginTop: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
-    backgroundColor: '#F5F5F5',
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
   },
   logoPreview: {

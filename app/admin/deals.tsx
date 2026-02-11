@@ -40,7 +40,7 @@ export default function DealsManagement() {
   };
 
   const toggleDealStatus = async (dealId: string, currentStatus: boolean) => {
-    if (togglingDealId === dealId) return; // Prevent double-clicks
+    if (togglingDealId === dealId) return;
     
     setTogglingDealId(dealId);
     try {
@@ -51,7 +51,6 @@ export default function DealsManagement() {
 
       if (error) throw error;
 
-      // Update local state
       setDeals(deals.map(deal => 
         deal.id === dealId ? { ...deal, is_active: !currentStatus } : deal
       ));
@@ -105,7 +104,6 @@ export default function DealsManagement() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => {
@@ -118,9 +116,12 @@ export default function DealsManagement() {
           }} 
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#FE902A" />
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Deals</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Deals</Text>
+          <Text style={styles.headerSubtitle}>{deals.length} active deal{deals.length !== 1 ? 's' : ''}</Text>
+        </View>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
@@ -136,14 +137,16 @@ export default function DealsManagement() {
           }}
           disabled={isLoading}
         >
-          <Ionicons name="add-circle" size={32} color="#FE902A" />
+          <Ionicons name="add-circle" size={28} color="#FE902A" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {deals.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="pricetag-outline" size={64} color="#C7C7CC" />
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="pricetag-outline" size={48} color="#CBD5E1" />
+            </View>
             <Text style={styles.emptyStateTitle}>No Deals Yet</Text>
             <Text style={styles.emptyStateMessage}>
               Create your first deal to attract customers
@@ -167,92 +170,126 @@ export default function DealsManagement() {
             </TouchableOpacity>
           </View>
         ) : (
-          deals.map((deal) => (
-            <View key={deal.id} style={styles.dealCard}>
-              <View style={styles.dealHeader}>
-                <View style={styles.dealTitleRow}>
-                  <Text style={styles.dealTitle}>{deal.title}</Text>
-                  <Switch
-                    value={deal.is_active}
-                    onValueChange={() => toggleDealStatus(deal.id, deal.is_active)}
-                    trackColor={{ false: '#E5E5EA', true: '#FE902A' }}
-                    disabled={isLoading || togglingDealId === deal.id}
-                  />
-                </View>
-                {deal.description && (
-                  <Text style={styles.dealDescription}>{deal.description}</Text>
-                )}
-              </View>
-
-              <View style={styles.dealMeta}>
-                {deal.is_recurring ? (
-                  <View style={styles.metaItem}>
-                    <Ionicons name="repeat" size={16} color="#FE902A" />
-                    <Text style={styles.metaText}>Recurring</Text>
-                  </View>
-                ) : (
-                  <>
-                    {deal.start_at && (
-                      <View style={styles.metaItem}>
-                        <Ionicons name="calendar" size={16} color="#8E8E93" />
-                        <Text style={styles.metaText}>
-                          {new Date(deal.start_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-                    )}
-                    {deal.end_at && (
-                      <View style={styles.metaItem}>
-                        <Ionicons name="calendar" size={16} color="#8E8E93" />
-                        <Text style={styles.metaText}>
-                          {new Date(deal.end_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-
-              {deal.tags && deal.tags.length > 0 && (
-                <View style={styles.tagsContainer}>
-                  {deal.tags.map((tag, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{tag}</Text>
+          <View style={styles.dealsList}>
+            {deals.map((deal) => (
+              <View key={deal.id} style={styles.dealCard}>
+                <View style={styles.dealHeader}>
+                  <View style={styles.dealTitleRow}>
+                    <Text style={styles.dealTitle}>{deal.title}</Text>
+                    <View style={[
+                      styles.statusIndicator,
+                      deal.is_active ? styles.statusIndicatorActive : styles.statusIndicatorInactive
+                    ]}>
+                      <View style={[
+                        styles.statusDot,
+                        deal.is_active ? styles.statusDotActive : styles.statusDotInactive
+                      ]} />
+                      <Text style={[
+                        styles.statusText,
+                        deal.is_active ? styles.statusTextActive : styles.statusTextInactive
+                      ]}>
+                        {deal.is_active ? 'Active' : 'Inactive'}
+                      </Text>
                     </View>
-                  ))}
+                  </View>
+                  {deal.description && (
+                    <Text style={styles.dealDescription}>{deal.description}</Text>
+                  )}
                 </View>
-              )}
 
-              <View style={styles.dealActions}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => {
-                    try {
-                      router.push({
-                        pathname: '/admin/deal-form' as any,
-                        params: { restaurantId, dealId: deal.id }
-                      });
-                    } catch (error) {
-                      console.error('Navigation error:', error);
-                      Alert.alert('Error', 'Failed to navigate. Please try again.');
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  <Ionicons name="pencil" size={20} color="#FE902A" />
-                  <Text style={styles.editButtonText}>Edit</Text>
-                </TouchableOpacity>
+                <View style={styles.dealMeta}>
+                  {deal.is_recurring ? (
+                    <View style={styles.metaItem}>
+                      <View style={styles.metaIcon}>
+                        <Ionicons name="repeat" size={14} color="#FE902A" />
+                      </View>
+                      <Text style={styles.metaText}>Recurring</Text>
+                    </View>
+                  ) : (
+                    <>
+                      {deal.start_at && (
+                        <View style={styles.metaItem}>
+                          <View style={styles.metaIcon}>
+                            <Ionicons name="calendar-outline" size={14} color="#64748B" />
+                          </View>
+                          <Text style={styles.metaText}>
+                            {new Date(deal.start_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      )}
+                      {deal.end_at && (
+                        <View style={styles.metaItem}>
+                          <View style={styles.metaIcon}>
+                            <Ionicons name="calendar-outline" size={14} color="#64748B" />
+                          </View>
+                          <Text style={styles.metaText}>
+                            {new Date(deal.end_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
+                </View>
 
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => deleteDeal(deal.id)}
-                  disabled={isLoading || togglingDealId === deal.id}
-                >
-                  <Ionicons name="trash" size={20} color="#FF3B30" />
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
+                {deal.tags && deal.tags.length > 0 && (
+                  <View style={styles.tagsContainer}>
+                    {deal.tags.map((tag, index) => (
+                      <View key={index} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <View style={styles.dealActions}>
+                  <TouchableOpacity
+                    style={styles.toggleButton}
+                    onPress={() => toggleDealStatus(deal.id, deal.is_active)}
+                    disabled={isLoading || togglingDealId === deal.id}
+                  >
+                    <Switch
+                      value={deal.is_active}
+                      onValueChange={() => toggleDealStatus(deal.id, deal.is_active)}
+                      trackColor={{ false: '#E2E8F0', true: '#FE902A' }}
+                      thumbColor="#FFFFFF"
+                      disabled={isLoading || togglingDealId === deal.id}
+                    />
+                    <Text style={styles.toggleButtonText}>
+                      {deal.is_active ? 'Deactivate' : 'Activate'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        try {
+                          router.push({
+                            pathname: '/admin/deal-form' as any,
+                            params: { restaurantId, dealId: deal.id }
+                          });
+                        } catch (error) {
+                          console.error('Navigation error:', error);
+                          Alert.alert('Error', 'Failed to navigate. Please try again.');
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      <Ionicons name="create-outline" size={18} color="#64748B" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => deleteDeal(deal.id)}
+                      disabled={isLoading || togglingDealId === deal.id}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-            </View>
-          ))
+            ))}
+          </View>
         )}
       </ScrollView>
     </View>
@@ -262,163 +299,226 @@ export default function DealsManagement() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     padding: 8,
+    marginRight: 8,
+  },
+  headerContent: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 2,
   },
   addButton: {
-    padding: 4,
+    padding: 8,
   },
   content: {
     flex: 1,
+  },
+  dealsList: {
     padding: 20,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginTop: 16,
-  },
-  emptyStateMessage: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 40,
-  },
-  createButton: {
-    backgroundColor: '#FE902A',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 24,
-  },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    gap: 12,
   },
   dealCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   dealHeader: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   dealTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
+    gap: 12,
   },
   dealTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
+    color: '#0F172A',
     flex: 1,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+  },
+  statusIndicatorActive: {
+    backgroundColor: '#F0FDF4',
+  },
+  statusIndicatorInactive: {
+    backgroundColor: '#F1F5F9',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusDotActive: {
+    backgroundColor: '#10B981',
+  },
+  statusDotInactive: {
+    backgroundColor: '#64748B',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusTextActive: {
+    color: '#10B981',
+  },
+  statusTextInactive: {
+    color: '#64748B',
   },
   dealDescription: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#64748B',
     lineHeight: 20,
   },
   dealMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 12,
+    gap: 12,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
-    marginBottom: 4,
+    gap: 6,
+  },
+  metaIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   metaText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginLeft: 4,
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 8,
   },
   tag: {
-    backgroundColor: '#FFF5EB',
+    backgroundColor: '#FEF3E2',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 4,
+    borderRadius: 12,
   },
   tagText: {
     fontSize: 12,
     color: '#FE902A',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   dealActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-    paddingTop: 12,
+    borderTopColor: '#E2E8F0',
   },
-  editButton: {
+  toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
+    gap: 8,
   },
-  editButtonText: {
-    color: '#FE902A',
-    fontSize: 16,
+  toggleButtonText: {
+    fontSize: 14,
+    color: '#64748B',
     fontWeight: '500',
-    marginLeft: 4,
   },
-  deleteButton: {
+  actionButtons: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    justifyContent: 'center',
   },
-  deleteButtonDisabled: {
-    opacity: 0.5,
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
-  deleteButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 4,
+  emptyIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  emptyStateMessage: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  createButton: {
+    backgroundColor: '#FE902A',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  createButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
