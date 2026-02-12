@@ -113,23 +113,80 @@ export default function AdminDashboard() {
 
       const totalScans = scansData?.length || 0;
       
-      // Since deals don't have prices stored, we'll calculate average based on:
-      // Option 1: If you want to track actual sale amounts, you'd need to add a price/amount field to deals
-      // Option 2: For now, calculate average scans per day over the last 30 days
-      // Option 3: Use a default estimated value per scan
-      
-      // For now, using a simple calculation: if we have scans, estimate average sale per scan
-      // You can update this once you add pricing to deals or track actual transaction amounts
-      const estimatedAvgSalePerScan = 5.03; // Default estimate - update when you have actual pricing data
-      
-      if (totalScans > 0) {
-        // Calculate total sales estimate
-        const totalSalesEstimate = totalScans * estimatedAvgSalePerScan;
-        setTotalSales(totalSalesEstimate);
-        setAverageSale(estimatedAvgSalePerScan);
-      } else {
+      if (totalScans === 0) {
         setTotalSales(0);
         setAverageSale(0);
+        return;
+      }
+
+      // Get deal recommendations that link deals to menu items
+      const { data: recommendationsData, error: recError } = await supabase
+        .from('deal_recommendations')
+        .select('deal_id, menu_item_id')
+        .in('deal_id', dealIds)
+        .not('menu_item_id', 'is', null);
+
+      if (recError) throw recError;
+
+      // Create a map of deal_id -> menu_item_id
+      const dealToMenuItemMap = new Map<string, string>();
+      recommendationsData?.forEach(rec => {
+        if (rec.deal_id && rec.menu_item_id) {
+          dealToMenuItemMap.set(rec.deal_id, rec.menu_item_id);
+        }
+      });
+
+      // Get menu items for this restaurant
+      const { data: menuItemsData, error: menuError } = await supabase
+        .from('menu_items')
+        .select('id, price')
+        .eq('restaurant_id', selectedRestaurantId)
+        .not('price', 'is', null);
+
+      if (menuError) throw menuError;
+
+      // Create a map of menu_item_id -> price
+      const menuItemPriceMap = new Map<string, number>();
+      menuItemsData?.forEach(item => {
+        if (item.id && item.price) {
+          menuItemPriceMap.set(item.id, Number(item.price));
+        }
+      });
+
+      // Calculate total sales and average from actual menu item prices
+      let totalSalesAmount = 0;
+      let scansWithPrices = 0;
+
+      scansData?.forEach(scan => {
+        if (scan.deal_id) {
+          const menuItemId = dealToMenuItemMap.get(scan.deal_id);
+          if (menuItemId) {
+            const price = menuItemPriceMap.get(menuItemId);
+            if (price && price > 0) {
+              totalSalesAmount += price;
+              scansWithPrices++;
+            }
+          }
+        }
+      });
+
+      // Calculate average sale
+      if (scansWithPrices > 0) {
+        const averageSaleAmount = totalSalesAmount / scansWithPrices;
+        setTotalSales(totalSalesAmount);
+        setAverageSale(averageSaleAmount);
+      } else {
+        // Fallback: if no menu items linked, use average menu item price for restaurant
+        if (menuItemsData && menuItemsData.length > 0) {
+          const avgMenuPrice = menuItemsData.reduce((sum, item) => sum + (Number(item.price) || 0), 0) / menuItemsData.length;
+          setTotalSales(totalScans * avgMenuPrice);
+          setAverageSale(avgMenuPrice);
+        } else {
+          // No menu items at all - use default estimate
+          const defaultAvgSale = 5.03;
+          setTotalSales(totalScans * defaultAvgSale);
+          setAverageSale(defaultAvgSale);
+        }
       }
     } catch (error) {
       console.error('Error fetching sales stats:', error);
