@@ -152,7 +152,7 @@ export default function SettingsScreen() {
           }}
         >
           <View style={styles.backIconBox}>
-            <AntDesign name="left" size={20} color="#FE902A" />
+            <AntDesign name="left" size={20} color="#333" />
           </View>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
@@ -397,39 +397,34 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: "#FE902A",
+    paddingBottom: 16,
+    backgroundColor: "#fff",
   },
   backButton: {
     padding: 8,
   },
   backIconBox: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 12,
     padding: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
-    color: "#fff",
+    color: "#1A1A1A",
   },
   placeholder: {
     width: 40,
   },
   section: {
     marginTop: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    color: "#333",
-    marginBottom: 16,
+    color: "#1A1A1A",
+    marginBottom: 12,
   },
   settingRow: {
     flexDirection: "row",
@@ -454,12 +449,12 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
-    marginBottom: 4,
+    color: "#999",
+    marginBottom: 2,
   },
   settingDescription: {
     fontSize: 13,
-    color: "#666",
+    color: "#bbb",
   },
   toggle: {
     width: 50,

@@ -233,6 +233,14 @@ export default function AdminDashboard() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Greeting */}
+        <View style={styles.greetingSection}>
+          <Text style={styles.greetingText}>
+            {new Date().getHours() < 12 ? 'Good Morning!' : new Date().getHours() < 17 ? 'Good Afternoon!' : 'Good Evening!'}
+          </Text>
+          <Text style={styles.greetingName}>{profile?.display_name || 'Owner'}</Text>
+        </View>
+
         {/* KPI Cards */}
         <View style={styles.kpiSection}>
           <View style={[styles.kpiCard, styles.kpiCardPrimary]}>
@@ -562,10 +570,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
   menuButton: {
     marginRight: 12,
@@ -592,6 +598,21 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  greetingSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 4,
+  },
+  greetingText: {
+    fontSize: 22,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  greetingName: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   kpiSection: {
     flexDirection: 'row',

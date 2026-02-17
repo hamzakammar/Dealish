@@ -232,27 +232,22 @@ export default function DealCard({ deal }: DealCardProps) {
 const styles = StyleSheet.create({
   dealCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: "#FE902A",
   },
   dealHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   dealTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
+    color: "#1A1A1A",
     flex: 1,
     marginRight: 8,
   },
@@ -260,7 +255,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffebee",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   expiredText: {
     color: "#c62828",
@@ -271,7 +266,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e3f2fd",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   upcomingText: {
     color: "#1976d2",
@@ -280,9 +275,9 @@ const styles = StyleSheet.create({
   },
   dealDescription: {
     fontSize: 14,
-    color: "#666",
+    color: "#888",
     lineHeight: 20,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   tagsContainer: {
     flexDirection: "row",
@@ -291,13 +286,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tag: {
-    backgroundColor: "#FE902A",
+    backgroundColor: "#FFF5EC",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   tagText: {
-    color: "#fff",
+    color: "#FE902A",
     fontSize: 11,
     fontWeight: "600",
   },
@@ -311,8 +306,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dateText: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: 13,
+    color: "#888",
   },
   qrButton: {
     flexDirection: "row",
@@ -321,10 +316,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: "#FFF5EB",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#FE902A",
+    backgroundColor: "#FFF5EC",
+    borderRadius: 10,
     gap: 6,
   },
   qrButtonText: {

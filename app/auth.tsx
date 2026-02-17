@@ -452,7 +452,7 @@ export default function AuthScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Take advantage of this deal</Text>
+      <Text style={styles.title}>Take advantage of{'\n'}this deal</Text>
       <Text style={styles.subtitle}>{isSignUp ? 'Sign up to continue' : 'Sign in to continue'}</Text>
 
       <View style={styles.form}>
@@ -463,14 +463,15 @@ export default function AuthScreen() {
         )}
 
         <View>
+            <Text style={styles.inputLabel}>Email Address</Text>
             <TextInput
             style={[
                 styles.input,
                 emailError && styles.inputError,
                 isRateLimited && styles.inputDisabled
             ]}
-            placeholder="Your Email"
-            placeholderTextColor="#999"
+            placeholder="your email"
+            placeholderTextColor="#bbb"
             value={email}
             onChangeText={(text) => {
                 setEmail(text);
@@ -487,6 +488,7 @@ export default function AuthScreen() {
         </View>
 
         <View>
+            <Text style={styles.inputLabel}>Password</Text>
             <View style={[
                 styles.passwordContainer,
                 passwordError && styles.inputError,
@@ -494,12 +496,11 @@ export default function AuthScreen() {
             ]}>
                 <TextInput
                 style={styles.passwordInput}
-                placeholder="Your Password"
-                placeholderTextColor="#999"
+                placeholder="your password"
+                placeholderTextColor="#bbb"
                 value={password}
                 onChangeText={(text) => {
                     setPassword(text);
-                    // Clear error when user starts typing
                     if (passwordError) setPasswordError('');
                 }}
                 secureTextEntry={!showPassword}
@@ -517,7 +518,7 @@ export default function AuthScreen() {
                     <Ionicons
                         name={showPassword ? 'eye-off' : 'eye'}
                         size={20}
-                        color="#999"
+                        color="#bbb"
                     />
                 </TouchableOpacity>
             </View>
@@ -526,12 +527,12 @@ export default function AuthScreen() {
             )}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.button, 
-            styles.emailButton, 
+            styles.button,
+            styles.emailButton,
             (loading || isRateLimited) && styles.buttonDisabled
-          ]} 
+          ]}
           onPress={handleEmailAuth}
           disabled={loading || isRateLimited}
           accessibilityLabel={isSignUp ? "Sign Up" : "Sign In"}
@@ -547,7 +548,7 @@ export default function AuthScreen() {
         </TouchableOpacity>
 
         {!isSignUp && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => router.push('/reset-password')}
             style={styles.forgotPasswordButton}
             accessibilityLabel="Forgot Password"
@@ -569,10 +570,10 @@ export default function AuthScreen() {
                 ]}
                 onPress={() => setSelectedRole('user')}
               >
-                <Ionicons 
-                  name="person" 
-                  size={24} 
-                  color={selectedRole === 'user' ? '#fff' : '#666'} 
+                <Ionicons
+                  name="person"
+                  size={24}
+                  color={selectedRole === 'user' ? '#fff' : '#666'}
                 />
                 <Text style={[
                   styles.roleButtonText,
@@ -588,10 +589,10 @@ export default function AuthScreen() {
                 ]}
                 onPress={() => setSelectedRole('owner')}
               >
-                <Ionicons 
-                  name="restaurant" 
-                  size={24} 
-                  color={selectedRole === 'owner' ? '#fff' : '#666'} 
+                <Ionicons
+                  name="restaurant"
+                  size={24}
+                  color={selectedRole === 'owner' ? '#fff' : '#666'}
                 />
                 <Text style={[
                   styles.roleButtonText,
@@ -609,8 +610,11 @@ export default function AuthScreen() {
             </TouchableOpacity>
           </View>
         )}
+      </View>
 
-        <TouchableOpacity 
+      {/* Bottom section */}
+      <View style={styles.bottomSection}>
+        <TouchableOpacity
           onPress={() => {
             setIsSignUp(!isSignUp);
             setShowRoleSelection(false);
@@ -621,47 +625,46 @@ export default function AuthScreen() {
           accessibilityHint={isSignUp ? "Switches to the sign in form for existing users" : "Switches to the sign up form to create a new account"}
         >
           <Text style={styles.toggleText}>
-            {isSignUp 
-              ? 'Already have an account? Sign in' 
-              : "Don't have an account? Sign up"}
+            {isSignUp ? 'Already have an account? Sign in' : 'Create new account'}
           </Text>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>OR</Text>
-        <View style={styles.dividerLine} />
-      </View>
+        <View style={styles.socialButtonsContainer}>
+          <TouchableOpacity
+            style={[styles.socialButton, styles.googleButton]}
+            onPress={handleGoogleSignIn}
+            accessibilityLabel="Sign in with Google"
+            accessibilityHint="Opens Google sign in in your browser"
+          >
+            <Image
+              source={require('@/assets/images/google-logo.png')}
+              style={styles.googleLogo}
+              resizeMode="contain"
+              accessibilityRole="image"
+              accessibilityLabel="Google logo"
+            />
+            <Text style={styles.socialButtonText}>Google</Text>
+          </TouchableOpacity>
 
-      <View style={styles.socialButtonsContainer}>
-        <TouchableOpacity 
-          style={[styles.socialButton, styles.googleButton]} 
-          onPress={handleGoogleSignIn}
-          accessibilityLabel="Sign in with Google"
-          accessibilityHint="Opens Google sign in in your browser"
-        >
-          <Image 
-            source={require('@/assets/images/google-logo.png')} 
-            style={styles.googleLogo}
-            resizeMode="contain"
-            accessibilityRole="image"
-            accessibilityLabel="Google logo"
-          />
-          <Text style={styles.socialButtonText}>Google</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.socialButton, styles.appleButton]}
+            disabled={true}
+            accessibilityLabel="Sign in with Apple is not currently available"
+            accessibilityHint="Apple sign in is not currently available"
+          >
+            <View style={styles.appleIconContainer}>
+              <FontAwesome5 name="apple" size={20} color="#000" />
+            </View>
+            <Text style={styles.socialButtonText}>Apple</Text>
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity 
-          style={[styles.socialButton, styles.appleButton]} 
-          disabled={true}
-          accessibilityLabel="Sign in with Apple is not currently available"
-          accessibilityHint="Apple sign in is not currently available"
-        >
-          <View style={styles.appleIconContainer}>
-            <FontAwesome5 name="apple" size={20} color="#000" />
-          </View>
-          <Text style={styles.socialButtonText}>Apple</Text>
-        </TouchableOpacity>
+        <Text style={styles.termsText}>
+          By continuing, you agree to our{' '}
+          <Text style={styles.termsLink}>Terms</Text>
+          {' '}and{' '}
+          <Text style={styles.termsLink}>Privacy Policy</Text>
+        </Text>
       </View>
     </View>
   );
@@ -671,56 +674,97 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 24,
     backgroundColor: '#fff',
   },
   title: {
     fontSize: 32,
-    fontFamily: 'Manrope',
     fontWeight: 'bold',
-    marginTop: 99,
+    marginTop: 80,
     marginBottom: 8,
     textAlign: 'center',
-    color: '#333',
+    color: '#1A1A1A',
   },
   subtitle: {
     fontSize: 16,
-    fontFamily: 'Manrope',
     fontWeight: '400',
-    color: '#666',
-    marginBottom: 40,
+    color: '#999',
+    marginBottom: 36,
     textAlign: 'center',
   },
   form: {
     width: '100%',
-    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
   },
   input: {
     width: '100%',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginBottom: 12,
+    marginBottom: 16,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#333',
   },
   button: {
     width: '100%',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 12,
     alignItems: 'center',
   },
   emailButton: {
     backgroundColor: '#FE902A',
+    marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  forgotPasswordButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  forgotPasswordText: {
+    color: '#333',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  bottomSection: {
+    marginTop: 'auto',
+    paddingBottom: 16,
+  },
+  toggleButton: {
+    backgroundColor: '#F2F2F2',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  toggleText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
   },
   socialButtonsContainer: {
     flexDirection: 'row',
     width: '100%',
     justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
   },
   socialButton: {
     flex: 1,
@@ -728,18 +772,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    backgroundColor: '#E9EAEB',
-    marginRight: 6,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFF5EC',
   },
   appleButton: {
-    backgroundColor: '#E9EAEB',
-    marginRight: 0,
-    marginLeft: 6,
+    backgroundColor: '#F2F2F2',
   },
   googleButton: {
-    backgroundColor: '#E9EAEB',
+    backgroundColor: '#FFF5EC',
   },
   googleLogo: {
     width: 20,
@@ -757,46 +798,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  forgotPasswordButton: {
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  forgotPasswordText: {
-    color: '#FE902A',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  toggleButton: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  toggleText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  dividerText: {
-    marginHorizontal: 16,
+  termsText: {
+    textAlign: 'center',
+    fontSize: 13,
     color: '#999',
-    fontSize: 14,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: '#FE902A',
+    fontWeight: '500',
   },
   inputError: {
     borderColor: '#ff4444',
@@ -805,7 +815,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff4444',
     fontSize: 12,
-    marginTop: -8,
+    marginTop: -12,
     marginBottom: 8,
     marginLeft: 4,
   },
@@ -813,7 +823,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff3cd',
     borderColor: '#ffc107',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 16,
   },
@@ -830,12 +840,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginBottom: 12,
+    marginBottom: 16,
     backgroundColor: '#fff',
   },
   passwordInput: {
@@ -843,6 +853,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: 0,
     margin: 0,
+    color: '#333',
   },
   eyeIcon: {
     paddingLeft: 8,

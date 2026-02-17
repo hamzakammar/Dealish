@@ -18,37 +18,26 @@ interface WelcomeSlide {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
-  color: string;
 }
 
 const slides: WelcomeSlide[] = [
   {
     id: '1',
-    icon: 'restaurant-outline',
-    title: 'Discover Local Deals',
-    description: 'Find exclusive deals and discounts at your favorite restaurants near you.',
-    color: '#FE902A',
+    icon: 'search-outline',
+    title: 'Discover Daily Deals',
+    description: 'Find the best food and drink specials near you with Dealish. Save money while exploring new places!',
   },
   {
     id: '2',
-    icon: 'qr-code-outline',
-    title: 'Easy QR Redemption',
-    description: 'Simply scan a QR code at the restaurant to redeem your deal instantly.',
-    color: '#FF6B6B',
+    icon: 'bookmark-outline',
+    title: 'Save Your Favorites!',
+    description: 'Pick your favorite restaurants and/or bars and add them to your list!',
   },
   {
     id: '3',
-    icon: 'time-outline',
-    title: 'Limited Time Offers',
-    description: 'Get notified about flash deals and time-sensitive offers in real-time.',
-    color: '#4ECDC4',
-  },
-  {
-    id: '4',
-    icon: 'heart-outline',
-    title: 'Save Your Favorites',
-    description: 'Save restaurants and deals you love to access them quickly anytime.',
-    color: '#95E1D3',
+    icon: 'navigate-outline',
+    title: "We'll take you there",
+    description: "Once you've picked a place, let us guide you there!",
   },
 ];
 
@@ -97,8 +86,8 @@ export default function WelcomeScreen() {
 
   const renderSlide = ({ item }: { item: WelcomeSlide }) => (
     <View style={styles.slide}>
-      <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
-        <Ionicons name={item.icon} size={80} color="#FFFFFF" />
+      <View style={styles.iconCircle}>
+        <Ionicons name={item.icon} size={64} color="#FE902A" />
       </View>
       <Text style={styles.title}>{item.title}</Text>
       <Text style={styles.description}>{item.description}</Text>
@@ -107,13 +96,6 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Skip Button */}
-      {currentIndex < slides.length - 1 && (
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Slides */}
       <FlatList
         ref={flatListRef}
@@ -149,8 +131,14 @@ export default function WelcomeScreen() {
           <Text style={styles.nextButtonText}>
             {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
           </Text>
-          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
         </TouchableOpacity>
+
+        {/* Skip */}
+        {currentIndex < slides.length - 1 && (
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -161,19 +149,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  skipButton: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  skipText: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '600',
-  },
   slide: {
     width,
     flex: 1,
@@ -181,18 +156,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  iconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+  iconCircle: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: '#FFF5EC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 48,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#1A1A1A',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -200,17 +176,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#8E8E93',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 26,
   },
   bottomContainer: {
-    paddingHorizontal: 40,
-    paddingBottom: 50,
+    paddingHorizontal: 32,
+    paddingBottom: 40,
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 32,
   },
   dot: {
     height: 8,
@@ -218,7 +194,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeDot: {
-    width: 24,
+    width: 8,
     backgroundColor: '#FE902A',
   },
   inactiveDot: {
@@ -226,11 +202,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
   },
   nextButton: {
-    flexDirection: 'row',
     backgroundColor: '#FE902A',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -238,6 +212,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
-    marginRight: 8,
+  },
+  skipButton: {
+    alignSelf: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  skipText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    fontWeight: '500',
   },
 });

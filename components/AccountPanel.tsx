@@ -276,11 +276,13 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                     <Image source={{ uri: userAvatar }} style={styles.avatar} />
                   ) : (
                     <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                      <AntDesign name="user" size={32} color="#FE902A" />
+                      <AntDesign name="user" size={24} color="#FE902A" />
                     </View>
                   )}
-                  <Text style={styles.userName}>{userName}</Text>
-                  <Text style={styles.userEmail}>{userEmail}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.userName}>{userName}</Text>
+                    <Text style={styles.userEmail}>{userEmail}</Text>
+                  </View>
                 </>
               )}
             </View>
@@ -397,12 +399,12 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    backgroundColor: "#F5E6D3",
+    backgroundColor: "#FFFFFF",
     zIndex: 6,
     shadowColor: "#000",
     shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     elevation: 5,
     paddingTop: 60,
     paddingHorizontal: 20,
@@ -429,47 +431,51 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   profileSection: {
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 32,
     paddingTop: 16,
+    flexDirection: "row",
+    gap: 14,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 12,
-    backgroundColor: "#fff",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#f5f5f5",
   },
   avatarPlaceholder: {
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#FE902A",
+    borderWidth: 0,
+    backgroundColor: "#FFF5EC",
   },
   userName: {
     fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 4,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 2,
   },
   userEmail: {
     fontSize: 13,
-    color: "#666",
+    color: "#999",
   },
   menuSection: {
     flex: 1,
-    gap: 16,
+    gap: 4,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    paddingTop: 16,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    gap: 12,
+    paddingVertical: 14,
+    gap: 14,
   },
   menuLabel: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
+    fontSize: 17,
+    color: "#1A1A1A",
+    fontWeight: "600",
   },
   favouritesTitle: {
     fontSize: 20,
@@ -525,7 +531,7 @@ const styles = StyleSheet.create({
   logoutButton: {
     backgroundColor: "#FE902A",
     paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: "center",
     marginBottom: 32,
     marginTop: "auto",
