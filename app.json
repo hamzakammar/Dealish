@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dealish",
     "slug": "Dealish",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "dealish",
@@ -13,16 +13,18 @@
       "resizeMode": "contain",
       "backgroundColor": "#FE902A"
     },
-    "icon": "./assets/images/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Dealish",
       "infoPlist": {
         "NSAllowsLocalNetworking": true,
-        "NSBonjourServices": ["_http._tcp"]
+        "NSBonjourServices": [
+          "_http._tcp"
+        ]
       }
     },
     "android": {
+      "icon": "./assets/images/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FE902A"
@@ -30,7 +32,11 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Dealish",
-      "useNextNotificationsApi": true
+      "useNextNotificationsApi": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -45,19 +51,17 @@
           "cameraPermission": "Allow Dealish to access your camera to scan QR codes for tracking visits."
         }
       ],
-      "./plugins/withEntitlementsModification"
-      // Temporarily disabled - requires paid Apple Developer account for Push Notifications
-      // [
-      //   "expo-notifications",
-      //   {
-      //     "icon": "./assets/images/icon.png",
-      //     "color": "#FE902A",
-      //     "sounds": []
-      //   }
-      // ]
+      "./plugins/withEntitlementsModification",
+      "./plugins/withGoogleMaps"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c8d4d9ee-1ec9-4e2c-a60f-fa51168853fe"
+      }
     }
   }
 }

@@ -566,7 +566,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
                   <Image
                     source={{ uri: restaurant.logo_url || restaurant.image_url }}
                     style={styles.logo}
-                    resizeMode="contain"
+                    resizeMode="cover"
                   />
                 ) : (
                   <View style={[styles.logo, styles.logoPlaceholder]}>
@@ -803,12 +803,13 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginRight: 12,
+    borderRadius: 14,
     overflow: "hidden",
   },
   logo: {
     width: 64,
     height: 64,
-    borderRadius: 8,
+    borderRadius: 14,
     backgroundColor: "#f5f5f5",
   },
   logoPlaceholder: {

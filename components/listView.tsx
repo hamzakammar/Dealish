@@ -54,11 +54,19 @@ function RestaurantCard({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Image
-        source={{ uri: restaurant.logo_url || restaurant.image_url }}
-        style={styles.image}
-        resizeMode="contain"
-      />
+      <View style={styles.imageContainer}>
+        {(restaurant.logo_url || restaurant.image_url) ? (
+          <Image
+            source={{ uri: restaurant.logo_url || restaurant.image_url }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Ionicons name="restaurant-outline" size={32} color="#ccc" />
+          </View>
+        )}
+      </View>
       <View style={styles.content}>
         <View>
           <Text style={styles.name} numberOfLines={1}>
@@ -352,13 +360,24 @@ const styles = StyleSheet.create({
   cardSelected: {
     borderColor: "#FE902A",
   },
-  image: {
+  imageContainer: {
     width: 120,
     height: "100%",
-    backgroundColor: "#f0f0f0",
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
+    backgroundColor: "#f5f5f5",
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
     overflow: "hidden",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  imagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f0f0f0",
   },
   content: {
     flex: 1,

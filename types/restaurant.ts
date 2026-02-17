@@ -21,6 +21,9 @@ export type Deal = {
   title: string;
   description?: string;
   tags?: string[];
+  discount_type?: 'percent' | 'fixed' | 'bogo'; // Type of discount offered
+  discount_value?: number; // Percentage (0-100) for percent, dollar amount for fixed
+  original_price?: number; // Original price before discount (for fixed savings calculation)
   start_at?: string;
   end_at?: string;
   is_active: boolean;

@@ -37,7 +37,6 @@ export default function AuthScreen() {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'user' | 'owner'>('user');
-  const [showRoleSelection, setShowRoleSelection] = useState(false);
   const redirectingRef = useRef(false);
 
   // ALL hooks must be called BEFORE any conditional returns, in consistent order
@@ -126,6 +125,9 @@ export default function AuthScreen() {
     );
   }
   const handleEmailAuth = async () => {
+    // Prevent double-submit while processing
+    if (loading) return;
+
     // Reset errors
     setEmailError('');
     setPasswordError('');
@@ -169,12 +171,6 @@ export default function AuthScreen() {
       return;
     }
 
-    // For sign-up, show role selection if not already shown
-    if (isSignUp && !showRoleSelection) {
-      setShowRoleSelection(true);
-      return;
-    }
-  
     setLoading(true);
     try {
       if (isSignUp) {
@@ -383,18 +379,18 @@ export default function AuthScreen() {
                     // Check if this is a new user (first time OAuth sign-in)
                     // For new users, we'll default to 'user' role, but they can change it later
                     // For existing users, keep their existing role
-                    const { data: existingProfile } = await supabase
+                    const { data: existingProfile, error: profileFetchError } = await supabase
                       .from('profiles')
                       .select('role')
                       .eq('id', sessionData.user.id)
-                      .single();
+                      .maybeSingle();
 
                     // If no profile exists or role is not set, default to 'user'
-                    if (!existingProfile || !existingProfile.role) {
+                    // Use upsert to handle both new and existing profiles safely
+                    if (profileFetchError || !existingProfile || !existingProfile.role) {
                       await supabase
                         .from('profiles')
-                        .update({ role: 'user' })
-                        .eq('id', sessionData.user.id);
+                        .upsert({ id: sessionData.user.id, role: 'user' }, { onConflict: 'id' });
                     }
 
                     // Fetch updated profile to get the correct role
@@ -546,19 +542,8 @@ export default function AuthScreen() {
           )}
         </TouchableOpacity>
 
-        {!isSignUp && (
-          <TouchableOpacity 
-            onPress={() => router.push('/reset-password')}
-            style={styles.forgotPasswordButton}
-            accessibilityLabel="Forgot Password"
-            accessibilityHint="Opens the password reset page to recover your account"
-          >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Role selection for sign-up */}
-        {isSignUp && showRoleSelection && (
+        {/* Role selection for sign-up - shown upfront */}
+        {isSignUp && (
           <View style={styles.roleSelectionContainer}>
             <Text style={styles.roleSelectionTitle}>I am a...</Text>
             <View style={styles.roleButtonsContainer}>
@@ -601,19 +586,23 @@ export default function AuthScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setShowRoleSelection(false)}
-            >
-              <Text style={styles.backButtonText}>Back</Text>
-            </TouchableOpacity>
           </View>
+        )}
+
+        {!isSignUp && (
+          <TouchableOpacity 
+            onPress={() => router.push('/reset-password')}
+            style={styles.forgotPasswordButton}
+            accessibilityLabel="Forgot Password"
+            accessibilityHint="Opens the password reset page to recover your account"
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity 
           onPress={() => {
             setIsSignUp(!isSignUp);
-            setShowRoleSelection(false);
             setSelectedRole('user');
           }}
           style={styles.toggleButton}
@@ -851,7 +840,7 @@ const styles = StyleSheet.create({
   },
   roleSelectionContainer: {
     width: '100%',
-    marginTop: 20,
+    marginTop: 12,
     marginBottom: 12,
   },
   roleSelectionTitle: {
@@ -891,15 +880,5 @@ const styles = StyleSheet.create({
   },
   roleButtonTextSelected: {
     color: '#fff',
-  },
-  backButton: {
-    alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  backButtonText: {
-    color: '#FE902A',
-    fontSize: 14,
-    fontWeight: '500',
   },
 });

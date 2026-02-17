@@ -16,6 +16,8 @@ export function useDealQRCode(dealId: string | null) {
     let mounted = true;
 
     async function fetchOrGenerateQRCode() {
+      if (!dealId) return;
+      const currentDealId = dealId; // Narrow type for closure
       setLoading(true);
       setError(null);
 
@@ -24,7 +26,7 @@ export function useDealQRCode(dealId: string | null) {
         const { data: deal, error: fetchError } = await supabase
           .from("deals")
           .select("qr_code_token")
-          .eq("id", dealId)
+          .eq("id", currentDealId)
           .single();
 
         if (fetchError) throw fetchError;
@@ -33,14 +35,14 @@ export function useDealQRCode(dealId: string | null) {
 
         // If no token exists, generate one
         if (!token) {
-          token = await generateQRCodeToken(dealId);
+          token = await generateQRCodeToken(currentDealId);
           if (!token) {
             throw new Error("Failed to generate QR code token");
           }
         }
 
         if (mounted) {
-          const qrData = createQRCodeData(dealId, token);
+          const qrData = createQRCodeData(currentDealId, token);
           setQrCodeData(qrData);
         }
       } catch (e: any) {

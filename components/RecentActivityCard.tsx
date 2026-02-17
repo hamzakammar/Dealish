@@ -16,7 +16,7 @@ export function RecentActivityCard({ logo, name, description, date, rating, rati
   return (
     <View style={styles.card}>
       <View style={styles.logoContainer}>
-        <Image source={{ uri: logo }} style={styles.logo} />
+        <Image source={{ uri: logo }} style={styles.logo} resizeMode="cover" />
       </View>
       <View style={styles.infoContainer}>
         <Text style={styles.name}>{name}</Text>
@@ -48,20 +48,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   logoContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: "#f5f5f5",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 16,
+    marginRight: 14,
     overflow: "hidden",
   },
   logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    resizeMode: "contain",
+    width: 52,
+    height: 52,
+    borderRadius: 14,
   },
   infoContainer: {
     flex: 1,
