@@ -6,12 +6,21 @@ import * as Linking from 'expo-linking';
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+// Log warnings instead of throwing to prevent app crashes
+// Environment variables should be set in EAS build configuration
 if (!url) {
-    throw new Error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_URL');
+    console.error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_URL');
+    console.error('Please set EXPO_PUBLIC_SUPABASE_URL in your EAS build environment variables');
 }
 if (!anon) {
-    throw new Error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    console.error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    console.error('Please set EXPO_PUBLIC_SUPABASE_ANON_KEY in your EAS build environment variables');
 }
+
+// Use fallback values to prevent crashes (app will still fail but won't crash immediately)
+// This allows error boundaries to catch the issue
+const supabaseUrl = url || 'https://placeholder.supabase.co';
+const supabaseAnonKey = anon || 'placeholder-key';
 
 export const AUTH_REDIRECT_PATH = 'auth/callback';
 export const getAuthRedirectUrl = () => {
@@ -26,7 +35,7 @@ export const getAuthRedirectUrl = () => {
 // Determine if we're in a static export/server environment
 const isServer = typeof window === 'undefined' && typeof global === 'object' && !global.navigator;
 
-export const supabase = createClient(url, anon, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         storage: isServer ? undefined : AsyncStorage, // Don't use AsyncStorage during static export
         persistSession: !isServer, // Don't persist sessions during static export

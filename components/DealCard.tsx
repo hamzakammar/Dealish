@@ -1,4 +1,5 @@
 import { Deal } from "@/types/restaurant";
+import { calculateSavings } from "@/utils/activity";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -168,6 +169,24 @@ export default function DealCard({ deal }: DealCardProps) {
 
   const dealStatus = getDealStatus();
 
+  // Format discount label for display
+  const getDiscountLabel = (): string | null => {
+    if (!deal.discount_type) return null;
+    switch (deal.discount_type) {
+      case 'percent':
+        return deal.discount_value ? `${deal.discount_value}% OFF` : null;
+      case 'fixed':
+        return deal.discount_value ? `$${deal.discount_value} OFF` : null;
+      case 'bogo':
+        return 'BOGO';
+      default:
+        return null;
+    }
+  };
+
+  const savings = calculateSavings(deal);
+  const discountLabel = getDiscountLabel();
+
   return (
     <>
       <View style={styles.dealCard}>
@@ -184,6 +203,19 @@ export default function DealCard({ deal }: DealCardProps) {
           </View>
         )}
       </View>
+
+      {/* Discount badge */}
+      {discountLabel && (
+        <View style={styles.discountRow}>
+          <View style={styles.discountBadge}>
+            <Ionicons name="pricetag" size={12} color="#FE902A" />
+            <Text style={styles.discountBadgeText}>{discountLabel}</Text>
+          </View>
+          {savings > 0 && (
+            <Text style={styles.savingsText}>Save ${savings.toFixed(2)}</Text>
+          )}
+        </View>
+      )}
 
       {deal.description && (
         <Text style={styles.dealDescription}>{deal.description}</Text>
@@ -277,6 +309,31 @@ const styles = StyleSheet.create({
     color: "#1976d2",
     fontSize: 10,
     fontWeight: "600",
+  },
+  discountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 10,
+  },
+  discountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF5EC",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 5,
+  },
+  discountBadgeText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FE902A",
+  },
+  savingsText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#22C55E",
   },
   dealDescription: {
     fontSize: 14,

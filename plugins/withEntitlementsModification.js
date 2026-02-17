@@ -4,6 +4,11 @@ module.exports = function withEntitlementsModification(config) {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
     
+    // Safety check: only modify if xcodeProject exists (iOS builds only)
+    if (!xcodeProject || !xcodeProject.pbxXCBuildConfigurationSection) {
+      return config;
+    }
+    
     // Find all build configurations
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
     

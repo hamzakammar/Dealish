@@ -23,13 +23,20 @@ export default function DealForm() {
   
   const [isLoading, setIsLoading] = useState(!!dealId);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [title, setTitle] = useState(suggestedTitle || '');
   const [description, setDescription] = useState(suggestedDescription || '');
   const [tags, setTags] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [isRecurring, setIsRecurring] = useState(false);
-  
+
+  // Discount fields for savings tracking
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed' | 'bogo'>(
+    suggestedDiscount ? 'percent' : 'percent'
+  );
+  const [discountValue, setDiscountValue] = useState(suggestedDiscount || '');
+  const [originalPrice, setOriginalPrice] = useState('');
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
@@ -70,7 +77,12 @@ export default function DealForm() {
         setTags(data.tags?.join(', ') || '');
         setIsActive(data.is_active);
         setIsRecurring(data.is_recurring || false);
-        
+
+        // Load discount fields
+        if (data.discount_type) setDiscountType(data.discount_type);
+        if (data.discount_value) setDiscountValue(String(data.discount_value));
+        if (data.original_price) setOriginalPrice(String(data.original_price));
+
         if (data.is_recurring) {
           setRecurrenceDays(data.recurrence_days || []);
           setStartTime(data.recurrence_start_time || '');
@@ -122,8 +134,37 @@ export default function DealForm() {
         Alert.alert('Error', 'Please set start and end dates for the deal');
         return false;
       }
-      if (new Date(startDate) > new Date(endDate)) {
+      const parsedStart = new Date(startDate);
+      const parsedEnd = new Date(endDate);
+      if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+        Alert.alert('Error', 'Please enter valid dates in YYYY-MM-DD format');
+        return false;
+      }
+      if (parsedStart > parsedEnd) {
         Alert.alert('Error', 'End date must be after start date');
+        return false;
+      }
+    }
+
+    // Validate discount fields
+    if (discountType === 'percent' && discountValue) {
+      const pct = parseFloat(discountValue);
+      if (isNaN(pct) || pct <= 0 || pct > 100) {
+        Alert.alert('Error', 'Discount percentage must be between 1 and 100');
+        return false;
+      }
+    }
+    if (discountType === 'fixed' && discountValue) {
+      const amt = parseFloat(discountValue);
+      if (isNaN(amt) || amt <= 0) {
+        Alert.alert('Error', 'Discount amount must be greater than 0');
+        return false;
+      }
+    }
+    if (originalPrice) {
+      const price = parseFloat(originalPrice);
+      if (isNaN(price) || price <= 0) {
+        Alert.alert('Error', 'Original price must be greater than 0');
         return false;
       }
     }
@@ -144,6 +185,9 @@ export default function DealForm() {
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         is_active: isActive,
         is_recurring: isRecurring,
+        discount_type: discountType,
+        discount_value: discountValue ? parseFloat(discountValue) : undefined,
+        original_price: originalPrice ? parseFloat(originalPrice) : undefined,
       };
 
       if (isRecurring) {
@@ -288,6 +332,73 @@ export default function DealForm() {
               onChangeText={setTags}
               placeholder="e.g., pizza, lunch, dinner"
               placeholderTextColor="#94A3B8"
+            />
+          </View>
+        </View>
+
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Discount & Savings</Text>
+          <Text style={[styles.helpText, { marginTop: -12, marginBottom: 16 }]}>
+            Used to track customer savings when they redeem this deal
+          </Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Discount Type</Text>
+            <View style={styles.discountTypeRow}>
+              {(['percent', 'fixed', 'bogo'] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.discountTypeButton,
+                    discountType === type && styles.discountTypeButtonSelected,
+                  ]}
+                  onPress={() => setDiscountType(type)}
+                >
+                  <Text
+                    style={[
+                      styles.discountTypeText,
+                      discountType === type && styles.discountTypeTextSelected,
+                    ]}
+                  >
+                    {type === 'percent' ? '% Off' : type === 'fixed' ? '$ Off' : 'BOGO'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {discountType !== 'bogo' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                {discountType === 'percent' ? 'Discount Percentage' : 'Discount Amount ($)'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={discountValue}
+                onChangeText={setDiscountValue}
+                placeholder={discountType === 'percent' ? 'e.g., 20' : 'e.g., 5.00'}
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+              />
+            </View>
+          )}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              {discountType === 'bogo' ? 'Item Price ($)' : 'Original Price ($)'}
+            </Text>
+            <Text style={styles.helpText}>
+              {discountType === 'bogo'
+                ? 'Price of one item (savings = getting one free)'
+                : 'Helps calculate exact savings for customers'}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={originalPrice}
+              onChangeText={setOriginalPrice}
+              placeholder="e.g., 15.99"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
             />
           </View>
         </View>
@@ -545,6 +656,31 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   dayButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  discountTypeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  discountTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  discountTypeButtonSelected: {
+    backgroundColor: '#FE902A',
+    borderColor: '#FE902A',
+  },
+  discountTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  discountTypeTextSelected: {
     color: '#FFFFFF',
   },
 });

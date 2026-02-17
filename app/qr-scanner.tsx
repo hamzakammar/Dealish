@@ -1,7 +1,7 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import QRScanner from "@/components/QRScanner";
-import { trackVisit } from "@/utils/activity";
+import { calculateSavings, trackRedemption, trackVisit } from "@/utils/activity";
 import { parseQRCodeData, recordQRCodeScan, validateQRCode } from "@/utils/qrCode";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,10 +39,10 @@ export default function QRScannerScreen() {
         return;
       }
 
-      // Get deal and restaurant information
+      // Get deal and restaurant information (including discount fields for savings)
       const { data: deal, error: dealError } = await supabase
         .from("deals")
-        .select("restaurant_id, title")
+        .select("restaurant_id, title, discount_type, discount_value, original_price")
         .eq("id", qrData.deal_id)
         .single();
 
@@ -61,6 +61,18 @@ export default function QRScannerScreen() {
 
       // Track visit
       await trackVisit(deal.restaurant_id, qrData.deal_id);
+
+      // Calculate savings from deal discount info
+      const savings = calculateSavings({
+        discount_type: deal.discount_type,
+        discount_value: deal.discount_value,
+        original_price: deal.original_price,
+      });
+
+      // Build confirmation message
+      const savingsText = savings > 0
+        ? `\n\nYou saved $${savings.toFixed(2)}!`
+        : '';
 
       // Show success and ask if they used the deal
       Alert.alert(
@@ -81,16 +93,55 @@ export default function QRScannerScreen() {
             },
           },
           {
-            text: "Yes",
-            onPress: () => {
-              // Could navigate to redemption tracking in the future
-              setProcessing(false);
+            text: "Yes, I used it!",
+            onPress: async () => {
               try {
-                router.back();
-              } catch (error) {
-                console.error('Navigation error:', error);
-                router.replace('/map');
+                // Track the redemption with savings amount
+                await trackRedemption(
+                  deal.restaurant_id,
+                  deal.title,
+                  savings > 0 ? savings : undefined,
+                  qrData.deal_id
+                );
+
+                // Show savings confirmation if we could calculate it
+                if (savings > 0) {
+                  Alert.alert(
+                    "Deal Redeemed! 🎉",
+                    `You saved $${savings.toFixed(2)} with "${deal.title}"!${savingsText}`,
+                    [{ text: "Awesome!", onPress: () => {
+                      try {
+                        router.back();
+                      } catch (error) {
+                        console.error('Navigation error:', error);
+                        router.replace('/map');
+                      }
+                    }}]
+                  );
+                } else {
+                  Alert.alert(
+                    "Deal Redeemed!",
+                    `"${deal.title}" has been tracked in your activity.`,
+                    [{ text: "OK", onPress: () => {
+                      try {
+                        router.back();
+                      } catch (error) {
+                        console.error('Navigation error:', error);
+                        router.replace('/map');
+                      }
+                    }}]
+                  );
+                }
+              } catch (redemptionError) {
+                console.error('Error tracking redemption:', redemptionError);
+                // Still navigate back even if tracking fails
+                try {
+                  router.back();
+                } catch (error) {
+                  router.replace('/map');
+                }
               }
+              setProcessing(false);
             },
           },
         ]

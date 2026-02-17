@@ -201,20 +201,20 @@ export default function AccountPage() {
                 if (profile && !profile.avatar_url) {
                     const googleAvatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture;
                     if (googleAvatarUrl && session.user.id) {
-                        try {
-                            // Silently sync in background - don't block UI
-                            supabase
-                                .from('profiles')
-                                .update({ avatar_url: googleAvatarUrl })
-                                .eq('id', session.user.id)
-                                .then(({ error }) => {
-                                    if (error) {
-                                        console.error('Error syncing avatar for existing user:', error);
-                                    }
-                                });
-                        } catch (syncErr) {
-                            console.error('Error syncing avatar:', syncErr);
-                        }
+                        // Silently sync in background - don't block UI
+                        (async () => {
+                            try {
+                                const { error: syncError } = await supabase
+                                    .from('profiles')
+                                    .update({ avatar_url: googleAvatarUrl })
+                                    .eq('id', session.user.id);
+                                if (syncError) {
+                                    console.error('Error syncing avatar for existing user:', syncError);
+                                }
+                            } catch (syncErr) {
+                                console.error('Error syncing avatar:', syncErr);
+                            }
+                        })();
                     }
                 }
 
