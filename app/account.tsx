@@ -407,7 +407,7 @@ export default function AccountPage() {
                     ) : (
                         <>
                             {userAvatar ? (
-                                <Image source={{ uri: userAvatar }} style={styles.avatar} />
+                                <Image source={{ uri: userAvatar }} style={styles.avatar} resizeMode="cover" />
                             ) : (
                                 <View style={[styles.avatar, styles.avatarPlaceholder]}>
                                     <AntDesign name="user" size={64} color="#FE902A" />

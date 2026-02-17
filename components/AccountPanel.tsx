@@ -4,6 +4,7 @@ import RatingDisplay from "@/components/RatingDisplay";
 import { useAccountNavigation } from "@/hooks/useAccountNavigation";
 import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -273,7 +274,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
               ) : (
                 <>
                   {userAvatar ? (
-                    <Image source={{ uri: userAvatar }} style={styles.avatar} />
+                    <Image source={{ uri: userAvatar }} style={styles.avatar} resizeMode="cover" />
                   ) : (
                     <View style={[styles.avatar, styles.avatarPlaceholder]}>
                       <AntDesign name="user" size={32} color="#FE902A" />
@@ -345,13 +346,19 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                     style={styles.favoriteItem}
                     onPress={() => handleFavouriteSelect(item)}
                   >
-                    {item.logo_url && (
-                      <Image
-                        source={{ uri: item.logo_url }}
-                        style={styles.favoriteImage}
-                        resizeMode="contain"
-                      />
-                    )}
+                    <View style={styles.favoriteImageContainer}>
+                      {item.logo_url ? (
+                        <Image
+                          source={{ uri: item.logo_url }}
+                          style={styles.favoriteImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.favoriteImagePlaceholder}>
+                          <Ionicons name="restaurant-outline" size={22} color="#ccc" />
+                        </View>
+                      )}
+                    </View>
                     <View style={styles.favoriteInfo}>
                       <Text style={styles.favoriteName}>{item.name}</Text>
                       <RatingDisplay
@@ -487,12 +494,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 12,
   },
+  favoriteImageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: "#f5f5f5",
+    overflow: "hidden",
+  },
   favoriteImage: {
     width: 50,
     height: 50,
-    borderRadius: 6,
+    borderRadius: 12,
+  },
+  favoriteImagePlaceholder: {
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#f0f0f0",
-    overflow: "hidden",
   },
   favoriteInfo: {
     flex: 1,

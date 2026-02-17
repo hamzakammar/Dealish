@@ -196,9 +196,9 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
               activeOpacity={isEditingProfile ? 0.7 : 1}
             >
               {isEditingProfile && editedAvatar ? (
-                <Image source={{ uri: editedAvatar }} style={styles.profileAvatar} />
+                <Image source={{ uri: editedAvatar }} style={styles.profileAvatar} resizeMode="cover" />
               ) : profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.profileAvatar} />
+                <Image source={{ uri: profile.avatar_url }} style={styles.profileAvatar} resizeMode="cover" />
               ) : (
                 <View style={[styles.profileAvatar, styles.profileAvatarPlaceholder]}>
                   <Ionicons name="person" size={32} color="#FE902A" />
