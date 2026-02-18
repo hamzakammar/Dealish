@@ -42,11 +42,8 @@ export function useInventoryAlerts(restaurantId: string | null) {
     } catch (e: any) {
       console.error('Error fetching alerts:', e);
       setError(e);
-      // Don't show alert dialog on initial load - let UI handle it
-      if (alerts.length === 0) {
-        // Only show alert if we have no data and this is an error
-        console.error('Failed to load inventory alerts:', e.message || e);
-      }
+      // Don't show alert dialog on initial load - let UI handle it via error state
+      console.error('Failed to load inventory alerts:', e.message || e);
     } finally {
       setLoading(false);
     }

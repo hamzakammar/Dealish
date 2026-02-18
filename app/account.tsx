@@ -298,7 +298,7 @@ export default function AccountPage() {
                         try {
                             const { data: restaurant } = await supabase
                                 .from('restaurants')
-                                .select('name, logo_url, rating, num_ratings')
+                                .select('name, hero_image_url, rating, num_ratings')
                                 .eq('id', activity.restaurant_id)
                                 .single();
 
@@ -306,7 +306,7 @@ export default function AccountPage() {
                                 ...activity,
                                 restaurants: restaurant ? {
                                     name: restaurant.name,
-                                    logo_url: restaurant.logo_url,
+                                    logo_url: restaurant.hero_image_url,
                                     rating: restaurant.rating,
                                     rating_count: restaurant.num_ratings
                                 } : {

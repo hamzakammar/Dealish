@@ -2,7 +2,6 @@ import { UserSettings } from "./settings";
 
 export type Profile = {
     id: string;
-    email?: string;
     display_name?: string;
     role: 'user' | 'owner' | 'admin';
     restaurant_ids?: string[]; // For 'owner' role

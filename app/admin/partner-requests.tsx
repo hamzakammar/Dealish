@@ -47,7 +47,6 @@ export default function PartnerRequestsScreen() {
         .select(`
           *,
           profiles:user_id (
-            email,
             display_name
           )
         `)
@@ -62,7 +61,7 @@ export default function PartnerRequestsScreen() {
         user_id: req.user_id,
         created_at: req.created_at,
         status: req.status,
-        user_email: req.profiles?.email,
+        user_email: undefined, // email lives in auth.users, not profiles table
         user_name: req.profiles?.display_name,
       }));
 

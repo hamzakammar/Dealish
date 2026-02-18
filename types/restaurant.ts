@@ -9,10 +9,14 @@ export type Restaurant = {
   phone?: string;
   type?: string;
   rating?: number;
+  // DB column names
+  num_ratings?: number;
+  hero_image_url?: string;
+  display_image?: string;
+  // Mapped aliases used in UI (populated by useRestaurants / AccountPanel)
   rating_count?: number;
   image_url?: string;
   logo_url?: string;
-  display_image?: string;
 };
 
 export type Deal = {

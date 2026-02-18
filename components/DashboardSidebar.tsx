@@ -16,7 +16,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
   const router = useRouter();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editedName, setEditedName] = useState(profile?.display_name || '');
-  const [editedEmail, setEditedEmail] = useState(profile?.email || session?.user?.email || '');
+  const [editedEmail, setEditedEmail] = useState(session?.user?.email || '');
   const [editedAvatar, setEditedAvatar] = useState<string | null>(profile?.avatar_url || null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const slideAnim = useRef(new Animated.Value(-280)).current;
@@ -122,7 +122,6 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
 
       const updateData: any = {
         display_name: editedName.trim() || null,
-        email: editedEmail.trim() || null,
       };
 
       if (avatarUrl !== profile.avatar_url) {
@@ -136,7 +135,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
       
       if (error) throw error;
       
-      const currentEmail = profile.email || session?.user?.email || '';
+      const currentEmail = session?.user?.email || '';
       if (editedEmail.trim() !== currentEmail) {
         await supabase.auth.updateUser({
           email: editedEmail.trim(),
@@ -233,7 +232,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
                     style={[styles.profileActionButton, styles.profileCancelButton]}
                     onPress={() => {
                       setEditedName(profile?.display_name || '');
-                      setEditedEmail(profile?.email || session?.user?.email || '');
+                      setEditedEmail(session?.user?.email || '');
                       setEditedAvatar(profile?.avatar_url || null);
                       setIsEditingProfile(false);
                     }}
@@ -246,7 +245,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
               <View style={styles.profileInfo}>
                 <Text style={styles.greeting}>{getGreeting()}!</Text>
                 <Text style={styles.profileName}>{profile?.display_name || 'User'}</Text>
-                <Text style={styles.profileEmail}>{profile?.email || session?.user?.email || ''}</Text>
+                <Text style={styles.profileEmail}>{session?.user?.email || ''}</Text>
                 <View style={styles.profileRole}>
                   <View style={styles.roleBadge}>
                     <Ionicons name="shield-checkmark" size={14} color="#FE902A" />

@@ -131,7 +131,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
             description: r.description ?? undefined,
             address: r.address ?? undefined,
             phone: r.phone ?? undefined,
-            cuisine_type: r.cuisine_type ?? undefined,
+            type: r.type ?? undefined,
             rating: r.rating ?? undefined,
             rating_count: r.num_ratings ?? undefined,
             image_url: r.hero_image_url ?? undefined,

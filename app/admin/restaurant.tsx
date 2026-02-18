@@ -51,9 +51,9 @@ export default function RestaurantSettings() {
         setPhone(data.phone || '');
         setType(data.type || '');
         setRating(data.rating?.toString() || '');
-        setNumReviews(data.rating_count?.toString() || '');
-        setImageUrl(data.image_url || '');
-        setLogoUrl(data.logo_url || '');
+        setNumReviews(data.num_ratings?.toString() || '');
+        setImageUrl(data.hero_image_url || '');
+        setLogoUrl(data.hero_image_url || '');
         setDisplayImage(data.display_image || '');
         setLatitude(data.lat?.toString() || '');
         setLongitude(data.lng?.toString() || '');
@@ -125,9 +125,8 @@ export default function RestaurantSettings() {
         phone: phone.trim() || null,
         type: type.trim() || null,
         rating: rating.trim() ? parseFloat(rating) : null,
-        rating_count: numReviews.trim() ? parseInt(numReviews, 10) : null,
-        image_url: imageUrl.trim() || null,
-        logo_url: logoUrl.trim() || null,
+        num_ratings: numReviews.trim() ? parseInt(numReviews, 10) : null,
+        hero_image_url: imageUrl.trim() || null,
         display_image: displayImage.trim() || null,
       };
 

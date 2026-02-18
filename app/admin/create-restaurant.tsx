@@ -111,11 +111,10 @@ export default function CreateRestaurant() {
             phone: phone.trim() || null,
             type: type.trim() || null,
             rating: rating.trim() ? parseFloat(rating) : null,
-            rating_count: numReviews.trim() ? parseInt(numReviews, 10) : null,
+            num_ratings: numReviews.trim() ? parseInt(numReviews, 10) : null,
             lat: parseFloat(latitude),
             lng: parseFloat(longitude),
-            image_url: imageUrl.trim() || null,
-            logo_url: logoUrl.trim() || null,
+            hero_image_url: imageUrl.trim() || null,
           },
         ]);
 
