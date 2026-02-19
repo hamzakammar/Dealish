@@ -388,6 +388,7 @@ export default function MapScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+          </View>
         </View>
       )}
 
