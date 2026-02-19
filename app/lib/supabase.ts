@@ -39,7 +39,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         storage: isServer ? undefined : AsyncStorage, // Don't use AsyncStorage during static export
         persistSession: !isServer, // Don't persist sessions during static export
-        autoRefreshToken: !isServer, // Don't auto-refresh during static export
+        autoRefreshToken: !isServer, // Auto-refresh tokens to keep session alive
         detectSessionInUrl: !isServer, // Don't detect session in URL during static export (avoids htmlRoutes error)
+        // Session persistence:
+        // - Access tokens expire after 1 hour (default)
+        // - Refresh tokens expire after 2 weeks (default) 
+        // - autoRefreshToken will automatically refresh access tokens using refresh tokens
+        // - Sessions persist in AsyncStorage and will be restored on app restart
+        // - If refresh token expires (after 2 weeks of inactivity), user will need to sign in again
+        storageKey: 'dealish-auth-token', // Custom storage key for better isolation
     }
 });

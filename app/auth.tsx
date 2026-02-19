@@ -393,25 +393,12 @@ export default function AuthScreen() {
                         .upsert({ id: sessionData.user.id, role: 'user' }, { onConflict: 'id' });
                     }
 
-                    // Fetch updated profile to get the correct role
-                    const { data: updatedProfile } = await supabase
-                      .from('profiles')
-                      .select('role')
-                      .eq('id', sessionData.user.id)
-                      .single();
-
                     // Refresh profile in auth context to ensure it's up to date
+                    // This will update the profile state, then index.tsx will handle routing
                     await refetchProfile();
 
-                    // Redirect based on role after OAuth success
-                    // Small delay to ensure session is fully set and profile is refreshed
-                    setTimeout(() => {
-                      if (updatedProfile?.role === 'owner' || updatedProfile?.role === 'admin') {
-                        router.replace('/admin');
-                      } else {
-                        router.replace('/map');
-                      }
-                    }, 200);
+                    // Redirect immediately - index.tsx will handle proper routing based on profile
+                    router.replace('/map');
                 } else {
                     console.warn('No session data returned after setSession');
                     Alert.alert('Error', 'Failed to create session. Please try again.');

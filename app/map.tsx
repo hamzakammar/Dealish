@@ -12,7 +12,7 @@ import { useUserLocation } from "@/hooks/useUserLocation";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import MapView, { Camera, Polyline, Region } from "react-native-maps";
 
@@ -131,7 +131,12 @@ export default function MapScreen() {
     clearRoute();
   };
 
-  const handleRestaurantSelect = (restaurant: Restaurant) => {
+  const handleRestaurantSelect = React.useCallback((restaurant: Restaurant) => {
+    // Prevent multiple rapid clicks
+    if (selectedRestaurant?.id === restaurant.id) {
+      return; // Already selected
+    }
+
     // Capture current view before zooming in, so we can restore it on close.
     if (!regionBeforeSelectRef.current) {
       regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
@@ -142,6 +147,8 @@ export default function MapScreen() {
         if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
       }).catch(() => {});
     }
+    
+    // Set selected restaurant immediately for responsive UI
     setSelectedRestaurant(restaurant);
 
     // If we're in list view, switch to map view first, then pan after a short delay
@@ -171,7 +178,7 @@ export default function MapScreen() {
         800 // Animation duration in milliseconds
       );
     }
-  };
+  }, [selectedRestaurant, viewMode, region]);
 
   const handleRecenter = () => {
     if (!userLocation || viewMode !== "map") return;
@@ -240,6 +247,7 @@ export default function MapScreen() {
                   restaurant={r}
                   isSelected={isSelected}
                   onPress={handleRestaurantSelect}
+                  dealInfo={null} // Don't fetch deals for markers - performance optimization
                 />
               );
             })}
@@ -379,7 +387,6 @@ export default function MapScreen() {
                 Map
               </Text>
             </TouchableOpacity>
-          </View>
           </View>
         </View>
       )}

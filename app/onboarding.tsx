@@ -2,10 +2,11 @@ import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Alert,
+    FlatList,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,12 +17,26 @@ import {
 
 type OnboardingStep = "welcome" | "name" | "location" | "complete";
 
+// Common cities list for autocomplete
+const COMMON_CITIES = [
+  "Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa", "Edmonton", "Winnipeg", "Quebec City",
+  "Hamilton", "Kitchener", "London", "Victoria", "Halifax", "Oshawa", "Windsor", "Saskatoon",
+  "Regina", "Sherbrooke", "St. John's", "Barrie", "Kelowna", "Abbotsford", "Sudbury", "Kingston",
+  "Saguenay", "Trois-Rivières", "Guelph", "Cambridge", "Thunder Bay", "Saint John", "Moncton",
+  "Brantford", "Saint-Jean-sur-Richelieu", "Peterborough", "Red Deer", "Lethbridge", "Nanaimo",
+  "Kamloops", "Belleville", "Chilliwack", "Fredericton", "Charlottetown", "Grande Prairie",
+  "Medicine Hat", "Airdrie", "Spruce Grove", "Vernon", "Penticton", "Newmarket", "Sarnia",
+  "Fort McMurray", "Prince George", "Sault Ste. Marie", "Chatham", "Orillia", "Cornwall",
+  "Lloydminster", "Brandon", "Whitehorse", "Yellowknife", "Iqaluit"
+];
+
 export default function OnboardingScreen() {
   const { session, refetchProfile } = useAuthContext();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome");
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
   const handleNext = () => {
     if (currentStep === "welcome") {
@@ -95,27 +110,17 @@ export default function OnboardingScreen() {
       // Refresh profile to get updated role
       await refetchProfile();
       
-      // Get updated profile to check role
-      const { data: updatedProfile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .single();
-
-      // Show completion step briefly, then navigate based on role
+      // Show completion step briefly, then navigate
       setCurrentStep("complete");
       setTimeout(() => {
         try {
-          if (updatedProfile?.role === 'owner' || updatedProfile?.role === 'admin') {
-            router.replace("/admin");
-          } else {
-            router.replace("/map");
-          }
+          // Let index.tsx handle routing based on profile role
+          router.replace("/map");
         } catch (error) {
           console.error("Navigation error:", error);
           router.replace("/map");
         }
-      }, 1500);
+      }, 800);
     } catch (error: any) {
       console.error("Error completing onboarding:", error);
       Alert.alert("Error", "Failed to save profile. Please try again.");
@@ -162,21 +167,56 @@ export default function OnboardingScreen() {
         );
 
       case "location":
+        const citySuggestions = useMemo(() => {
+          if (!location.trim()) return [];
+          const query = location.toLowerCase().trim();
+          return COMMON_CITIES
+            .filter(city => city.toLowerCase().startsWith(query))
+            .slice(0, 5);
+        }, [location]);
+
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Where are you located?</Text>
             <Text style={styles.stepDescription}>
               Help us show you deals near you
             </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your city or area"
-              placeholderTextColor="#999"
-              value={location}
-              onChangeText={setLocation}
-              autoFocus
-              autoCapitalize="words"
-            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your city or area"
+                placeholderTextColor="#999"
+                value={location}
+                onChangeText={(text) => {
+                  setLocation(text);
+                  setShowCitySuggestions(text.length > 0);
+                }}
+                onFocus={() => setShowCitySuggestions(location.length > 0)}
+                onBlur={() => setTimeout(() => setShowCitySuggestions(false), 200)}
+                autoFocus
+                autoCapitalize="words"
+              />
+              {showCitySuggestions && citySuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  <FlatList
+                    data={citySuggestions}
+                    keyExtractor={(item) => item}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          setLocation(item);
+                          setShowCitySuggestions(false);
+                        }}
+                      >
+                        <Text style={styles.suggestionText}>{item}</Text>
+                      </TouchableOpacity>
+                    )}
+                    scrollEnabled={false}
+                  />
+                </View>
+              )}
+            </View>
           </View>
         );
 
@@ -290,6 +330,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 32,
   },
+  inputContainer: {
+    width: "100%",
+    position: "relative",
+  },
   input: {
     width: "100%",
     paddingVertical: 16,
@@ -300,6 +344,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     backgroundColor: "#fff",
+  },
+  suggestionsContainer: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    marginTop: 4,
+    maxHeight: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  suggestionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
+  },
+  suggestionText: {
+    fontSize: 16,
+    color: "#333",
   },
   buttonContainer: {
     width: "100%",

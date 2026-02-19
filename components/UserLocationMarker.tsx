@@ -17,7 +17,7 @@ export default function UserLocationMarker({ location }: UserLocationMarkerProps
       <View style={styles.userLocationMarker}>
         <View style={styles.userLocationHalo} />
         <View style={styles.userLocationCircle}>
-          <MaterialCommunityIcons name="navigation" size={20} color="#fff" />
+          <MaterialCommunityIcons name="navigation" size={18} color="#fff" />
         </View>
       </View>
     </Marker>
@@ -34,14 +34,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#FE902A",
+    backgroundColor: "#4285F4",
     opacity: 0.3,
   },
   userLocationCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#FE902A",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#4285F4",
     borderWidth: 3,
     borderColor: "#fff",
     alignItems: "center",
@@ -51,6 +51,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,
+    overflow: "visible",
   },
 });
 

@@ -21,6 +21,9 @@ export default function Index() {
     setHasSeenWelcome(seen === 'true');
   };
 
+  // Only show welcome screen if user hasn't seen it AND is not logged in
+  // If user is logged in, skip welcome screen
+
   // Use useEffect for navigation to avoid mounting/unmounting issues with Redirect
   useEffect(() => {
     // Always declare timeoutId at the top for consistent hook structure
@@ -29,41 +32,41 @@ export default function Index() {
 
     // Wait until all loading is complete before redirecting
     if (!isLoading && !profileLoading && hasSeenWelcome !== null) {
-      // Use requestAnimationFrame to ensure redirect happens after render completes
-      timeoutId = setTimeout(() => {
-        if (isMounted) {
-          try {
-            // First time user - show welcome screen
-            if (!hasSeenWelcome) {
-              router.replace('/welcome');
+      // Immediate redirect for better performance
+      if (isMounted) {
+        try {
+          if (session) {
+            // If user is logged in, skip welcome screen
+            // Only show welcome screen for first-time users who aren't logged in
+            // Check if user is admin or owner - redirect to admin dashboard
+            if (profile?.role === 'owner' || profile?.role === 'admin') {
+              router.replace('/admin');
               return;
             }
-
-            if (session) {
-              // Check if user is admin or owner - redirect to admin dashboard
-              if (profile?.role === 'owner' || profile?.role === 'admin') {
-                router.replace('/admin');
-              }
-              // Check if profile needs setup
-              else if (needsSetup) {
-                router.replace('/onboarding');
-              } else {
-                router.replace('/map');
-              }
+            // Check if profile needs setup
+            if (needsSetup) {
+              router.replace('/onboarding');
+              return;
+            }
+            router.replace('/map');
+          } else {
+            // Not logged in - check if they've seen welcome screen
+            if (!hasSeenWelcome) {
+              router.replace('/welcome');
             } else {
               router.replace('/auth');
             }
-          } catch (error) {
-            console.error('Navigation error:', error);
-            // Fallback to auth screen
-            try {
-              router.replace('/auth');
-            } catch (fallbackError) {
-              console.error('Fallback navigation failed:', fallbackError);
-            }
+          }
+        } catch (error) {
+          console.error('Navigation error:', error);
+          // Fallback to auth screen
+          try {
+            router.replace('/auth');
+          } catch (fallbackError) {
+            console.error('Fallback navigation failed:', fallbackError);
           }
         }
-      }, 0);
+      }
     }
 
     // ALWAYS return cleanup function for consistent hook structure

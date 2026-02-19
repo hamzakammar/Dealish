@@ -2,6 +2,7 @@ import { supabase } from '@/app/lib/supabase'
 import type { Profile } from '@/types/user'
 import type { Session } from '@supabase/supabase-js'
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { AppState, AppStateStatus } from 'react-native'
 
 type AuthContextType = {
   session: Session | null | undefined;
@@ -123,9 +124,27 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       try {
         const {
           data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (isActive && isMountedRef.current) {
-            setSession(session)
+            // Handle token refresh events
+            if (event === 'TOKEN_REFRESHED' && session) {
+              console.log('Token refreshed successfully')
+              setSession(session)
+            } 
+            // Handle sign in events
+            else if (event === 'SIGNED_IN' && session) {
+              console.log('User signed in')
+              setSession(session)
+            }
+            // Handle sign out events
+            else if (event === 'SIGNED_OUT') {
+              console.log('User signed out')
+              setSession(null)
+            }
+            // Handle session updates
+            else {
+              setSession(session)
+            }
           }
         })
         subscriptionRef.current = subscription
@@ -135,7 +154,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       }
     }
 
-    // Fetch session asynchronously
+    // Fetch session asynchronously with refresh handling
     const fetchSession = async () => {
       if (!isActive) return
       
@@ -151,13 +170,52 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         
         if (error) {
           console.error('Error fetching auth session:', error)
+          // If session fetch fails, try to refresh the token
+          if (error.message?.includes('expired') || error.message?.includes('invalid')) {
+            try {
+              const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+              if (!refreshError && refreshedSession) {
+                console.log('Session refreshed successfully')
+                setSession(refreshedSession)
+                setIsLoadingSession(false)
+                return
+              }
+            } catch (refreshErr) {
+              console.error('Error refreshing session:', refreshErr)
+            }
+          }
+          setSession(null)
+        } else {
+          // Check if session is expired and needs refresh
+          if (session) {
+            const expiresAt = session.expires_at
+            const now = Math.floor(Date.now() / 1000)
+            const expiresIn = expiresAt ? expiresAt - now : 0
+            
+            // If token expires in less than 5 minutes, refresh it proactively
+            if (expiresIn > 0 && expiresIn < 300) {
+              try {
+                const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+                if (!refreshError && refreshedSession) {
+                  console.log('Proactively refreshed session (expires soon)')
+                  setSession(refreshedSession)
+                  setIsLoadingSession(false)
+                  return
+                }
+              } catch (refreshErr) {
+                console.error('Error proactively refreshing session:', refreshErr)
+                // Continue with existing session even if refresh fails
+              }
+            }
+          }
+          setSession(session)
         }
-        setSession(session)
         setIsLoadingSession(false)
       } catch (err) {
         if (!isActive || !isMountedRef.current) return
         console.error('Error fetching auth session:', err)
         setIsLoadingSession(false)
+        setSession(null)
       }
     }
 
@@ -198,6 +256,45 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       currentFetchSessionIdRef.current = null
     }
   }, [fetchProfile])
+
+  // Handle app state changes to refresh session when app comes to foreground
+  useEffect(() => {
+    let appStateSubscription: { remove: () => void } | null = null
+
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      // When app comes to foreground, refresh the session if we have one
+      if (nextAppState === 'active' && session) {
+        try {
+          // Check if session is still valid
+          const { data: { session: currentSession }, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            // Try to refresh if there's an error
+            const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+            if (refreshedSession) {
+              setSession(refreshedSession)
+            } else {
+              setSession(null)
+            }
+          } else if (currentSession) {
+            // Update session if it changed
+            setSession(currentSession)
+          }
+        } catch (err) {
+          console.error('Error refreshing session on app state change:', err)
+        }
+      }
+    }
+
+    // Subscribe to app state changes
+    appStateSubscription = AppState.addEventListener('change', handleAppStateChange)
+
+    return () => {
+      if (appStateSubscription) {
+        appStateSubscription.remove()
+      }
+    }
+  }, [session])
 
   return (
     <AuthContext.Provider

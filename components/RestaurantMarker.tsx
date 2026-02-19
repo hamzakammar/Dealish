@@ -1,7 +1,6 @@
-import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
-import { Deal, Restaurant } from "@/types/restaurant";
+import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Marker } from "react-native-maps";
 
@@ -9,39 +8,18 @@ type RestaurantMarkerProps = {
   restaurant: Restaurant;
   isSelected: boolean;
   onPress: (restaurant: Restaurant) => void;
+  dealInfo?: string | null; // Pass deal info from parent to avoid fetching in every marker
 };
-
-// Helper function to extract deal info (percentage or dollar amount) from deal title/description
-function extractDealInfo(deal: Deal | null): string | null {
-  if (!deal) return null;
-  
-  const text = `${deal.title} ${deal.description || ''}`.toLowerCase();
-  
-  // Try to extract percentage (e.g., "50%", "50 percent")
-  const percentMatch = text.match(/(\d+)%|(\d+)\s*percent/);
-  if (percentMatch) {
-    const percentage = percentMatch[1] || percentMatch[2];
-    return `${percentage}%`;
-  }
-  
-  // Try to extract dollar amount (e.g., "$10", "10$", "$10 off", "save $10")
-  const dollarMatch = text.match(/\$(\d+)|(\d+)\$|(\d+)\s*dollar/);
-  if (dollarMatch) {
-    const amount = dollarMatch[1] || dollarMatch[2] || dollarMatch[3];
-    return `$${amount}`;
-  }
-  
-  return null;
-}
 
 export default function RestaurantMarker({
   restaurant,
   isSelected,
   onPress,
+  dealInfo: providedDealInfo,
 }: RestaurantMarkerProps) {
-  const { deals } = useRestaurantDeals(restaurant.id);
-  const firstDeal = deals && deals.length > 0 ? deals[0] : null;
-  const dealInfo = extractDealInfo(firstDeal);
+  // Use provided deal info if available, otherwise show default icon
+  // This avoids fetching deals for every marker (performance optimization)
+  const dealInfo = providedDealInfo;
   const isPartner = Boolean(restaurant.partner);
 
   const markerContent = useMemo(
@@ -85,12 +63,18 @@ export default function RestaurantMarker({
     [isSelected, dealInfo, isPartner]
   );
 
+  const handleMarkerPress = React.useCallback(() => {
+    // Ensure onPress is called even if there's lag
+    onPress(restaurant);
+  }, [restaurant, onPress]);
+
   return (
     <Marker
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
-      onPress={() => onPress(restaurant)}
+      onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={true}
+      tracksViewChanges={false}
+      tappable={true}
     >
       {markerContent}
     </Marker>
@@ -101,6 +85,7 @@ const styles = StyleSheet.create({
   markerWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
+    overflow: "visible",
   },
   dealBadge: {
     borderRadius: 8,
@@ -179,17 +164,18 @@ const styles = StyleSheet.create({
     borderStyle: "solid",
     borderLeftWidth: 12,
     borderRightWidth: 12,
-    borderTopWidth: 18,
+    borderTopWidth: 20,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#FE902A",
-    marginTop: -3,
+    marginTop: -2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 3,
     elevation: 4,
     zIndex: 0,
+    overflow: "visible",
   },
   markerPinPartner: {
     borderLeftWidth: 13,

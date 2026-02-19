@@ -33,6 +33,15 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Google Play service account keys
+dealish-*.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!app.json
+!eas.json
+
 # typescript
 *.tsbuildinfo
 
