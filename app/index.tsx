@@ -2,7 +2,7 @@ import { useAuthContext } from '@/app/providers/auth';
 import { useProfileSetup } from '@/hooks/useProfileSetup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
@@ -10,72 +10,64 @@ export default function Index() {
   const { needsSetup, loading: profileLoading } = useProfileSetup();
   const router = useRouter();
   const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean | null>(null);
+  const hasNavigatedRef = useRef(false);
 
-  // Check if user has seen welcome screen
+  // Check if user has seen welcome screen immediately (parallel with auth check)
   useEffect(() => {
-    checkWelcomeStatus();
+    AsyncStorage.getItem('hasSeenWelcome').then((seen) => {
+      setHasSeenWelcome(seen === 'true');
+    }).catch(() => {
+      // Default to showing welcome if storage fails
+      setHasSeenWelcome(false);
+    });
   }, []);
-
-  const checkWelcomeStatus = async () => {
-    const seen = await AsyncStorage.getItem('hasSeenWelcome');
-    setHasSeenWelcome(seen === 'true');
-  };
 
   // Only show welcome screen if user hasn't seen it AND is not logged in
   // If user is logged in, skip welcome screen
 
   // Use useEffect for navigation to avoid mounting/unmounting issues with Redirect
   useEffect(() => {
-    // Always declare timeoutId at the top for consistent hook structure
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let isMounted = true;
-
-    // Wait until all loading is complete before redirecting
-    if (!isLoading && !profileLoading && hasSeenWelcome !== null) {
-      // Immediate redirect for better performance
-      if (isMounted) {
-        try {
-          if (session) {
-            // If user is logged in, skip welcome screen
-            // Only show welcome screen for first-time users who aren't logged in
-            // Check if user is admin or owner - redirect to admin dashboard
-            if (profile?.role === 'owner' || profile?.role === 'admin') {
-              router.replace('/admin');
-              return;
-            }
-            // Check if profile needs setup
-            if (needsSetup) {
-              router.replace('/onboarding');
-              return;
-            }
-            router.replace('/map');
+    // Prevent multiple navigations
+    if (hasNavigatedRef.current) return;
+    
+    // Wait until critical loading is complete before redirecting
+    // Don't wait for profileLoading if we don't have a session (faster for logged-out users)
+    const canNavigate = !isLoading && hasSeenWelcome !== null && (!session || !profileLoading);
+    
+    if (canNavigate) {
+      hasNavigatedRef.current = true;
+      try {
+        if (session) {
+          // If user is logged in, skip welcome screen
+          // Check if user is admin or owner - redirect to admin dashboard
+          if (profile?.role === 'owner' || profile?.role === 'admin') {
+            router.replace('/admin');
+            return;
+          }
+          // Check if profile needs setup (don't wait for profileLoading to complete)
+          if (needsSetup) {
+            router.replace('/onboarding');
+            return;
+          }
+          router.replace('/map');
+        } else {
+          // Not logged in - check if they've seen welcome screen
+          if (!hasSeenWelcome) {
+            router.replace('/welcome');
           } else {
-            // Not logged in - check if they've seen welcome screen
-            if (!hasSeenWelcome) {
-              router.replace('/welcome');
-            } else {
-              router.replace('/auth');
-            }
-          }
-        } catch (error) {
-          console.error('Navigation error:', error);
-          // Fallback to auth screen
-          try {
             router.replace('/auth');
-          } catch (fallbackError) {
-            console.error('Fallback navigation failed:', fallbackError);
           }
+        }
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback to auth screen
+        try {
+          router.replace('/auth');
+        } catch (fallbackError) {
+          console.error('Fallback navigation failed:', fallbackError);
         }
       }
     }
-
-    // ALWAYS return cleanup function for consistent hook structure
-    return () => {
-      isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
   }, [session, isLoading, profileLoading, needsSetup, profile, router, hasSeenWelcome]);
 
   // Show loading while checking auth or during redirect

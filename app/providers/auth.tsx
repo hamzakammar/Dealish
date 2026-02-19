@@ -186,28 +186,8 @@ export default function AuthProvider({ children }: PropsWithChildren) {
           }
           setSession(null)
         } else {
-          // Check if session is expired and needs refresh
-          if (session) {
-            const expiresAt = session.expires_at
-            const now = Math.floor(Date.now() / 1000)
-            const expiresIn = expiresAt ? expiresAt - now : 0
-            
-            // If token expires in less than 5 minutes, refresh it proactively
-            if (expiresIn > 0 && expiresIn < 300) {
-              try {
-                const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
-                if (!refreshError && refreshedSession) {
-                  console.log('Proactively refreshed session (expires soon)')
-                  setSession(refreshedSession)
-                  setIsLoadingSession(false)
-                  return
-                }
-              } catch (refreshErr) {
-                console.error('Error proactively refreshing session:', refreshErr)
-                // Continue with existing session even if refresh fails
-              }
-            }
-          }
+          // Set session immediately - let Supabase handle token refresh automatically
+          // Don't proactively refresh here as it adds delay to startup
           setSession(session)
         }
         setIsLoadingSession(false)
@@ -222,12 +202,10 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     // Initialize subscription immediately (synchronously)
     initializeSubscription()
 
-    // Fetch session after a tiny delay to ensure mount is complete
-    timeoutId = setTimeout(() => {
-      if (isActive) {
-        fetchSession()
-      }
-    }, 0)
+    // Fetch session immediately (no delay)
+    if (isActive) {
+      fetchSession()
+    }
 
     // Always return cleanup function for consistent hook structure
     return () => {
@@ -258,31 +236,36 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   }, [fetchProfile])
 
   // Handle app state changes to refresh session when app comes to foreground
+  // Only refresh if session exists and app was in background for a while
   useEffect(() => {
     let appStateSubscription: { remove: () => void } | null = null
+    let backgroundTime: number | null = null
 
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      // When app comes to foreground, refresh the session if we have one
-      if (nextAppState === 'active' && session) {
-        try {
-          // Check if session is still valid
-          const { data: { session: currentSession }, error } = await supabase.auth.getSession()
-          
-          if (error) {
-            // Try to refresh if there's an error
-            const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
-            if (refreshedSession) {
-              setSession(refreshedSession)
-            } else {
-              setSession(null)
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        backgroundTime = Date.now()
+      } else if (nextAppState === 'active' && session && backgroundTime) {
+        // Only refresh if app was in background for more than 5 minutes
+        const timeInBackground = Date.now() - backgroundTime
+        if (timeInBackground > 5 * 60 * 1000) {
+          try {
+            // Quick check - don't wait for refresh if it's slow
+            const { data: { session: currentSession } } = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise<{ data: { session: null } }>((resolve) => 
+                setTimeout(() => resolve({ data: { session: null } }), 1000)
+              )
+            ])
+            
+            if (currentSession?.session) {
+              setSession(currentSession.session)
             }
-          } else if (currentSession) {
-            // Update session if it changed
-            setSession(currentSession)
+          } catch (err) {
+            // Silently fail - session will refresh automatically when needed
+            console.error('Error refreshing session on app state change:', err)
           }
-        } catch (err) {
-          console.error('Error refreshing session on app state change:', err)
         }
+        backgroundTime = null
       }
     }
 

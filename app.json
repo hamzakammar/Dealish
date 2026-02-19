@@ -19,6 +19,7 @@
       "infoPlist": {
         "NSAllowsLocalNetworking": true,
         "NSBonjourServices": [
+          "_http._tcp",
           "_http._tcp"
         ]
       }
@@ -34,6 +35,8 @@
       "package": "com.anonymous.Dealish",
       "useNextNotificationsApi": true,
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
@@ -62,6 +65,12 @@
       "eas": {
         "projectId": "c8d4d9ee-1ec9-4e2c-a60f-fa51168853fe"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c8d4d9ee-1ec9-4e2c-a60f-fa51168853fe"
     }
   }
 }
