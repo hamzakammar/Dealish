@@ -234,9 +234,9 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     { label: "Filters", icon: "filter", action: handleFiltersPress },
     { label: "Favourites", icon: "heart", action: handleFavouritesPress },
     { label: "Settings", icon: "setting", action: handleSettingsPress },
-    { label: "About", icon: "info", action: () => router.push('/about') },
-    { label: "Help", icon: "question", action: () => router.push('/help') },
-    { label: "Partner with us", icon: "like", action: () => router.push('/partner') },
+    { label: "About", icon: "info", action: () => router.push('/about' as any) },
+    { label: "Help", icon: "question", action: () => router.push('/help' as any) },
+    { label: "Partner with us", icon: "like", action: () => router.push('/partner' as any) },
   ];
 
   return (

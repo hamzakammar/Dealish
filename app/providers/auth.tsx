@@ -244,22 +244,22 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (nextAppState === 'background' || nextAppState === 'inactive') {
         backgroundTime = Date.now()
-      } else if (nextAppState === 'active' && session && backgroundTime) {
-        // Only refresh if app was in background for more than 5 minutes
-        const timeInBackground = Date.now() - backgroundTime
-        if (timeInBackground > 5 * 60 * 1000) {
-          try {
-            // Quick check - don't wait for refresh if it's slow
-            const { data: { session: currentSession } } = await Promise.race([
-              supabase.auth.getSession(),
-              new Promise<{ data: { session: null } }>((resolve) => 
-                setTimeout(() => resolve({ data: { session: null } }), 1000)
-              )
-            ])
-            
-            if (currentSession?.session) {
-              setSession(currentSession.session)
-            }
+          } else if (nextAppState === 'active' && session && backgroundTime) {
+            // Only refresh if app was in background for more than 5 minutes
+            const timeInBackground = Date.now() - backgroundTime
+            if (timeInBackground > 5 * 60 * 1000) {
+              try {
+                // Quick check - don't wait for refresh if it's slow
+                const { data: { session: currentSession } } = await Promise.race([
+                  supabase.auth.getSession(),
+                  new Promise<{ data: { session: null } }>((resolve) => 
+                    setTimeout(() => resolve({ data: { session: null } }), 1000)
+                  )
+                ])
+                
+                if (currentSession) {
+                  setSession(currentSession)
+                }
           } catch (err) {
             // Silently fail - session will refresh automatically when needed
             console.error('Error refreshing session on app state change:', err)

@@ -8,59 +8,65 @@ type RestaurantMarkerProps = {
   restaurant: Restaurant;
   isSelected: boolean;
   onPress: (restaurant: Restaurant) => void;
-  dealInfo?: string | null; // Pass deal info from parent to avoid fetching in every marker
+  hasActiveDeal: boolean; // Whether restaurant has an active deal right now
 };
 
 export default function RestaurantMarker({
   restaurant,
   isSelected,
   onPress,
-  dealInfo: providedDealInfo,
+  hasActiveDeal,
 }: RestaurantMarkerProps) {
-  // Use provided deal info if available, otherwise show default icon
-  // This avoids fetching deals for every marker (performance optimization)
-  const dealInfo = providedDealInfo;
   const isPartner = Boolean(restaurant.partner);
 
   const markerContent = useMemo(
-    () => (
-      <View style={styles.markerWrapper}>
+    () => {
+      // If no active deal, show simple orange dot
+      if (!hasActiveDeal) {
+        return (
+          <View style={styles.markerWrapper}>
+            <View
+              style={[
+                styles.markerDot,
+                isSelected && styles.markerDotSelected,
+              ]}
+            />
+          </View>
+        );
+      }
 
-        <View
-          style={[
-            styles.markerContainer,
-            isPartner && styles.markerContainerPartner,
-            isSelected && styles.markerContainerSelected,
-          ]}
-        >
-        {isPartner && (
-          <View style={styles.partnerBadge}>
-            <AntDesign name="check-circle" size={12} color="#2E7D32" />
+      // If has active deal, show full icon with shop icon
+      return (
+        <View style={styles.markerWrapper}>
+          <View
+            style={[
+              styles.markerContainer,
+              isPartner && styles.markerContainerPartner,
+              isSelected && styles.markerContainerSelected,
+            ]}
+          >
+            {isPartner && (
+              <View style={styles.partnerBadge}>
+                <AntDesign name="check-circle" size={12} color="#2E7D32" />
+              </View>
+            )}
+            <AntDesign
+              name="shop"
+              size={18}
+              color="#fff"
+            />
           </View>
-        )}
-        {dealInfo && (
-          <View style={styles.dealBadge}>
-            <Text style={styles.dealText}>{dealInfo}</Text>
-          </View>
-        )}
-        {!dealInfo && (
-          <AntDesign
-            name="shop"
-            size={18}
-            color="#fff"
+          <View
+            style={[
+              styles.markerPin,
+              isPartner && styles.markerPinPartner,
+              isSelected && styles.markerPinSelected,
+            ]}
           />
-        )}
         </View>
-        <View
-          style={[
-            styles.markerPin,
-            isPartner && styles.markerPinPartner,
-            isSelected && styles.markerPinSelected,
-          ]}
-        />
-      </View>
-    ),
-    [isSelected, dealInfo, isPartner]
+      );
+    },
+    [isSelected, hasActiveDeal, isPartner]
   );
 
   const handleMarkerPress = React.useCallback(() => {
@@ -87,14 +93,27 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     overflow: "visible",
   },
-  dealBadge: {
-    borderRadius: 8,
-    elevation: 3,
+  markerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#FE902A",
+    borderWidth: 2,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  dealText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#fff",
+  markerDotSelected: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 6,
   },
   titleContainer: {
     backgroundColor: "#fff",

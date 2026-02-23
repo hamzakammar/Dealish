@@ -9,6 +9,7 @@ import { useDirections } from "@/hooks/useDirections";
 import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
+import { useActiveDealsMap } from "@/hooks/useActiveDealsMap";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -65,6 +66,9 @@ export default function MapScreen() {
       restaurant.type?.toLowerCase().includes(query)
     );
   }, [filteredByFilters, searchQuery]);
+
+  // Batch fetch active deals for filtered restaurants
+  const { activeDealsMap } = useActiveDealsMap(filteredRestaurants);
 
   // Get search suggestions (limited to top 5)
   const searchSuggestions = React.useMemo(() => {
@@ -241,13 +245,14 @@ export default function MapScreen() {
 
             {filteredRestaurants.map((r) => {
               const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
+              const hasActiveDeal = activeDealsMap.get(r.id) ?? false;
               return (
                 <RestaurantMarker
                   key={r.id}
                   restaurant={r}
                   isSelected={isSelected}
                   onPress={handleRestaurantSelect}
-                  dealInfo={null} // Don't fetch deals for markers - performance optimization
+                  hasActiveDeal={hasActiveDeal}
                 />
               );
             })}
