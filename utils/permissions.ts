@@ -1,8 +1,16 @@
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
 import { Alert, Linking, Platform } from 'react-native';
+
+// Lazy load Notifications to avoid errors in Expo Go
+function getNotifications() {
+  try {
+    return require('expo-notifications');
+  } catch (e) {
+    return null;
+  }
+}
 
 export type PermissionType = 'location' | 'camera' | 'notifications' | 'mediaLibrary';
 
@@ -108,17 +116,35 @@ export async function requestCameraPermission(): Promise<PermissionStatus> {
  * Check notification permission status
  */
 export async function checkNotificationPermission(): Promise<PermissionStatus> {
-  const { status, canAskAgain } = await Notifications.getPermissionsAsync();
-  if (status === 'denied' && canAskAgain === false) return 'blocked';
-  return status as PermissionStatus;
+  const Notifications = getNotifications();
+  if (!Notifications) {
+    return 'undetermined';
+  }
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    if (status === 'denied' && canAskAgain === false) return 'blocked';
+    return status as PermissionStatus;
+  } catch (e) {
+    // Silently fail - notifications not available in Expo Go
+    return 'undetermined';
+  }
 }
 
 /**
  * Request notification permission
  */
 export async function requestNotificationPermission(): Promise<PermissionStatus> {
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status as PermissionStatus;
+  const Notifications = getNotifications();
+  if (!Notifications) {
+    return 'undetermined';
+  }
+  try {
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status as PermissionStatus;
+  } catch (e) {
+    // Silently fail - notifications not available in Expo Go
+    return 'denied';
+  }
 }
 
 /**

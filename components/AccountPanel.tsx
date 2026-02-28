@@ -2,11 +2,12 @@ import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import RatingDisplay from "@/components/RatingDisplay";
 import { useAccountNavigation } from "@/hooks/useAccountNavigation";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -32,6 +33,7 @@ type PanelView = "menu" | "favourites";
 
 export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPanToRestaurant, onOpenFilters }: AccountPanelProps) {
   const { session, profile } = useAuthContext();
+  const colors = useThemeColors();
   const [userEmail, setUserEmail] = useState<string>("");
   const [userName, setUserName] = useState<string>("User");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
@@ -40,6 +42,37 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
   const [currentView, setCurrentView] = useState<PanelView>("menu");
   const [favourites, setFavourites] = useState<Restaurant[]>([]);
   const [loadingFavourites, setLoadingFavourites] = useState(false);
+  
+  // Dynamic styles based on theme
+  const dynamicStyles = useMemo(() => ({
+    panel: {
+      backgroundColor: colors.card,
+    },
+    userName: {
+      color: colors.text,
+    },
+    userEmail: {
+      color: colors.textSecondary,
+    },
+    menuLabel: {
+      color: colors.text,
+    },
+    favouritesTitle: {
+      color: colors.text,
+    },
+    favoriteItem: {
+      backgroundColor: colors.cardSecondary,
+    },
+    favoriteName: {
+      color: colors.text,
+    },
+    favoriteAddress: {
+      color: colors.textSecondary,
+    },
+    backButton: {
+      backgroundColor: colors.cardSecondary,
+    },
+  }), [colors]);
 
   // Dynamic labels based on count
   const favouritesLabel = favourites.length === 1 ? "Favourite" : "Favourites";
@@ -254,6 +287,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
       <Animated.View
         style={[
           styles.panel,
+          dynamicStyles.panel,
           {
             width: panelWidth,
             transform: [{ translateX: slideAnim }],
@@ -280,8 +314,8 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                       <AntDesign name="user" size={32} color="#FE902A" />
                     </View>
                   )}
-                  <Text style={styles.userName}>{userName}</Text>
-                  <Text style={styles.userEmail}>{userEmail}</Text>
+                  <Text style={[styles.userName, dynamicStyles.userName]}>{userName}</Text>
+                  <Text style={[styles.userEmail, dynamicStyles.userEmail]}>{userEmail}</Text>
                 </>
               )}
             </View>
@@ -294,8 +328,8 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                   style={styles.menuItem}
                   onPress={item.action}
                 >
-                  <AntDesign name={item.icon as any} size={20} color="#333" />
-                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <AntDesign name={item.icon as any} size={20} color={colors.text} />
+                  <Text style={[styles.menuLabel, dynamicStyles.menuLabel]}>{item.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -320,14 +354,14 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
           <>
             {/* Back Button */}
             <TouchableOpacity
-              style={styles.backButton}
+              style={[styles.backButton, dynamicStyles.backButton]}
               onPress={handleBackToMenu}
             >
-              <AntDesign name="left" size={24} color="#333" />
+              <AntDesign name="left" size={24} color={colors.text} />
             </TouchableOpacity>
 
             {/* Favorites List */}
-            <Text style={styles.favouritesTitle}>{favouritesLabel}</Text>
+            <Text style={[styles.favouritesTitle, dynamicStyles.favouritesTitle]}>{favouritesLabel}</Text>
             {loadingFavourites ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FE902A" />
@@ -343,7 +377,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={styles.favoriteItem}
+                    style={[styles.favoriteItem, dynamicStyles.favoriteItem]}
                     onPress={() => handleFavouriteSelect(item)}
                   >
                     <View style={styles.favoriteImageContainer}>
@@ -355,12 +389,12 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                         />
                       ) : (
                         <View style={styles.favoriteImagePlaceholder}>
-                          <Ionicons name="restaurant-outline" size={22} color="#ccc" />
+                          <Ionicons name="restaurant-outline" size={22} color={colors.textTertiary} />
                         </View>
                       )}
                     </View>
                     <View style={styles.favoriteInfo}>
-                      <Text style={styles.favoriteName}>{item.name}</Text>
+                      <Text style={[styles.favoriteName, dynamicStyles.favoriteName]}>{item.name}</Text>
                       <RatingDisplay
                         rating={item.rating}
                         ratingCount={item.rating_count}
@@ -369,7 +403,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                       />
                       {item.address && (
                         <Text
-                          style={styles.favoriteAddress}
+                          style={[styles.favoriteAddress, dynamicStyles.favoriteAddress]}
                           numberOfLines={1}
                         >
                           {item.address}
@@ -404,7 +438,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    backgroundColor: "#F5E6D3",
     zIndex: 6,
     shadowColor: "#000",
     shadowOffset: { width: 2, height: 0 },
@@ -425,14 +458,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: "#FFF8F0",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
   },
   backText: {
     fontSize: 16,
-    color: "#333",
     fontWeight: "600",
   },
   profileSection: {
@@ -445,7 +476,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 12,
-    backgroundColor: "#fff",
   },
   avatarPlaceholder: {
     alignItems: "center",
@@ -456,12 +486,10 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 13,
-    color: "#666",
   },
   menuSection: {
     flex: 1,
@@ -475,13 +503,11 @@ const styles = StyleSheet.create({
   },
   menuLabel: {
     fontSize: 16,
-    color: "#333",
     fontWeight: "500",
   },
   favouritesTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333",
     marginBottom: 16,
   },
   favoriteItem: {
@@ -489,7 +515,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
     borderRadius: 8,
     marginBottom: 10,
     gap: 12,
@@ -519,12 +544,10 @@ const styles = StyleSheet.create({
   favoriteName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 4,
   },
   favoriteAddress: {
     fontSize: 12,
-    color: "#666",
   },
   loadingContainer: {
     flex: 1,

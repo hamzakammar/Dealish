@@ -44,7 +44,9 @@ export function useInventory(restaurantId: string | null) {
       // Filter out items where product join failed (product was deleted)
       const validItems = (data || []).filter((item: any) => item.product !== null);
 
-      console.log(`Fetched ${validItems.length} inventory items (${data?.length || 0} total, ${(data?.length || 0) - validItems.length} with missing products)`);
+      if (__DEV__) {
+        console.log(`Fetched ${validItems.length} inventory items (${data?.length || 0} total, ${(data?.length || 0) - validItems.length} with missing products)`);
+      }
 
       setInventoryItems(validItems as InventoryItemWithProduct[]);
     } catch (e: any) {

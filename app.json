@@ -19,9 +19,12 @@
       "infoPlist": {
         "NSAllowsLocalNetworking": true,
         "NSBonjourServices": [
-          "_http._tcp",
           "_http._tcp"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
       }
     },
     "android": {
@@ -35,8 +38,6 @@
       "package": "com.anonymous.Dealish",
       "useNextNotificationsApi": true,
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]

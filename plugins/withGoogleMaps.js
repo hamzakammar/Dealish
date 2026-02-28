@@ -1,7 +1,8 @@
-const { withAndroidManifest } = require('expo/config-plugins');
+const { withAndroidManifest, withInfoPlist } = require('expo/config-plugins');
 
 module.exports = function withGoogleMaps(config) {
-  return withAndroidManifest(config, async (config) => {
+  // Configure Android
+  config = withAndroidManifest(config, async (config) => {
     const androidManifest = config.modResults;
     const mainApplication = androidManifest.manifest.application[0];
 
@@ -36,4 +37,22 @@ module.exports = function withGoogleMaps(config) {
 
     return config;
   });
+
+  // Configure iOS
+  config = withInfoPlist(config, async (config) => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (apiKey && apiKey.trim() !== '') {
+      // Add Google Maps API key to Info.plist for iOS
+      if (!config.modResults.GMSApiKey) {
+        config.modResults.GMSApiKey = apiKey;
+      } else {
+        config.modResults.GMSApiKey = apiKey;
+      }
+    }
+
+    return config;
+  });
+
+  return config;
 };

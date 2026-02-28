@@ -1,7 +1,7 @@
 import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import React, { useMemo, useCallback } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useCallback, useEffect, useState } from "react";
+import { StyleSheet, Text, View, Platform } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
@@ -18,6 +18,24 @@ export default function RestaurantMarker({
   hasActiveDeal,
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
+  const [forceRender, setForceRender] = useState(0);
+
+  // Force initial render on Android to ensure markers appear
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      // Force multiple re-renders to ensure marker appears
+      const timer1 = setTimeout(() => {
+        setForceRender(1);
+      }, 50);
+      const timer2 = setTimeout(() => {
+        setForceRender(2);
+      }, 200);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    }
+  }, []);
 
   const markerContent = useMemo(
     () => {
@@ -56,13 +74,24 @@ export default function RestaurantMarker({
               color="#fff"
             />
           </View>
-          <View
-            style={[
-              styles.markerPin,
-              isPartner && styles.markerPinPartner,
-              isSelected && styles.markerPinSelected,
-            ]}
-          />
+          {/* Use different approach for Android to avoid triangle rendering issues */}
+          {Platform.OS === 'android' ? (
+            <View
+              style={[
+                styles.markerPinAndroid,
+                isPartner && styles.markerPinPartnerAndroid,
+                isSelected && styles.markerPinSelected,
+              ]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.markerPin,
+                isPartner && styles.markerPinPartner,
+                isSelected && styles.markerPinSelected,
+              ]}
+            />
+          )}
         </View>
       );
     },
@@ -79,8 +108,14 @@ export default function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={false}
+      tracksViewChanges={Platform.OS === 'ios' ? false : (forceRender < 2)}
       tappable={true}
+      // Android-specific optimizations
+      {...(Platform.OS === 'android' && {
+        flat: false,
+        centerOffset: { x: 0, y: 0 },
+      })}
+      key={`${restaurant.id}-${forceRender}`}
     >
       {markerContent}
     </Marker>
@@ -91,7 +126,14 @@ const styles = StyleSheet.create({
   markerWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
-    overflow: "visible",
+    ...Platform.select({
+      ios: {
+        overflow: "visible",
+      },
+      android: {
+        overflow: "hidden",
+      },
+    }),
   },
   markerDot: {
     width: 12,
@@ -104,7 +146,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        zIndex: 1,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   markerDotSelected: {
     width: 16,
@@ -113,7 +162,14 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     shadowOpacity: 0.5,
     shadowRadius: 4,
-    elevation: 6,
+    ...Platform.select({
+      ios: {
+        zIndex: 2,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   titleContainer: {
     backgroundColor: "#fff",
@@ -125,7 +181,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        zIndex: 1,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
     maxWidth: 120,
   },
   markerTitle: {
@@ -146,8 +209,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1,
+    ...Platform.select({
+      ios: {
+        zIndex: 1,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   markerContainerPartner: {
     width: 48,
@@ -160,7 +229,14 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     shadowOpacity: 0.5,
     shadowRadius: 6,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        zIndex: 2,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   partnerBadge: {
     position: "absolute",
@@ -173,8 +249,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 2,
-    elevation: 2,
-    zIndex: 2,
+    ...Platform.select({
+      ios: {
+        zIndex: 3,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   markerPin: {
     width: 0,
@@ -192,9 +274,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 3,
-    elevation: 4,
     zIndex: 0,
     overflow: "visible",
+  },
+  markerPinAndroid: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#FE902A",
+    borderRadius: 10,
+    marginTop: -10,
+    transform: [{ rotate: '45deg' }],
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 2,
   },
   markerPinPartner: {
     borderLeftWidth: 13,
@@ -202,6 +296,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 20,
     borderTopColor: "#FFD54F",
     marginTop: -4,
+  },
+  markerPinPartnerAndroid: {
+    backgroundColor: "#FFD54F",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginTop: -11,
   },
   markerPinSelected: {
     shadowOpacity: 0.5,

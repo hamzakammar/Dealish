@@ -4,8 +4,8 @@ import DashboardSidebar from '@/components/DashboardSidebar';
 import { Deal, Restaurant } from '@/types/restaurant';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState, useMemo } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function AdminDashboard() {
   const { profile, isLoading } = useAuthContext();
@@ -17,6 +17,8 @@ export default function AdminDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [totalSales, setTotalSales] = useState(0);
   const [averageSale, setAverageSale] = useState(0);
+  const [restaurantSearchQuery, setRestaurantSearchQuery] = useState("");
+  const [isRestaurantDropdownOpen, setIsRestaurantDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!profile || (profile.role !== 'owner' && profile.role !== 'admin'))) {
@@ -197,6 +199,19 @@ export default function AdminDashboard() {
 
   const selectedRestaurant = restaurants.find(r => r.id === selectedRestaurantId);
 
+  // Filter restaurants based on search query
+  const filteredRestaurantsForDropdown = useMemo(() => {
+    if (!restaurantSearchQuery.trim()) {
+      return restaurants;
+    }
+    const query = restaurantSearchQuery.toLowerCase().trim();
+    return restaurants.filter((restaurant) =>
+      restaurant.name.toLowerCase().includes(query) ||
+      restaurant.address?.toLowerCase().includes(query) ||
+      restaurant.type?.toLowerCase().includes(query)
+    );
+  }, [restaurants, restaurantSearchQuery]);
+
   if (isLoading || isLoadingRestaurants) {
     return (
       <View style={styles.loadingContainer}>
@@ -232,7 +247,11 @@ export default function AdminDashboard() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* KPI Cards */}
         <View style={styles.kpiSection}>
           <View style={[styles.kpiCard, styles.kpiCardPrimary]}>
@@ -252,39 +271,62 @@ export default function AdminDashboard() {
           </View>
         </View>
 
-        {/* Restaurant Selector */}
-        {restaurants.length > 1 && (
+        {/* Restaurant Selector with Search */}
+        {restaurants.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Locations</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
-              {restaurants.map((restaurant) => (
+            <Text style={styles.sectionTitle}>Select Restaurant</Text>
+            
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={18} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search restaurants..."
+                placeholderTextColor="#94A3B8"
+                value={restaurantSearchQuery}
+                onChangeText={setRestaurantSearchQuery}
+                onFocus={() => setIsRestaurantDropdownOpen(true)}
+              />
+              {restaurantSearchQuery.length > 0 && (
                 <TouchableOpacity
-                  key={restaurant.id}
-                  style={[
-                    styles.locationCard,
-                    selectedRestaurantId === restaurant.id && styles.locationCardSelected
-                  ]}
-                  onPress={() => setSelectedRestaurantId(restaurant.id)}
+                  onPress={() => {
+                    setRestaurantSearchQuery("");
+                    setIsRestaurantDropdownOpen(false);
+                  }}
+                  style={styles.clearButton}
                 >
-                  <Ionicons 
-                    name="location" 
-                    size={20} 
-                    color={selectedRestaurantId === restaurant.id ? '#FE902A' : '#94A3B8'} 
-                  />
-                  <Text style={[
-                    styles.locationName,
-                    selectedRestaurantId === restaurant.id && styles.locationNameSelected
-                  ]}>
-                    {restaurant.name}
-                  </Text>
-                  {restaurant.address && (
-                    <Text style={styles.locationAddress} numberOfLines={1}>
-                      {restaurant.address}
-                    </Text>
-                  )}
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              )}
+            </View>
+
+            {/* Dropdown */}
+            <View style={styles.dropdownContainer}>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setIsRestaurantDropdownOpen(!isRestaurantDropdownOpen)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.dropdownButtonContent}>
+                  <Ionicons name="location" size={20} color="#FE902A" />
+                  <View style={styles.dropdownButtonText}>
+                    <Text style={styles.dropdownButtonTitle}>
+                      {selectedRestaurant?.name || "Select a restaurant"}
+                    </Text>
+                    {selectedRestaurant?.address && (
+                      <Text style={styles.dropdownButtonSubtitle} numberOfLines={1}>
+                        {selectedRestaurant.address}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <Ionicons 
+                  name={isRestaurantDropdownOpen ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#64748B" 
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -542,6 +584,71 @@ export default function AdminDashboard() {
 
       {/* Sidebar */}
       <DashboardSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
+      {/* Dropdown List - rendered OUTSIDE ScrollView to ensure it's on top */}
+      {isRestaurantDropdownOpen && restaurants.length > 0 && (
+        <>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => {
+              setIsRestaurantDropdownOpen(false);
+              setRestaurantSearchQuery("");
+            }}
+          />
+          <View style={styles.dropdownListAbsolute}>
+            {filteredRestaurantsForDropdown.length === 0 ? (
+              <View style={styles.dropdownEmpty}>
+                <Text style={styles.dropdownEmptyText}>No restaurants found</Text>
+              </View>
+            ) : (
+              <ScrollView 
+                style={styles.dropdownScrollView}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filteredRestaurantsForDropdown.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.dropdownItem,
+                      selectedRestaurantId === item.id && styles.dropdownItemSelected
+                    ]}
+                    onPress={() => {
+                      setSelectedRestaurantId(item.id);
+                      setIsRestaurantDropdownOpen(false);
+                      setRestaurantSearchQuery("");
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons 
+                      name="location" 
+                      size={18} 
+                      color={selectedRestaurantId === item.id ? '#FE902A' : '#94A3B8'} 
+                    />
+                    <View style={styles.dropdownItemContent}>
+                      <Text style={[
+                        styles.dropdownItemName,
+                        selectedRestaurantId === item.id && styles.dropdownItemNameSelected
+                      ]}>
+                        {item.name}
+                      </Text>
+                      {item.address && (
+                        <Text style={styles.dropdownItemAddress} numberOfLines={1}>
+                          {item.address}
+                        </Text>
+                      )}
+                    </View>
+                    {selectedRestaurantId === item.id && (
+                      <Ionicons name="checkmark" size={20} color="#FE902A" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -550,6 +657,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    position: 'relative',
   },
   loadingContainer: {
     flex: 1,
@@ -645,36 +753,137 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 12,
   },
-  locationScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  locationCard: {
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    padding: 0,
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 1002,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
-    marginRight: 12,
-    minWidth: 200,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-  },
-  locationCardSelected: {
     borderColor: '#FE902A',
-    backgroundColor: '#FFFBF5',
+    minHeight: 60,
   },
-  locationName: {
+  dropdownButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dropdownButtonText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  dropdownButtonTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#0F172A',
-    marginTop: 8,
+    marginBottom: 2,
   },
-  locationNameSelected: {
-    color: '#FE902A',
-  },
-  locationAddress: {
+  dropdownButtonSubtitle: {
     fontSize: 13,
     color: '#64748B',
-    marginTop: 4,
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+    maxHeight: 300,
+    zIndex: 1003,
+    overflow: 'hidden',
+  },
+  dropdownListAbsolute: {
+    position: 'absolute',
+    top: 200,
+    left: 16,
+    right: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 20,
+    maxHeight: 300,
+    zIndex: 10000,
+  },
+  dropdownScrollView: {
+    maxHeight: 300,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#FFFBF5',
+  },
+  dropdownItemContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  dropdownItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  dropdownItemNameSelected: {
+    color: '#FE902A',
+  },
+  dropdownItemAddress: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  dropdownEmpty: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  dropdownEmptyText: {
+    fontSize: 14,
+    color: '#94A3B8',
   },
   dealCard: {
     backgroundColor: '#FFFFFF',
@@ -846,5 +1055,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    zIndex: 999,
   },
 });

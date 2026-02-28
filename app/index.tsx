@@ -30,42 +30,50 @@ export default function Index() {
     // Prevent multiple navigations
     if (hasNavigatedRef.current) return;
     
-    // Wait until critical loading is complete before redirecting
-    // Don't wait for profileLoading if we don't have a session (faster for logged-out users)
-    const canNavigate = !isLoading && hasSeenWelcome !== null && (!session || !profileLoading);
-    
-    if (canNavigate) {
+    // If user has a session, skip all welcome/onboarding checks and go straight to app
+    // This ensures logged-in users never see welcome screen
+    if (session && !isLoading) {
       hasNavigatedRef.current = true;
       try {
-        if (session) {
-          // If user is logged in, skip welcome screen
-          // Check if user is admin or owner - redirect to admin dashboard
-          if (profile?.role === 'owner' || profile?.role === 'admin') {
-            router.replace('/admin');
-            return;
-          }
-          // Check if profile needs setup (don't wait for profileLoading to complete)
-          if (needsSetup) {
-            router.replace('/onboarding');
-            return;
-          }
-          router.replace('/map');
+        // Check if user is admin or owner - redirect to admin dashboard
+        if (profile?.role === 'owner' || profile?.role === 'admin') {
+          router.replace('/admin');
+          return;
+        }
+        // Check if profile needs setup
+        if (needsSetup && !profileLoading) {
+          router.replace('/onboarding');
+          return;
+        }
+        // If profile is still loading but we have a session, go to map anyway
+        // Profile will load in background
+        router.replace('/map');
+      } catch (error) {
+        if (__DEV__) {
+          console.error('Navigation error:', error);
+        }
+        router.replace('/map');
+      }
+      return;
+    }
+    
+    // For non-logged-in users, wait for welcome check
+    const canNavigate = !isLoading && hasSeenWelcome !== null;
+    
+    if (canNavigate && !session) {
+      hasNavigatedRef.current = true;
+      try {
+        // Not logged in - check if they've seen welcome screen
+        if (!hasSeenWelcome) {
+          router.replace('/welcome');
         } else {
-          // Not logged in - check if they've seen welcome screen
-          if (!hasSeenWelcome) {
-            router.replace('/welcome');
-          } else {
-            router.replace('/auth');
-          }
+          router.replace('/auth');
         }
       } catch (error) {
-        console.error('Navigation error:', error);
-        // Fallback to auth screen
-        try {
-          router.replace('/auth');
-        } catch (fallbackError) {
-          console.error('Fallback navigation failed:', fallbackError);
+        if (__DEV__) {
+          console.error('Navigation error:', error);
         }
+        router.replace('/auth');
       }
     }
   }, [session, isLoading, profileLoading, needsSetup, profile, router, hasSeenWelcome]);

@@ -2,9 +2,11 @@ import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import PasswordChangeModal from "@/components/PasswordChangeModal";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useTheme, DarkTheme } from "@react-navigation/native";
+import React, { useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -17,6 +19,7 @@ import {
 
 export default function SettingsScreen() {
   const { session } = useAuthContext();
+  const theme = useTheme();
   const {
     settings,
     loading,
@@ -26,6 +29,91 @@ export default function SettingsScreen() {
   } = useUserSettings();
   const [saving, setSaving] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  // Check if theme is dark by comparing background color
+  const isDark = useMemo(() => theme.colors.background === DarkTheme.colors.background, [theme]);
+  
+  // Create dynamic styles based on theme
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: theme.colors.text,
+      marginBottom: 16,
+    },
+    settingLabel: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: theme.colors.text,
+      marginBottom: 4,
+    },
+    settingDescription: {
+      fontSize: 13,
+      color: isDark ? "#999" : "#666",
+    },
+    settingRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? "#333" : "#f0f0f0",
+    },
+    settingRowVertical: {
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? "#333" : "#f0f0f0",
+    },
+    selectOption: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: isDark ? "#333" : "#f5f5f5",
+      borderWidth: 1,
+      borderColor: isDark ? "#555" : "#e0e0e0",
+      minWidth: 60,
+    },
+    selectOptionText: {
+      fontSize: 13,
+      color: isDark ? "#ccc" : "#666",
+      fontWeight: "500",
+    },
+    selectOptionFull: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: isDark ? "#333" : "#f5f5f5",
+      borderWidth: 1,
+      borderColor: isDark ? "#555" : "#e0e0e0",
+      flex: 1,
+      minWidth: 0,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    selectOptionTextFull: {
+      fontSize: 13,
+      color: isDark ? "#ccc" : "#666",
+      fontWeight: "500",
+      textAlign: "center",
+    },
+    accountButton: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? "#333" : "#f0f0f0",
+    },
+    accountButtonText: {
+      fontSize: 16,
+      color: theme.colors.text,
+      fontWeight: "500",
+    },
+  }), [theme, isDark]);
 
   const handleToggle = async (
     category: "notifications" | "privacy",
@@ -130,14 +218,14 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color="#FE902A" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView style={dynamicStyles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -161,11 +249,11 @@ export default function SettingsScreen() {
 
       {/* Notifications Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <View style={styles.settingRow}>
+        <Text style={dynamicStyles.sectionTitle}>Notifications</Text>
+        <View style={dynamicStyles.settingRow}>
           <View style={styles.settingContent}>
-            <Text style={styles.settingLabel}>Deal Notifications</Text>
-            <Text style={styles.settingDescription}>
+            <Text style={dynamicStyles.settingLabel}>Deal Notifications</Text>
+            <Text style={dynamicStyles.settingDescription}>
               Get notified about new deals
             </Text>
           </View>
@@ -181,10 +269,10 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        <View style={styles.settingRow}>
+        <View style={dynamicStyles.settingRow}>
           <View style={styles.settingContent}>
-            <Text style={styles.settingLabel}>Visit Tracking</Text>
-            <Text style={styles.settingDescription}>
+            <Text style={dynamicStyles.settingLabel}>Visit Tracking</Text>
+            <Text style={dynamicStyles.settingDescription}>
               Notifications about your visits
             </Text>
           </View>
@@ -200,10 +288,10 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        <View style={styles.settingRow}>
+        <View style={dynamicStyles.settingRow}>
           <View style={styles.settingContent}>
-            <Text style={styles.settingLabel}>Favorites Updates</Text>
-            <Text style={styles.settingDescription}>
+            <Text style={dynamicStyles.settingLabel}>Favorites Updates</Text>
+            <Text style={dynamicStyles.settingDescription}>
               Updates about your favorite restaurants
             </Text>
           </View>
@@ -222,11 +310,11 @@ export default function SettingsScreen() {
 
       {/* Privacy Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy</Text>
-        <View style={styles.settingRow}>
+        <Text style={dynamicStyles.sectionTitle}>Privacy</Text>
+        <View style={dynamicStyles.settingRow}>
           <View style={styles.settingContent}>
-            <Text style={styles.settingLabel}>Share Location</Text>
-            <Text style={styles.settingDescription}>
+            <Text style={dynamicStyles.settingLabel}>Share Location</Text>
+            <Text style={dynamicStyles.settingDescription}>
               Allow location sharing for better recommendations
             </Text>
           </View>
@@ -242,10 +330,10 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        <View style={styles.settingRow}>
+        <View style={dynamicStyles.settingRow}>
           <View style={styles.settingContent}>
-            <Text style={styles.settingLabel}>Show Visit History</Text>
-            <Text style={styles.settingDescription}>
+            <Text style={dynamicStyles.settingLabel}>Show Visit History</Text>
+            <Text style={dynamicStyles.settingDescription}>
               Make your visit history visible to others
             </Text>
           </View>
@@ -264,53 +352,53 @@ export default function SettingsScreen() {
 
       {/* Appearance Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Appearance</Text>
-        <View style={styles.settingRow}>
+        <Text style={dynamicStyles.sectionTitle}>Appearance</Text>
+        <View style={dynamicStyles.settingRow}>
           <View style={styles.settingContent}>
-            <Text style={styles.settingLabel}>Theme</Text>
-            <Text style={styles.settingDescription}>Choose your preferred theme</Text>
+            <Text style={dynamicStyles.settingLabel}>Theme</Text>
+            <Text style={dynamicStyles.settingDescription}>Choose your preferred theme</Text>
           </View>
           <View style={styles.selectContainer}>
-            {(["light", "dark", "auto"] as const).map((theme) => (
+            {(["light", "dark", "auto"] as const).map((themeOption) => (
               <TouchableOpacity
-                key={theme}
+                key={themeOption}
                 style={[
-                  styles.selectOption,
-                  settings.appearance.theme === theme && styles.selectOptionActive,
+                  dynamicStyles.selectOption,
+                  settings.appearance.theme === themeOption && styles.selectOptionActive,
                 ]}
-                onPress={() => handleAppearanceChange("theme", theme)}
+                onPress={() => handleAppearanceChange("theme", themeOption)}
               >
                 <Text
                   style={[
-                    styles.selectOptionText,
-                    settings.appearance.theme === theme && styles.selectOptionTextActive,
+                    dynamicStyles.selectOptionText,
+                    settings.appearance.theme === themeOption && styles.selectOptionTextActive,
                   ]}
                 >
-                  {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                  {themeOption.charAt(0).toUpperCase() + themeOption.slice(1)}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        <View style={styles.settingRowVertical}>
+        <View style={dynamicStyles.settingRowVertical}>
           <View style={styles.settingContentFull}>
-            <Text style={styles.settingLabel}>Default Map Type</Text>
-            <Text style={styles.settingDescription}>Preferred map view</Text>
+            <Text style={dynamicStyles.settingLabel}>Default Map Type</Text>
+            <Text style={dynamicStyles.settingDescription}>Preferred map view</Text>
           </View>
           <View style={styles.selectContainerFull}>
             {(["standard", "satellite", "hybrid", "terrain"] as const).map((mapType) => (
               <TouchableOpacity
                 key={mapType}
                 style={[
-                  styles.selectOptionFull,
+                  dynamicStyles.selectOptionFull,
                   settings.appearance.defaultMapType === mapType && styles.selectOptionActiveFull,
                 ]}
                 onPress={() => handleAppearanceChange("defaultMapType", mapType)}
               >
                 <Text
                   style={[
-                    styles.selectOptionTextFull,
+                    dynamicStyles.selectOptionTextFull,
                     settings.appearance.defaultMapType === mapType && styles.selectOptionTextActiveFull,
                   ]}
                   numberOfLines={1}
@@ -327,9 +415,9 @@ export default function SettingsScreen() {
 
       {/* Permissions Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Permissions</Text>
+        <Text style={dynamicStyles.sectionTitle}>Permissions</Text>
         <TouchableOpacity 
-          style={styles.accountButton} 
+          style={dynamicStyles.accountButton} 
           onPress={() => {
             try {
               router.push('/permissions');
@@ -339,26 +427,26 @@ export default function SettingsScreen() {
             }
           }}
         >
-          <Text style={styles.accountButtonText}>Manage Permissions</Text>
-          <AntDesign name="right" size={16} color="#666" />
+          <Text style={dynamicStyles.accountButtonText}>Manage Permissions</Text>
+          <AntDesign name="right" size={16} color={isDark ? "#999" : "#666"} />
         </TouchableOpacity>
       </View>
 
       {/* Account Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={dynamicStyles.sectionTitle}>Account</Text>
         <TouchableOpacity 
-          style={styles.accountButton} 
+          style={dynamicStyles.accountButton} 
           onPress={handleChangePassword}
         >
-          <Text style={styles.accountButtonText}>Change Password</Text>
-          <AntDesign name="right" size={16} color="#666" />
+          <Text style={dynamicStyles.accountButtonText}>Change Password</Text>
+          <AntDesign name="right" size={16} color={isDark ? "#999" : "#666"} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.accountButton, styles.deleteButton]}
+          style={[dynamicStyles.accountButton, styles.deleteButton]}
           onPress={handleDeleteAccount}
         >
-          <Text style={[styles.accountButtonText, styles.deleteButtonText]}>
+          <Text style={[dynamicStyles.accountButtonText, styles.deleteButtonText]}>
             Delete Account
           </Text>
         </TouchableOpacity>

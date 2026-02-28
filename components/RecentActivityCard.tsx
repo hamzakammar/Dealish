@@ -1,4 +1,3 @@
-// This is a placeholder for the RecentActivityCard component
 import RatingDisplay from "@/components/RatingDisplay";
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";

@@ -128,17 +128,23 @@ export default function AuthProvider({ children }: PropsWithChildren) {
           if (isActive && isMountedRef.current) {
             // Handle token refresh events
             if (event === 'TOKEN_REFRESHED' && session) {
-              console.log('Token refreshed successfully')
+              if (__DEV__) {
+                console.log('Token refreshed successfully')
+              }
               setSession(session)
             } 
             // Handle sign in events
             else if (event === 'SIGNED_IN' && session) {
-              console.log('User signed in')
+              if (__DEV__) {
+                console.log('User signed in')
+              }
               setSession(session)
             }
             // Handle sign out events
             else if (event === 'SIGNED_OUT') {
-              console.log('User signed out')
+              if (__DEV__) {
+                console.log('User signed out')
+              }
               setSession(null)
             }
             // Handle session updates
@@ -175,7 +181,9 @@ export default function AuthProvider({ children }: PropsWithChildren) {
             try {
               const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
               if (!refreshError && refreshedSession) {
-                console.log('Session refreshed successfully')
+                if (__DEV__) {
+                  console.log('Session refreshed successfully')
+                }
                 setSession(refreshedSession)
                 setIsLoadingSession(false)
                 return

@@ -10,12 +10,15 @@ import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useActiveDealsMap } from "@/hooks/useActiveDealsMap";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { useThemeColors } from "@/hooks/useThemeColors";
+import { useColorScheme } from "@/components/useColorScheme";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import MapView, { Camera, Polyline, Region } from "react-native-maps";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
 const fallbackRegion: Region = {
   latitude: 43.46946,
@@ -31,7 +34,6 @@ export default function MapScreen() {
   const currentRegionRef = useRef<Region | null>(null);
   const regionBeforeSelectRef = useRef<Region | null>(null);
   const cameraBeforeSelectRef = useRef<Camera | null>(null);
-  const [mapType, setMapType] = useState<MapType>("standard");
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [isShowingDirections, setIsShowingDirections] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
@@ -42,6 +44,107 @@ export default function MapScreen() {
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
   const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
+  const { settings } = useUserSettings();
+  const colors = useThemeColors();
+  
+  const systemColorScheme = useColorScheme();
+  
+  // Determine if dark mode is active from settings
+  const isDarkMode = useMemo(() => {
+    if (!settings?.appearance?.theme) return false;
+    if (settings.appearance.theme === 'dark') return true;
+    if (settings.appearance.theme === 'auto') {
+      return systemColorScheme === 'dark';
+    }
+    return false;
+  }, [settings?.appearance?.theme, systemColorScheme]);
+  
+  // Dark map style for Google Maps
+  const darkMapStyle = useMemo(() => [
+    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+    {
+      featureType: "administrative.locality",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#d59563" }],
+    },
+    {
+      featureType: "poi",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#d59563" }],
+    },
+    {
+      featureType: "poi.park",
+      elementType: "geometry",
+      stylers: [{ color: "#263c3f" }],
+    },
+    {
+      featureType: "poi.park",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#6b9a76" }],
+    },
+    {
+      featureType: "road",
+      elementType: "geometry",
+      stylers: [{ color: "#38414e" }],
+    },
+    {
+      featureType: "road",
+      elementType: "geometry.stroke",
+      stylers: [{ color: "#212a37" }],
+    },
+    {
+      featureType: "road",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#9ca5b3" }],
+    },
+    {
+      featureType: "road.highway",
+      elementType: "geometry",
+      stylers: [{ color: "#746855" }],
+    },
+    {
+      featureType: "road.highway",
+      elementType: "geometry.stroke",
+      stylers: [{ color: "#1f2835" }],
+    },
+    {
+      featureType: "road.highway",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#f3d19c" }],
+    },
+    {
+      featureType: "transit",
+      elementType: "geometry",
+      stylers: [{ color: "#2f3948" }],
+    },
+    {
+      featureType: "transit.station",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#d59563" }],
+    },
+    {
+      featureType: "water",
+      elementType: "geometry",
+      stylers: [{ color: "#17263c" }],
+    },
+    {
+      featureType: "water",
+      elementType: "labels.text.fill",
+      stylers: [{ color: "#515c6d" }],
+    },
+    {
+      featureType: "water",
+      elementType: "labels.text.stroke",
+      stylers: [{ color: "#17263c" }],
+    },
+  ], []);
+  
+  // Initialize map type from user settings
+  const [mapType, setMapType] = useState<MapType>(() => {
+    return settings?.appearance?.defaultMapType || "standard";
+  });
   
   // Filter restaurants
   const {
@@ -69,6 +172,13 @@ export default function MapScreen() {
 
   // Batch fetch active deals for filtered restaurants
   const { activeDealsMap } = useActiveDealsMap(filteredRestaurants);
+
+  // Update map type when settings change
+  useEffect(() => {
+    if (settings?.appearance?.defaultMapType && settings.appearance.defaultMapType !== mapType) {
+      setMapType(settings.appearance.defaultMapType);
+    }
+  }, [settings?.appearance?.defaultMapType, mapType]);
 
   // Get search suggestions (limited to top 5)
   const searchSuggestions = React.useMemo(() => {
@@ -203,10 +313,12 @@ export default function MapScreen() {
     }
   }, [userLocation, isShowingDirections, selectedRestaurant]);
 
-  if (loading) {
+  // Show minimal loading - don't block if we have restaurants or location
+  // This prevents 10-second loading times
+  if (loading && restaurants.length === 0 && !region) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator />
+        <ActivityIndicator size="large" color="#FE902A" />
       </View>
     );
   }
@@ -223,6 +335,8 @@ export default function MapScreen() {
             initialRegion={region ?? fallbackRegion}
             showsMyLocationButton={true}
             mapType={mapType}
+            provider={PROVIDER_GOOGLE}
+            customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
             onRegionChangeComplete={(r) => {
               currentRegionRef.current = r;
               // Sync blurred map background with main map
@@ -277,9 +391,9 @@ export default function MapScreen() {
 
       {/* Top Search and Controls Bar */}
       {!isAccountPanelOpen && !isFilterPanelOpen && (
-        <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: '#f5f5f5' }]}>
-          {/* Blurred Map Background - only show in map view */}
-          {viewMode === "map" && region && (
+        <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
+          {/* Blurred Map Background - disabled on Android to prevent duplicate map */}
+          {viewMode === "map" && region && Platform.OS === 'ios' && (
             <View style={styles.blurredMapBackground}>
               <MapView
                 ref={(r) => {
@@ -288,33 +402,39 @@ export default function MapScreen() {
                 style={StyleSheet.absoluteFillObject}
                 region={currentRegionRef.current || region || fallbackRegion}
                 mapType={mapType}
+                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
+                customMapStyle={isDarkMode && mapType === "standard" && Platform.OS === 'android' ? darkMapStyle : undefined}
                 scrollEnabled={false}
                 zoomEnabled={false}
                 pitchEnabled={false}
                 rotateEnabled={false}
                 toolbarEnabled={false}
               />
-              <BlurView intensity={60} style={StyleSheet.absoluteFillObject} tint="light" />
+              <BlurView intensity={colors.isDark ? 80 : 60} style={StyleSheet.absoluteFillObject} tint={colors.isDark ? "dark" : "light"} />
             </View>
+          )}
+          {/* Simple background for Android */}
+          {viewMode === "map" && Platform.OS === 'android' && (
+            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(26, 26, 26, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
           )}
           <View style={styles.topBarContent}>
             <View style={styles.topBar}>
             {/* Settings Button */}
             <TouchableOpacity
-              style={styles.topActionButton}
+              style={[styles.topActionButton, { backgroundColor: colors.card }]}
               onPress={() => setIsAccountPanelOpen(true)}
               activeOpacity={0.7}
             >
-              <Ionicons name="settings-outline" size={20} color="#666" />
+              <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
             {/* Search Bar */}
-            <View style={styles.topSearchBar}>
-              <Ionicons name="search" size={18} color="#999" style={{ marginRight: 8 }} />
+            <View style={[styles.topSearchBar, { backgroundColor: colors.card }]}>
+              <Ionicons name="search" size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />
               <TextInput
-                style={styles.topSearchInput}
+                style={[styles.topSearchInput, { color: colors.text }]}
                 placeholder="Search"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textTertiary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -323,18 +443,22 @@ export default function MapScreen() {
                   onPress={() => setSearchQuery("")}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons name="close-circle" size={18} color="#999" />
+                  <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
                 </TouchableOpacity>
               )}
             </View>
 
             {/* Filter and Location Buttons */}
             <TouchableOpacity
-              style={[styles.topActionButton, activeFilterCount > 0 && styles.topActionButtonActive]}
+              style={[
+                styles.topActionButton, 
+                { backgroundColor: colors.card },
+                activeFilterCount > 0 && styles.topActionButtonActive
+              ]}
               onPress={() => setIsFilterPanelOpen(true)}
               activeOpacity={0.7}
             >
-              <Ionicons name="options" size={18} color={activeFilterCount > 0 ? "#FE902A" : "#666"} />
+              <Ionicons name="options" size={18} color={activeFilterCount > 0 ? colors.primary : colors.textSecondary} />
               {activeFilterCount > 0 && (
                 <View style={styles.filterBadge}>
                   <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
@@ -342,7 +466,7 @@ export default function MapScreen() {
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.topActionButton}
+              style={[styles.topActionButton, { backgroundColor: colors.card }]}
               onPress={handleRecenter}
               activeOpacity={0.7}
               disabled={!userLocation || viewMode !== "map"}
@@ -350,13 +474,13 @@ export default function MapScreen() {
               <Ionicons 
                 name="location" 
                 size={18} 
-                color={userLocation && viewMode === "map" ? "#666" : "#CCC"} 
+                color={userLocation && viewMode === "map" ? colors.textSecondary : colors.textTertiary} 
               />
             </TouchableOpacity>
           </View>
 
           {/* List/Map Toggle */}
-          <View style={styles.viewToggleContainer}>
+          <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#2a2a2a" : "#E9EAEB" }]}>
             <TouchableOpacity
               style={[
                 styles.viewToggleSegment,
@@ -370,6 +494,7 @@ export default function MapScreen() {
             >
               <Text style={[
                 styles.viewToggleText,
+                { color: viewMode === "list" ? "#fff" : colors.textSecondary },
                 viewMode === "list" && styles.viewToggleTextActive
               ]}>
                 List
@@ -386,6 +511,7 @@ export default function MapScreen() {
             >
               <Text style={[
                 styles.viewToggleText,
+                { color: viewMode === "map" ? "#fff" : (!hasLocationPermission ? colors.textTertiary : colors.textSecondary) },
                 viewMode === "map" && styles.viewToggleTextActive,
                 !hasLocationPermission && styles.viewToggleTextDisabled
               ]}>
@@ -413,9 +539,9 @@ export default function MapScreen() {
 
       {/* {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />} */}
 
-      {/* White overlay when account panel is open */}
+      {/* Overlay when account panel is open */}
       {isAccountPanelOpen && (
-        <View style={styles.accountPanelOverlay} />
+        <View style={[styles.accountPanelOverlay, { backgroundColor: colors.background }]} />
       )}
 
       {/* Account Panel */}
@@ -461,7 +587,7 @@ export default function MapScreen() {
 
       {/* Search Suggestions Dropdown */}
       {!isAccountPanelOpen && !isFilterPanelOpen && searchSuggestions.length > 0 && (
-        <View style={styles.suggestionsContainer}>
+        <View style={[styles.suggestionsContainer, { backgroundColor: colors.card, borderColor: colors.primary }]}>
           <FlatList
             data={searchSuggestions}
             keyExtractor={(item) => item.id}
@@ -469,23 +595,24 @@ export default function MapScreen() {
               <TouchableOpacity
                 style={[
                   styles.suggestionItem,
+                  { borderBottomColor: colors.border },
                   index === searchSuggestions.length - 1 && styles.suggestionItemLast
                 ]}
                 onPress={() => handleSuggestionPress(item)}
                 activeOpacity={0.7}
               >
-                <View style={styles.suggestionIcon}>
-                  <Ionicons name="restaurant" size={18} color="#FE902A" />
+                <View style={[styles.suggestionIcon, { backgroundColor: colors.primaryLight }]}>
+                  <Ionicons name="restaurant" size={18} color={colors.primary} />
                 </View>
                 <View style={styles.suggestionContent}>
-                  <Text style={styles.suggestionName}>{item.name}</Text>
+                  <Text style={[styles.suggestionName, { color: colors.text }]}>{item.name}</Text>
                   {item.address && (
-                    <Text style={styles.suggestionAddress} numberOfLines={1}>
+                    <Text style={[styles.suggestionAddress, { color: colors.textSecondary }]} numberOfLines={1}>
                       {item.address}
                     </Text>
                   )}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </TouchableOpacity>
             )}
             scrollEnabled={false}
@@ -658,7 +785,6 @@ const styles = StyleSheet.create({
     top: 110,
     left: 16,
     right: 16,
-    backgroundColor: '#fff',
     borderRadius: 12,
     marginTop: 8,
     maxHeight: 300,
@@ -668,7 +794,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     borderWidth: 1.5,
-    borderColor: '#FE902A',
     overflow: 'hidden',
     zIndex: 11,
   },
@@ -678,7 +803,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   suggestionItemLast: {
     borderBottomWidth: 0,
@@ -687,7 +811,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#FFF5EB',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -698,12 +821,10 @@ const styles = StyleSheet.create({
   suggestionName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
   suggestionAddress: {
     fontSize: 13,
-    color: '#666',
   },
   searchBar: {
     flexDirection: 'row',
@@ -750,7 +871,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#fff',
     zIndex: 5,
   },
 });

@@ -4,7 +4,7 @@ import { useAuthContext } from "@/app/providers/auth";
 import { UserSettings, DEFAULT_SETTINGS } from "@/types/settings";
 
 export function useUserSettings() {
-  const { session, profile } = useAuthContext();
+  const { session, profile, refetchProfile } = useAuthContext();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -43,6 +43,7 @@ export function useUserSettings() {
     if (!session?.user?.id) return;
 
     try {
+      // Update local state immediately for instant UI feedback
       setSettings(newSettings);
       
       const { error } = await supabase
@@ -58,6 +59,11 @@ export function useUserSettings() {
         }
         throw error;
       }
+      
+      // Refresh profile in AuthContext to ensure all components see the update
+      // This will trigger useEffect in all components using useUserSettings
+      // They will sync settings from the updated profile
+      await refetchProfile();
     } catch (error) {
       console.error("Error saving settings:", error);
       throw error;

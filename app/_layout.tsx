@@ -6,11 +6,12 @@ import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useUserSettings } from '@/hooks/useUserSettings';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -48,7 +49,7 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const systemColorScheme = useColorScheme();
 
   useEffect(() => {
     // Always declare subscription at the top for consistent hook structure
@@ -133,8 +134,8 @@ function RootLayoutNav() {
   
   return (
     <AuthProvider>
-      <NotificationHandler />
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeWrapper>
+        <NotificationHandler />
         <Stack screenOptions={{ headerShown: false }}>
           {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
@@ -153,8 +154,27 @@ function RootLayoutNav() {
           <Stack.Screen name="admin/analytics" options={{ headerShown: false }} />
           <Stack.Screen name="admin/create-restaurant" options={{ headerShown: false }} />
         </Stack>
-      </ThemeProvider>
+      </ThemeWrapper>
     </AuthProvider>
+  );
+}
+
+// Component to handle theme inside AuthProvider
+function ThemeWrapper({ children }: { children: React.ReactNode }) {
+  const systemColorScheme = useColorScheme();
+  const { settings } = useUserSettings();
+  
+  // Determine theme based on user settings
+  const colorScheme = React.useMemo(() => {
+    if (!settings?.appearance?.theme) return systemColorScheme;
+    if (settings.appearance.theme === 'auto') return systemColorScheme;
+    return settings.appearance.theme;
+  }, [settings?.appearance?.theme, systemColorScheme]);
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      {children}
+    </ThemeProvider>
   );
 }
 
@@ -167,12 +187,17 @@ function NotificationHandler() {
 
   // Handle notification taps (both foreground and background)
   useEffect(() => {
-    const notificationData = lastNotificationResponse?.notification.request.content.data || 
-                           notification?.request.content.data;
-    
-    if (notificationData?.screen) {
-      // Navigate to the screen specified in notification data
-      router.push(notificationData.screen as any);
+    try {
+      const notificationData = lastNotificationResponse?.notification?.request?.content?.data || 
+                             notification?.request?.content?.data;
+      
+      if (notificationData?.screen) {
+        // Navigate to the screen specified in notification data
+        router.push(notificationData.screen as any);
+      }
+    } catch (e) {
+      // Ignore errors in notification handling
+      console.warn('Error handling notification:', e);
     }
   }, [notification, lastNotificationResponse, router]);
 

@@ -1,10 +1,11 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -26,6 +27,7 @@ const validateEmail = (email: string) => {
 
 export default function AuthScreen() {
   const { session, isLoading, refetchProfile } = useAuthContext();
+  const colors = useThemeColors();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +40,137 @@ export default function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'user' | 'owner'>('user');
   const redirectingRef = useRef(false);
+  
+  // Dynamic styles based on theme
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 20,
+      backgroundColor: colors.background,
+    },
+    title: {
+      fontSize: 32,
+      fontFamily: 'Manrope',
+      fontWeight: 'bold',
+      marginTop: 99,
+      marginBottom: 8,
+      textAlign: 'center',
+      color: colors.text,
+    },
+    subtitle: {
+      fontSize: 16,
+      fontFamily: 'Manrope',
+      fontWeight: '400',
+      color: colors.textSecondary,
+      marginBottom: 40,
+      textAlign: 'center',
+    },
+    input: {
+      width: '100%',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      marginBottom: 12,
+      fontSize: 16,
+      backgroundColor: colors.inputBackground,
+      color: colors.text,
+    },
+    passwordContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: '100%',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      marginBottom: 12,
+      backgroundColor: colors.inputBackground,
+    },
+    passwordInput: {
+      flex: 1,
+      fontSize: 16,
+      padding: 0,
+      margin: 0,
+      color: colors.text,
+    },
+    socialButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      backgroundColor: colors.cardSecondary,
+      marginRight: 6,
+    },
+    socialButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    toggleText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    forgotPasswordText: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerText: {
+      marginHorizontal: 16,
+      color: colors.textTertiary,
+      fontSize: 14,
+    },
+    errorText: {
+      color: colors.error,
+      fontSize: 12,
+      marginTop: -8,
+      marginBottom: 8,
+      marginLeft: 4,
+    },
+    rateLimitText: {
+      color: colors.isDark ? '#ffc107' : '#856404',
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    roleSelectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    roleButton: {
+      flex: 1,
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    roleButtonText: {
+      marginTop: 8,
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  }), [colors]);
 
   // ALL hooks must be called BEFORE any conditional returns, in consistent order
   
@@ -110,8 +243,8 @@ export default function AuthScreen() {
   // Show loading state or if already logged in (during redirect)
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#FE902A" />
+      <View style={dynamicStyles.container}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -119,8 +252,8 @@ export default function AuthScreen() {
   // If we have a session, show loading while redirecting (don't return null to keep hooks consistent)
   if (session) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#FE902A" />
+      <View style={dynamicStyles.container}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -278,7 +411,7 @@ export default function AuthScreen() {
       setLoading(false);
     }
   };
-  const handleGoogleSignIn = async () => {
+  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     // Only allow OAuth in client-side browser/native environments (not during static export)
     if (typeof window === 'undefined') {
       Alert.alert('Error', 'OAuth is not available in this environment.');
@@ -311,7 +444,7 @@ export default function AuthScreen() {
       }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: provider,
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: isNative, // Skip redirect on native, use WebBrowser instead
@@ -338,7 +471,9 @@ export default function AuthScreen() {
             try {
                 // Parse the callback URL to extract the tokens
                 const callbackUrl = result.url;
-                console.log('OAuth callback URL:', callbackUrl);
+                if (__DEV__) {
+                  console.log('OAuth callback URL:', callbackUrl);
+                }
                 
                 // On native with skipBrowserRedirect, Supabase doesn't automatically process the callback URL
                 // We need to manually extract tokens from the URL hash and set the session
@@ -374,7 +509,9 @@ export default function AuthScreen() {
                 }
                 
                 if (sessionData?.session && sessionData.user) {
-                    console.log('OAuth authentication successful - session created');
+                    if (__DEV__) {
+                      console.log('OAuth authentication successful - session created');
+                    }
                     
                     // Check if this is a new user (first time OAuth sign-in)
                     // For new users, we'll default to 'user' role, but they can change it later
@@ -422,7 +559,7 @@ export default function AuthScreen() {
         }
       }
     } catch (error: unknown) {
-        let errorMessage = 'Failed to sign in with Google';
+        let errorMessage = `Failed to sign in with ${provider === 'apple' ? 'Apple' : 'Google'}`;
         if (error instanceof Error && error.message) {
           errorMessage = error.message;
         } else if (typeof error === 'string' && error) {
@@ -434,26 +571,26 @@ export default function AuthScreen() {
 
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Take advantage of this deal</Text>
-      <Text style={styles.subtitle}>{isSignUp ? 'Sign up to continue' : 'Sign in to continue'}</Text>
+    <View style={dynamicStyles.container}>
+      <Text style={dynamicStyles.title}>Take advantage of this deal</Text>
+      <Text style={dynamicStyles.subtitle}>{isSignUp ? 'Sign up to continue' : 'Sign in to continue'}</Text>
 
       <View style={styles.form}>
         {rateLimitError && (
-          <View style={styles.rateLimitContainer}>
-            <Text style={styles.rateLimitText}>{rateLimitError}</Text>
+          <View style={[styles.rateLimitContainer, { backgroundColor: colors.isDark ? '#332701' : '#fff3cd', borderColor: colors.isDark ? '#664d03' : '#ffc107' }]}>
+            <Text style={dynamicStyles.rateLimitText}>{rateLimitError}</Text>
           </View>
         )}
 
         <View>
             <TextInput
             style={[
-                styles.input,
+                dynamicStyles.input,
                 emailError && styles.inputError,
                 isRateLimited && styles.inputDisabled
             ]}
             placeholder="Your Email"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textTertiary}
             value={email}
             onChangeText={(text) => {
                 setEmail(text);
@@ -465,20 +602,20 @@ export default function AuthScreen() {
             editable={!isRateLimited}
             />
             {emailError && (
-            <Text style={styles.errorText}>{emailError}</Text>
+            <Text style={dynamicStyles.errorText}>{emailError}</Text>
             )}
         </View>
 
         <View>
             <View style={[
-                styles.passwordContainer,
+                dynamicStyles.passwordContainer,
                 passwordError && styles.inputError,
                 isRateLimited && styles.inputDisabled
             ]}>
                 <TextInput
-                style={styles.passwordInput}
+                style={dynamicStyles.passwordInput}
                 placeholder="Your Password"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textTertiary}
                 value={password}
                 onChangeText={(text) => {
                     setPassword(text);
@@ -500,12 +637,12 @@ export default function AuthScreen() {
                     <Ionicons
                         name={showPassword ? 'eye-off' : 'eye'}
                         size={20}
-                        color="#999"
+                        color={colors.textTertiary}
                     />
                 </TouchableOpacity>
             </View>
             {passwordError && (
-            <Text style={styles.errorText}>{passwordError}</Text>
+            <Text style={dynamicStyles.errorText}>{passwordError}</Text>
             )}
         </View>
 
@@ -532,11 +669,11 @@ export default function AuthScreen() {
         {/* Role selection for sign-up - shown upfront */}
         {isSignUp && (
           <View style={styles.roleSelectionContainer}>
-            <Text style={styles.roleSelectionTitle}>I am a...</Text>
+            <Text style={dynamicStyles.roleSelectionTitle}>I am a...</Text>
             <View style={styles.roleButtonsContainer}>
               <TouchableOpacity
                 style={[
-                  styles.roleButton,
+                  dynamicStyles.roleButton,
                   selectedRole === 'user' && styles.roleButtonSelected
                 ]}
                 onPress={() => setSelectedRole('user')}
@@ -544,10 +681,10 @@ export default function AuthScreen() {
                 <Ionicons 
                   name="person" 
                   size={24} 
-                  color={selectedRole === 'user' ? '#fff' : '#666'} 
+                  color={selectedRole === 'user' ? '#fff' : colors.textSecondary} 
                 />
                 <Text style={[
-                  styles.roleButtonText,
+                  dynamicStyles.roleButtonText,
                   selectedRole === 'user' && styles.roleButtonTextSelected
                 ]}>
                   Customer
@@ -555,7 +692,7 @@ export default function AuthScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.roleButton,
+                  dynamicStyles.roleButton,
                   selectedRole === 'owner' && styles.roleButtonSelected
                 ]}
                 onPress={() => setSelectedRole('owner')}
@@ -563,10 +700,10 @@ export default function AuthScreen() {
                 <Ionicons 
                   name="restaurant" 
                   size={24} 
-                  color={selectedRole === 'owner' ? '#fff' : '#666'} 
+                  color={selectedRole === 'owner' ? '#fff' : colors.textSecondary} 
                 />
                 <Text style={[
-                  styles.roleButtonText,
+                  dynamicStyles.roleButtonText,
                   selectedRole === 'owner' && styles.roleButtonTextSelected
                 ]}>
                   Restaurant Owner
@@ -583,7 +720,7 @@ export default function AuthScreen() {
             accessibilityLabel="Forgot Password"
             accessibilityHint="Opens the password reset page to recover your account"
           >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            <Text style={dynamicStyles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
         )}
 
@@ -596,7 +733,7 @@ export default function AuthScreen() {
           accessibilityLabel={isSignUp ? "Switch to Sign In" : "Switch to Sign Up"}
           accessibilityHint={isSignUp ? "Switches to the sign in form for existing users" : "Switches to the sign up form to create a new account"}
         >
-          <Text style={styles.toggleText}>
+          <Text style={dynamicStyles.toggleText}>
             {isSignUp 
               ? 'Already have an account? Sign in' 
               : "Don't have an account? Sign up"}
@@ -605,15 +742,15 @@ export default function AuthScreen() {
       </View>
 
       <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>OR</Text>
-        <View style={styles.dividerLine} />
+        <View style={dynamicStyles.dividerLine} />
+        <Text style={dynamicStyles.dividerText}>OR</Text>
+        <View style={dynamicStyles.dividerLine} />
       </View>
 
       <View style={styles.socialButtonsContainer}>
         <TouchableOpacity 
-          style={[styles.socialButton, styles.googleButton]} 
-          onPress={handleGoogleSignIn}
+          style={[dynamicStyles.socialButton, styles.googleButton]} 
+          onPress={() => handleOAuthSignIn('google')}
           accessibilityLabel="Sign in with Google"
           accessibilityHint="Opens Google sign in in your browser"
         >
@@ -624,19 +761,19 @@ export default function AuthScreen() {
             accessibilityRole="image"
             accessibilityLabel="Google logo"
           />
-          <Text style={styles.socialButtonText}>Google</Text>
+          <Text style={dynamicStyles.socialButtonText}>Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.socialButton, styles.appleButton]} 
-          disabled={true}
-          accessibilityLabel="Sign in with Apple is not currently available"
-          accessibilityHint="Apple sign in is not currently available"
+          style={[dynamicStyles.socialButton, styles.appleButton]} 
+          onPress={() => handleOAuthSignIn('apple')}
+          accessibilityLabel="Sign in with Apple"
+          accessibilityHint="Opens Apple sign in in your browser"
         >
           <View style={styles.appleIconContainer}>
-            <FontAwesome5 name="apple" size={20} color="#000" />
+            <FontAwesome5 name="apple" size={20} color={colors.text} />
           </View>
-          <Text style={styles.socialButtonText}>Apple</Text>
+          <Text style={dynamicStyles.socialButtonText}>Apple</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -645,42 +782,9 @@ export default function AuthScreen() {
 
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 32,
-    fontFamily: 'Manrope',
-    fontWeight: 'bold',
-    marginTop: 99,
-    marginBottom: 8,
-    textAlign: 'center',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: 'Manrope',
-    fontWeight: '400',
-    color: '#666',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
   form: {
     width: '100%',
     marginBottom: 20,
-  },
-  input: {
-    width: '100%',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
   },
   button: {
     width: '100%',
@@ -755,70 +859,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
     alignItems: 'center',
   },
-  toggleText: {
-    color: '#666',
-    fontSize: 14,
-  },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 20,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#999',
-    fontSize: 14,
-  },
   inputError: {
     borderColor: '#ff4444',
     borderWidth: 1,
   },
-  errorText: {
-    color: '#ff4444',
-    fontSize: 12,
-    marginTop: -8,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
   rateLimitContainer: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffc107',
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
-  rateLimitText: {
-    color: '#856404',
-    fontSize: 14,
-    textAlign: 'center',
-  },
   inputDisabled: {
-    backgroundColor: '#f5f5f5',
     opacity: 0.6,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 12,
-    backgroundColor: '#fff',
-  },
-  passwordInput: {
-    flex: 1,
-    fontSize: 16,
-    padding: 0,
-    margin: 0,
   },
   eyeIcon: {
     paddingLeft: 8,
@@ -830,40 +887,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 12,
   },
-  roleSelectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
   roleButtonsContainer: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 12,
   },
-  roleButton: {
-    flex: 1,
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fff',
-  },
   roleButtonSelected: {
     borderColor: '#FE902A',
     backgroundColor: '#FE902A',
-  },
-  roleButtonText: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    textAlign: 'center',
   },
   roleButtonTextSelected: {
     color: '#fff',

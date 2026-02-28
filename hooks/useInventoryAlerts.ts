@@ -19,7 +19,9 @@ export function useInventoryAlerts(restaurantId: string | null) {
       setLoading(true);
       setError(null);
 
-      console.log('Fetching alerts for restaurant:', restaurantId);
+      if (__DEV__) {
+        console.log('Fetching alerts for restaurant:', restaurantId);
+      }
 
       const { data, error: fetchError } = await supabase
         .from('inventory_alerts')
@@ -37,7 +39,9 @@ export function useInventoryAlerts(restaurantId: string | null) {
         throw fetchError;
       }
 
-      console.log('Fetched alerts:', data?.length || 0);
+      if (__DEV__) {
+        console.log('Fetched alerts:', data?.length || 0);
+      }
       setAlerts((data || []) as InventoryAlertWithProduct[]);
     } catch (e: any) {
       console.error('Error fetching alerts:', e);
