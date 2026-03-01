@@ -38,6 +38,16 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
+  // Move useMemo OUTSIDE of renderStep to avoid conditional hook call
+  // This hook MUST be called unconditionally on every render
+  const citySuggestions = useMemo(() => {
+    if (!location.trim()) return [];
+    const query = location.toLowerCase().trim();
+    return COMMON_CITIES
+      .filter(city => city.toLowerCase().startsWith(query))
+      .slice(0, 5);
+  }, [location]);
+
   const handleNext = () => {
     if (currentStep === "welcome") {
       setCurrentStep("name");
@@ -167,14 +177,6 @@ export default function OnboardingScreen() {
         );
 
       case "location":
-        const citySuggestions = useMemo(() => {
-          if (!location.trim()) return [];
-          const query = location.toLowerCase().trim();
-          return COMMON_CITIES
-            .filter(city => city.toLowerCase().startsWith(query))
-            .slice(0, 5);
-        }, [location]);
-
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Where are you located?</Text>

@@ -176,7 +176,37 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         
         if (error) {
           console.error('Error fetching auth session:', error)
-          // If session fetch fails, try to refresh the token
+          // Only kill session for actual auth errors, not network errors
+          // Network errors should retry, not kill the session
+          const isNetworkError = error.message?.includes('network') || 
+                                 error.message?.includes('timeout') ||
+                                 error.message?.includes('fetch');
+          
+          if (isNetworkError) {
+            // Network error - retry once after a short delay
+            // Don't kill session on network errors, user might still be logged in
+            // Capture timeout ID so it can be cleared on unmount
+            timeoutId = setTimeout(async () => {
+              if (!isActive || !isMountedRef.current) return
+              try {
+                const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
+                if (!retryError && retrySession) {
+                  setSession(retrySession)
+                } else if (!retryError && !retrySession) {
+                  // No session after retry - user is actually logged out
+                  setSession(null)
+                }
+                // If retry also fails, keep existing session state (don't kill it)
+              } catch (retryErr) {
+                console.error('Retry session fetch failed:', retryErr)
+                // Don't kill session on retry failure either
+              }
+              setIsLoadingSession(false)
+            }, 1000)
+            return
+          }
+          
+          // Actual auth error (expired/invalid token) - try to refresh
           if (error.message?.includes('expired') || error.message?.includes('invalid')) {
             try {
               const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
@@ -192,6 +222,9 @@ export default function AuthProvider({ children }: PropsWithChildren) {
               console.error('Error refreshing session:', refreshErr)
             }
           }
+          
+          // Only set session to null if it's a real auth error (not network)
+          // This prevents killing valid sessions on temporary network issues
           setSession(null)
         } else {
           // Set session immediately - let Supabase handle token refresh automatically

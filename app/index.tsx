@@ -20,14 +20,23 @@ export default function Index() {
     let isActive = true;
 
     async function initialize() {
-      // CRITICAL: Always check session FIRST (network operation, slower)
-      // Wait for session check to complete before making navigation decisions
+      // CRITICAL: Wait for BOTH session AND welcome check to complete
+      // Don't make navigation decisions until both are ready
+      // This prevents race conditions where AsyncStorage (fast) beats Supabase (slow)
+      
+      // Wait for session check to complete (network operation, 300-500ms)
       if (isLoading) {
-        // Still loading session - wait
-        return;
+        return; // Still loading session - wait
       }
 
-      // Session check is complete
+      // Wait for welcome check to complete (AsyncStorage, 50-100ms)
+      // Even though it's faster, we need to wait for it to avoid race conditions
+      if (hasSeenWelcome === null) {
+        return; // Still loading welcome status - wait
+      }
+
+      // BOTH checks are complete - now make navigation decision
+      // Session check takes priority over welcome check
       if (session) {
         // Validate token freshness before trusting session
         // Supabase sessions have expires_at in seconds (Unix timestamp)
@@ -37,10 +46,7 @@ export default function Index() {
         // If token is expired, treat as no session (Supabase should refresh, but be safe)
         if (!isTokenValid) {
           // Token expired - treat as not authenticated
-          // Will fall through to welcome/auth screen logic
-          if (hasSeenWelcome === null) {
-            return; // Wait for welcome check
-          }
+          // hasSeenWelcome is already checked above (both checks complete)
           if (hasNavigatedRef.current) return;
           hasNavigatedRef.current = true;
           router.replace(hasSeenWelcome ? '/auth' : '/welcome');
@@ -50,6 +56,7 @@ export default function Index() {
 
         // Valid session with valid token - user is authenticated
         // Skip welcome screen check entirely for authenticated users
+        // Session check wins - authenticated users never see welcome screen
         if (hasNavigatedRef.current) return;
         hasNavigatedRef.current = true;
 
@@ -81,13 +88,8 @@ export default function Index() {
       }
 
       // No session - user is not authenticated
-      // NOW check welcome screen status (AsyncStorage, faster)
-      if (hasSeenWelcome === null) {
-        // Still loading welcome status - wait
-        return;
-      }
-
-      // Both checks complete - make navigation decision
+      // Both checks are already complete (checked at top of function)
+      // Make navigation decision based on welcome screen status
       if (hasNavigatedRef.current) return;
       hasNavigatedRef.current = true;
 

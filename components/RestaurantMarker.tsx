@@ -18,24 +18,6 @@ export default function RestaurantMarker({
   hasActiveDeal,
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
-  const [isMounted, setIsMounted] = useState(false);
-
-  // Single mount trigger for Android to ensure markers appear
-  // Simplified from complex forceRender cycling to prevent flicker
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      // Single delayed mount trigger - no state cycling
-      const timer = setTimeout(() => {
-        setIsMounted(true);
-      }, 100);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      // iOS doesn't need this optimization
-      setIsMounted(true);
-    }
-  }, []);
 
   const markerContent = useMemo(
     () => {
@@ -114,8 +96,9 @@ export default function RestaurantMarker({
       anchor={{ x: 0.5, y: 0.5 }}
       // Platform-specific tracksViewChanges:
       // iOS: false for performance (markers are static)
-      // Android: true initially to ensure markers render, then false after mount for performance
-      tracksViewChanges={Platform.OS === 'ios' ? false : !isMounted}
+      // Android: true to ensure markers render properly (required for initial render)
+      // Don't toggle this value - changing it causes markers to flicker/disappear
+      tracksViewChanges={Platform.OS === 'ios' ? false : true}
       tappable={true}
       // Android-specific optimizations
       {...(Platform.OS === 'android' && {
