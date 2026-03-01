@@ -333,7 +333,7 @@ export default function MapScreen() {
             }}
             style={{ flex: 1 }}
             initialRegion={region ?? fallbackRegion}
-            showsMyLocationButton={true}
+            showsMyLocationButton={false}
             mapType={mapType}
             provider={PROVIDER_GOOGLE}
             customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}

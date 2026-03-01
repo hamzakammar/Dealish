@@ -56,7 +56,7 @@ export default function RestaurantMarker({
               color="#fff"
             />
           </View>
-          {/* Use different approach for Android to avoid triangle rendering issues */}
+          {/* Pointer under the circle - triangle on iOS, rotated square on Android (triangle clips on Android) */}
           {Platform.OS === 'android' ? (
             <View
               style={[
@@ -94,11 +94,9 @@ export default function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      // Platform-specific tracksViewChanges:
-      // iOS: false for performance (markers are static)
-      // Android: true to ensure markers render properly (required for initial render)
-      // Don't toggle this value - changing it causes markers to flicker/disappear
-      tracksViewChanges={Platform.OS === 'ios' ? false : true}
+      // Google Maps on iOS requires tracksViewChanges=true for custom marker views to render correctly
+      // (otherwise only partial content like the pin triangle may show)
+      tracksViewChanges={true}
       tappable={true}
       // Android-specific optimizations
       {...(Platform.OS === 'android' && {
@@ -116,14 +114,7 @@ const styles = StyleSheet.create({
   markerWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
-    ...Platform.select({
-      ios: {
-        overflow: "visible",
-      },
-      android: {
-        overflow: "hidden",
-      },
-    }),
+    overflow: "visible", // Required for pointer to show below circle
   },
   markerDot: {
     width: 12,
@@ -259,7 +250,7 @@ const styles = StyleSheet.create({
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#FE902A",
-    marginTop: -2,
+    marginTop: -8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
@@ -272,7 +263,7 @@ const styles = StyleSheet.create({
     height: 20,
     backgroundColor: "#FE902A",
     borderRadius: 10,
-    marginTop: -10,
+    marginTop: -14,
     transform: [{ rotate: '45deg' }],
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -285,14 +276,14 @@ const styles = StyleSheet.create({
     borderRightWidth: 13,
     borderTopWidth: 20,
     borderTopColor: "#FFD54F",
-    marginTop: -4,
+    marginTop: -8,
   },
   markerPinPartnerAndroid: {
     backgroundColor: "#FFD54F",
     width: 22,
     height: 22,
     borderRadius: 11,
-    marginTop: -11,
+    marginTop: -15,
   },
   markerPinSelected: {
     shadowOpacity: 0.5,
