@@ -18,22 +18,22 @@ export default function RestaurantMarker({
   hasActiveDeal,
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
-  const [forceRender, setForceRender] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Force initial render on Android to ensure markers appear
+  // Single mount trigger for Android to ensure markers appear
+  // Simplified from complex forceRender cycling to prevent flicker
   useEffect(() => {
     if (Platform.OS === 'android') {
-      // Force multiple re-renders to ensure marker appears
-      const timer1 = setTimeout(() => {
-        setForceRender(1);
-      }, 50);
-      const timer2 = setTimeout(() => {
-        setForceRender(2);
-      }, 200);
+      // Single delayed mount trigger - no state cycling
+      const timer = setTimeout(() => {
+        setIsMounted(true);
+      }, 100);
       return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
+        clearTimeout(timer);
       };
+    } else {
+      // iOS doesn't need this optimization
+      setIsMounted(true);
     }
   }, []);
 
@@ -103,19 +103,26 @@ export default function RestaurantMarker({
     onPress(restaurant);
   }, [restaurant, onPress]);
 
+  // Stable key prop - never changes during component lifecycle
+  // This prevents unnecessary remounting that causes flicker
+  const markerKey = `restaurant-${restaurant.id}`;
+
   return (
     <Marker
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={Platform.OS === 'ios' ? false : (forceRender < 2)}
+      // Platform-specific tracksViewChanges:
+      // iOS: false for performance (markers are static)
+      // Android: true initially to ensure markers render, then false after mount for performance
+      tracksViewChanges={Platform.OS === 'ios' ? false : !isMounted}
       tappable={true}
       // Android-specific optimizations
       {...(Platform.OS === 'android' && {
         flat: false,
         centerOffset: { x: 0, y: 0 },
       })}
-      key={`${restaurant.id}-${forceRender}`}
+      key={markerKey}
     >
       {markerContent}
     </Marker>
