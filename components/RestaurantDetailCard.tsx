@@ -314,23 +314,37 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     setSheetState(initialState); // Reset to initial state
   
     // Animate card entrance
-    Animated.timing(slideAnim, {
+    const entranceAnimation = Animated.timing(slideAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: false,
-    }).start();
+    });
+    
+    entranceAnimation.start();
+    
+    // Cleanup: stop animation on unmount to prevent state updates
+    return () => {
+      entranceAnimation.stop();
+    };
   }, [restaurant.id, initialState]);
 
   /**
    * Animate vertical offset when sheet state changes
    */
   useEffect(() => {
-    Animated.timing(sheetHeightAnim, {
+    const heightAnimation = Animated.timing(sheetHeightAnim, {
       toValue: getSheetHeight(sheetState),
       duration: STATE_TRANSITION_DURATION_MS,
       easing: Easing.out(Easing.quad),
       useNativeDriver: false,
-    }).start();
+    });
+    
+    heightAnimation.start();
+    
+    // Cleanup: stop animation on unmount
+    return () => {
+      heightAnimation.stop();
+    };
   }, [sheetState, screenHeight]);
 
   /**

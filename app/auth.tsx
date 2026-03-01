@@ -188,29 +188,21 @@ export default function AuthScreen() {
     checkLimit();
   }, []);
 
-  // Second useEffect: If already logged in, redirect to map (only redirect once)
-  // Must be called consistently on every render, BEFORE any returns
+  // When user has session on auth page (e.g. just logged in), redirect to app
+  // index.tsx handles initial load; this handles post-login redirect when user is ON auth page
   useEffect(() => {
-    // Always declare timeoutId at the top for consistent hook structure
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    // Only redirect if we're loaded, have a session, and haven't already initiated redirect
     if (!isLoading && session && !redirectingRef.current) {
       redirectingRef.current = true;
-      
-      // Check if user has preferred_role in metadata and set it to profile
       const checkAndSetRole = async () => {
         try {
           const preferredRole = session.user.user_metadata?.preferred_role;
           if (preferredRole && (preferredRole === 'user' || preferredRole === 'owner')) {
-            // Check current profile role
             const { data: profile } = await supabase
               .from('profiles')
               .select('role')
               .eq('id', session.user.id)
               .single();
-            
-            // If profile doesn't have a role set, use the preferred role from metadata
             if (profile && !profile.role) {
               await supabase
                 .from('profiles')
@@ -222,20 +214,14 @@ export default function AuthScreen() {
           console.error('Error checking/setting role:', error);
         }
       };
-      
       checkAndSetRole();
-      
-      // Use setTimeout with 0 delay to ensure redirect happens after render completes
+      // Redirect to index so it can route to admin/onboarding/map (single source of truth)
       timeoutId = setTimeout(() => {
-        router.replace('/map');
+        router.replace('/');
       }, 0);
     }
-
-    // ALWAYS return cleanup function for consistent hook structure
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [session, isLoading, router]);
 

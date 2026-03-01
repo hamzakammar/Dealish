@@ -37,15 +37,24 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   // Combined loading state - true if either session or profile is loading
   const isLoading = isLoadingSession || isLoadingProfile
 
+  // Use ref to track current session to avoid stale closures
+  const sessionRef = useRef<Session | null | undefined>(session)
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
   // Function to fetch profile - can be called manually to refresh
+  // Use sessionRef to avoid stale closures and circular dependencies
   const fetchProfile = useCallback(async () => {
-    const sessionId = session?.user?.id || null
+    // Always use latest session from ref to avoid stale closures
+    const currentSession = sessionRef.current
+    const sessionId = currentSession?.user?.id || null
     currentFetchSessionIdRef.current = sessionId
     
     setIsLoadingProfile(true)
 
     try {
-      if (session && sessionId) {
+      if (currentSession && sessionId) {
         const { data, error } = await supabase
           .from('profiles')
           .select('*, settings')
@@ -62,7 +71,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
           setProfile(null)
         } else {
           // Sync avatar_url from Google auth metadata if profile doesn't have one
-          const googleAvatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture
+          const googleAvatarUrl = currentSession.user.user_metadata?.avatar_url || currentSession.user.user_metadata?.picture
           const profileAvatarUrl = data?.avatar_url
           
           // If profile has no avatar but Google auth does, sync it
@@ -103,14 +112,15 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         setIsLoadingProfile(false)
       }
     }
-  }, [session])
+  }, []) // Remove session dependency - use ref instead to break circular dependency
 
   // Manual refetch function exposed to consumers
   const refetchProfile = useCallback(async () => {
-    if (session?.user?.id) {
+    const currentSession = sessionRef.current
+    if (currentSession?.user?.id) {
       await fetchProfile()
     }
-  }, [session, fetchProfile])
+  }, [fetchProfile])
 
   // Fetch the session once, and subscribe to auth state changes
   // This effect MUST always run to maintain hook consistency
@@ -267,6 +277,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   // Fetch the profile when the session changes
+  // Must include session so we refetch when user logs in (fetchProfile uses sessionRef)
   useEffect(() => {
     fetchProfile()
 
@@ -274,7 +285,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       currentFetchSessionIdRef.current = null
     }
-  }, [fetchProfile])
+  }, [session, fetchProfile])
 
   // Handle app state changes to refresh session when app comes to foreground
   // Only refresh if session exists and app was in background for a while

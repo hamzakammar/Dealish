@@ -15,7 +15,6 @@ export function useInventory(restaurantId: string | null) {
       setInventoryItems([]);
       return;
     }
-
     fetchInventory();
   }, [restaurantId]);
 
@@ -270,7 +269,8 @@ export function useInventoryStats(restaurantId: string | null) {
     }
 
     fetchStats();
-  }, [restaurantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId]); // fetchStats uses restaurantId directly, no stale closure
 
   return {
     stats,
