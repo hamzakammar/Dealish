@@ -1,146 +1,110 @@
 import { useAuthContext } from '@/app/providers/auth';
-import { useProfileSetup } from '@/hooks/useProfileSetup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 
 export default function Index() {
   // ALL hooks MUST be called unconditionally at the top level
   const { session, isLoading, profile } = useAuthContext();
-  const { needsSetup, loading: profileLoading } = useProfileSetup();
   const router = useRouter();
   const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const hasNavigatedRef = useRef(false);
 
-  // Initialize: Check session FIRST, then welcome screen status
-  // This prevents race conditions where hasSeenWelcome resolves before session
+  // Initialize: Check session FIRST, then welcome/onboarding status
   useEffect(() => {
-    let isActive = true;
-
     async function initialize() {
-      // CRITICAL: Wait for BOTH session AND welcome check to complete
-      // Don't make navigation decisions until both are ready
-      // This prevents race conditions where AsyncStorage (fast) beats Supabase (slow)
-      
-      // Wait for session check to complete (network operation, 300-500ms)
-      if (isLoading) {
-        return; // Still loading session - wait
-      }
+      // Wait for session check to complete
+      if (isLoading) return;
 
-      // Wait for welcome check to complete (AsyncStorage, 50-100ms)
-      // Even though it's faster, we need to wait for it to avoid race conditions
-      if (hasSeenWelcome === null) {
-        return; // Still loading welcome status - wait
-      }
+      // Wait for AsyncStorage checks to complete
+      if (hasSeenWelcome === null || hasCompletedOnboarding === null) return;
 
-      // BOTH checks are complete - now make navigation decision
-      // Session check takes priority over welcome check
+      // Prevent duplicate navigation
+      if (hasNavigatedRef.current) return;
+      hasNavigatedRef.current = true;
+
       if (session) {
-        // Validate token freshness before trusting session
-        // Supabase sessions have expires_at in seconds (Unix timestamp)
-        const isTokenValid = session.expires_at && 
-                            session.expires_at > Date.now() / 1000;
+        // Validate token freshness
+        const isTokenValid = session.expires_at && session.expires_at > Date.now() / 1000;
         
-        // If token is expired, treat as no session (Supabase should refresh, but be safe)
         if (!isTokenValid) {
-          // Token expired - treat as not authenticated
-          // hasSeenWelcome is already checked above (both checks complete)
-          if (hasNavigatedRef.current) return;
-          hasNavigatedRef.current = true;
           router.replace(hasSeenWelcome ? '/auth' : '/welcome');
           setIsInitializing(false);
           return;
         }
 
-        // Valid session with valid token - user is authenticated
-        // Skip welcome screen check entirely for authenticated users
-        // Session check wins - authenticated users never see welcome screen
-        if (hasNavigatedRef.current) return;
-        hasNavigatedRef.current = true;
-
+        // Valid session - check role and onboarding status
         try {
-          // Check if user is admin or owner - redirect to admin dashboard
           if (profile?.role === 'owner' || profile?.role === 'admin') {
             router.replace('/admin');
-            setIsInitializing(false);
-            return;
-          }
-          // Check if profile needs setup
-          if (needsSetup && !profileLoading) {
+          } else if (!hasCompletedOnboarding) {
             router.replace('/onboarding');
-            setIsInitializing(false);
-            return;
+          } else {
+            router.replace('/map');
           }
-          // If profile is still loading but we have a session, go to map anyway
-          // Profile will load in background
-          router.replace('/map');
-          setIsInitializing(false);
         } catch (error) {
-          if (__DEV__) {
-            console.error('Navigation error:', error);
-          }
+          if (__DEV__) console.error('Navigation error:', error);
           router.replace('/map');
-          setIsInitializing(false);
         }
+        setIsInitializing(false);
         return;
       }
 
-      // No session - user is not authenticated
-      // Both checks are already complete (checked at top of function)
-      // Make navigation decision based on welcome screen status
-      if (hasNavigatedRef.current) return;
-      hasNavigatedRef.current = true;
-
+      // No session - check welcome screen status
       try {
-        // Not logged in - check if they've seen welcome screen
-        if (!hasSeenWelcome) {
-          router.replace('/welcome');
-        } else {
-          router.replace('/auth');
-        }
-        setIsInitializing(false);
+        router.replace(hasSeenWelcome ? '/auth' : '/welcome');
       } catch (error) {
-        if (__DEV__) {
-          console.error('Navigation error:', error);
-        }
+        if (__DEV__) console.error('Navigation error:', error);
         router.replace('/auth');
-        setIsInitializing(false);
       }
+      setIsInitializing(false);
     }
 
     initialize();
+  }, [session, isLoading, profile, router, hasSeenWelcome, hasCompletedOnboarding]);
 
-    return () => {
-      isActive = false;
-    };
-  }, [session, isLoading, profileLoading, needsSetup, profile, router, hasSeenWelcome]);
-
-  // Check if user has seen welcome screen (only needed for non-authenticated users)
-  // This runs in parallel but navigation logic waits for session check first
+  // Load AsyncStorage flags on mount
   useEffect(() => {
-    AsyncStorage.getItem('hasSeenWelcome').then((seen) => {
+    Promise.all([
+      AsyncStorage.getItem('hasSeenWelcome'),
+      AsyncStorage.getItem('hasCompletedOnboarding'),
+    ]).then(([seen, completed]) => {
       setHasSeenWelcome(seen === 'true');
+      setHasCompletedOnboarding(completed === 'true');
     }).catch(() => {
-      // Default to showing welcome if storage fails
       setHasSeenWelcome(false);
+      setHasCompletedOnboarding(false);
     });
   }, []);
 
-  // Show loading while initializing or during redirect
-  if (isInitializing || isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#FE902A" />
-      </View>
-    );
-  }
-
-  // Fallback loading state
+  // Show branded loading screen while initializing
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" color="#FE902A" />
+    <View style={styles.container}>
+      <Image 
+        source={require('../assets/images/splash-icon.png')} 
+        style={styles.logo}
+        resizeMode="contain"
+      />
+      <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FE902A',
+  },
+  logo: {
+    width: 120,
+    height: 120,
+  },
+  spinner: {
+    marginTop: 32,
+  },
+});

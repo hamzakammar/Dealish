@@ -14,15 +14,16 @@ export function useProfileSetup() {
       return;
     }
 
-    // If we have a session but no profile yet, keep loading
-    // But don't block navigation - profile can load in background
+    // Session exists but profile hasn't loaded yet — stay in loading state.
+    // The auth provider WILL deliver the profile; we just need to wait.
     if (!profile) {
-      // Set loading to false after a short timeout to prevent blocking
-      const timeout = setTimeout(() => {
+      // Safety timeout: if profile never arrives after 3s, assume complete
+      // so a returning user isn't stuck on a loading screen or sent to onboarding.
+      const safetyTimeout = setTimeout(() => {
         setLoading(false);
-        setIsProfileComplete(false);
-      }, 500);
-      return () => clearTimeout(timeout);
+        setIsProfileComplete(true);
+      }, 3000);
+      return () => clearTimeout(safetyTimeout);
     }
 
     // Check if profile is complete

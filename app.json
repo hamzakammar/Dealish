@@ -17,6 +17,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Dealish",
       "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
         "NSAllowsLocalNetworking": true,
         "NSBonjourServices": [
           "_http._tcp"

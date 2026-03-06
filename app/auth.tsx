@@ -796,16 +796,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
-    backgroundColor: '#E9EAEB',
     marginRight: 6,
   },
   appleButton: {
-    backgroundColor: '#E9EAEB',
     marginRight: 0,
     marginLeft: 6,
   },
   googleButton: {
-    backgroundColor: '#E9EAEB',
   },
   googleLogo: {
     width: 20,
@@ -816,12 +813,6 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  socialButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   buttonDisabled: {
     opacity: 0.6,

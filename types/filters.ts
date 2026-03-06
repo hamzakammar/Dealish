@@ -14,18 +14,4 @@ export const DEFAULT_FILTERS: FilterState = {
   hasDealsOnly: false,
 };
 
-export const DISTANCE_OPTIONS = [
-  { label: "All", value: null },
-  { label: "1 km", value: 1 },
-  { label: "5 km", value: 5 },
-  { label: "10 km", value: 10 },
-  { label: "25 km", value: 25 },
-  { label: "50 km", value: 50 },
-];
-
-export const RATING_OPTIONS = [
-  { label: "Any", value: null },
-  { label: "4+ stars", value: 4 },
-  { label: "4.5+ stars", value: 4.5 },
-  { label: "5 stars", value: 5 },
-];
+// Distance options are now defined directly in FilterPanel for flexibility

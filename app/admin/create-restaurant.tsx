@@ -1,10 +1,11 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { geocodeAddress } from '@/utils/geocode';
+import { pickAndUploadHeroImage, pickAndUploadImage } from '@/utils/uploadImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateRestaurant() {
   const { profile } = useAuthContext();
@@ -24,6 +25,32 @@ export default function CreateRestaurant() {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const handleUploadLogo = async () => {
+    setIsUploadingLogo(true);
+    try {
+      const url = await pickAndUploadImage();
+      if (url) {
+        setLogoUrl(url);
+      }
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleUploadImage = async () => {
+    setIsUploadingImage(true);
+    try {
+      const url = await pickAndUploadHeroImage();
+      if (url) {
+        setImageUrl(url);
+      }
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const handleGeocode = async () => {
     if (!address.trim()) {
@@ -305,27 +332,65 @@ export default function CreateRestaurant() {
 
         {/* Images */}
         <View style={styles.section}>
-          <Text style={styles.label}>Image URL</Text>
-          <TextInput
-            style={styles.input}
-            value={imageUrl}
-            onChangeText={setImageUrl}
-            placeholder="https://example.com/image.jpg"
-            placeholderTextColor="#C7C7CC"
-            autoCapitalize="none"
-          />
+          <Text style={styles.sectionTitle}>Images</Text>
+          
+          <Text style={styles.label}>Logo (Square)</Text>
+          <View style={styles.imageInputRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={logoUrl}
+              onChangeText={setLogoUrl}
+              placeholder="https://... or upload"
+              placeholderTextColor="#C7C7CC"
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={[styles.uploadButton, isUploadingLogo && styles.saveButtonDisabled]}
+              onPress={handleUploadLogo}
+              disabled={isUploadingLogo}
+            >
+              {isUploadingLogo ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="cloud-upload" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          {logoUrl ? (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: logoUrl }} style={styles.logoPreview} />
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Logo URL</Text>
-          <TextInput
-            style={styles.input}
-            value={logoUrl}
-            onChangeText={setLogoUrl}
-            placeholder="https://example.com/logo.jpg"
-            placeholderTextColor="#C7C7CC"
-            autoCapitalize="none"
-          />
+          <Text style={styles.label}>Hero Image (Wide)</Text>
+          <View style={styles.imageInputRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={imageUrl}
+              onChangeText={setImageUrl}
+              placeholder="https://... or upload"
+              placeholderTextColor="#C7C7CC"
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={[styles.uploadButton, isUploadingImage && styles.saveButtonDisabled]}
+              onPress={handleUploadImage}
+              disabled={isUploadingImage}
+            >
+              {isUploadingImage ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="cloud-upload" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          {imageUrl ? (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: imageUrl }} style={styles.heroPreview} />
+            </View>
+          ) : null}
         </View>
 
         <View style={{ height: 40 }} />
@@ -448,5 +513,37 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontStyle: 'italic',
     marginBottom: 4,
+  },
+  imageInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  uploadButton: {
+    backgroundColor: '#FE902A',
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePreviewContainer: {
+    marginTop: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+  },
+  logoPreview: {
+    width: 80,
+    height: 80,
+    margin: 12,
+    borderRadius: 8,
+  },
+  heroPreview: {
+    width: '100%',
+    height: 160,
   },
 });

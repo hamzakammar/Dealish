@@ -2,11 +2,12 @@ import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import { RecentActivityCard } from "@/components/RecentActivityCard";
 import { useProfileSetup } from "@/hooks/useProfileSetup";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { ActivityWithRestaurant } from "@/types/activity";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import * as ImagePicker from 'expo-image-picker';
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -37,7 +38,78 @@ async function getFavouriteCount(userId: string): Promise<number> {
 export default function AccountPage() {
     const { session, profile, refetchProfile } = useAuthContext();
     const { needsSetup } = useProfileSetup();
+    const colors = useThemeColors();
     const [loading, setLoading] = useState<boolean>(true);
+
+    const dynamicStyles = useMemo(() => StyleSheet.create({
+        scrollView: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        name: {
+            fontSize: 32,
+            fontWeight: '700',
+            marginTop: 56,
+            color: colors.text,
+        },
+        location: {
+            fontSize: 18,
+            color: colors.textSecondary,
+            marginTop: 4,
+            marginBottom: 16,
+        },
+        statCard: {
+            flex: 1,
+            backgroundColor: colors.cardSecondary,
+            borderRadius: 20,
+            alignItems: 'center',
+            paddingVertical: 20,
+            marginHorizontal: 8,
+        },
+        statLabel: {
+            fontSize: 15,
+            color: colors.textSecondary,
+            fontWeight: '500',
+        },
+        sectionTitle: {
+            fontSize: 22,
+            fontWeight: '700',
+            color: colors.text,
+            marginLeft: 16,
+            marginBottom: 12,
+        },
+        avatarPlaceholder: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.card,
+        },
+        editInput: {
+            borderWidth: 2,
+            borderColor: '#FE902A',
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            fontSize: 20,
+            fontWeight: '700',
+            color: colors.text,
+            backgroundColor: colors.inputBackground,
+            minWidth: 200,
+        },
+        cancelBtn: {
+            backgroundColor: colors.cardSecondary,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        cancelBtnText: {
+            color: colors.textSecondary,
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        emptyText: {
+            color: colors.textSecondary,
+            fontSize: 16,
+        },
+    }), [colors]);
     const [userEmail, setUserEmail] = useState<string>("");
     const [userName, setUserName] = useState<string>("User");
     const [userLocation, setUserLocation] = useState<string>("");
@@ -298,7 +370,7 @@ export default function AccountPage() {
                         try {
                             const { data: restaurant } = await supabase
                                 .from('restaurants')
-                                .select('name, hero_image_url, rating, num_ratings')
+                                .select('name, hero_image_url, display_image, rating, num_ratings')
                                 .eq('id', activity.restaurant_id)
                                 .single();
 
@@ -306,7 +378,7 @@ export default function AccountPage() {
                                 ...activity,
                                 restaurants: restaurant ? {
                                     name: restaurant.name,
-                                    logo_url: restaurant.hero_image_url,
+                                    logo_url: restaurant.hero_image_url || restaurant.display_image,
                                     rating: restaurant.rating,
                                     rating_count: restaurant.num_ratings
                                 } : {
@@ -344,7 +416,7 @@ export default function AccountPage() {
 
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 32 }}>
+        <ScrollView style={dynamicStyles.scrollView} contentContainerStyle={{ paddingBottom: 32 }}>
             {/* Orange Header */}
             <View style={styles.headerBg}>
                 <TouchableOpacity 
@@ -358,14 +430,14 @@ export default function AccountPage() {
                     }
                   }}
                 >
-                    <View style={styles.backIconBox}>
+                    <View style={[styles.backIconBox, { backgroundColor: colors.card }]}>
                         <AntDesign name="left" size={20} color="#FE902A"/>
                     </View>
                 </TouchableOpacity>
 
                 {!isEditing && (
                     <TouchableOpacity style={styles.editButton} onPress={startEditing}>
-                        <View style={styles.editIconBox}>
+                        <View style={[styles.editIconBox, { backgroundColor: colors.card }]}>
                             <AntDesign name="edit" size={20} color="#FE902A" />
                         </View>
                     </TouchableOpacity>
@@ -384,7 +456,7 @@ export default function AccountPage() {
                           }
                         }}
                     >
-                        <View style={styles.adminIconBox}>
+                        <View style={[styles.adminIconBox, { backgroundColor: colors.card }]}>
                             <AntDesign name="setting" size={20} color="#FE902A" />
                         </View>
                     </TouchableOpacity>
@@ -396,7 +468,7 @@ export default function AccountPage() {
                             {editingAvatar ? (
                                 <Image source={{ uri: editingAvatar }} style={styles.avatar} />
                             ) : (
-                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <View style={[styles.avatar, dynamicStyles.avatarPlaceholder]}>
                                     <AntDesign name="user" size={64} color="#FE902A" />
                                 </View>
                             )}
@@ -409,7 +481,7 @@ export default function AccountPage() {
                             {userAvatar ? (
                                 <Image source={{ uri: userAvatar }} style={styles.avatar} resizeMode="cover" />
                             ) : (
-                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <View style={[styles.avatar, dynamicStyles.avatarPlaceholder]}>
                                     <AntDesign name="user" size={64} color="#FE902A" />
                                 </View>
                             )}
@@ -423,25 +495,25 @@ export default function AccountPage() {
                 {isEditing ? (
                     <View style={{ alignItems: 'center', width: '80%' }}>
                         <TextInput
-                            style={[styles.name, styles.editInput, { textAlign: 'center' }]}
+                            style={[dynamicStyles.editInput, { textAlign: 'center', marginTop: 56 }]}
                             value={editingName}
                             onChangeText={setEditingName}
                             placeholder="Enter your name"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textTertiary}
                         />
                         <TextInput
-                            style={[styles.location, styles.editInput, { textAlign: 'center', marginTop: 8 }]}
+                            style={[dynamicStyles.editInput, { textAlign: 'center', marginTop: 8, fontSize: 18, fontWeight: '400' }]}
                             value={editingLocation}
                             onChangeText={setEditingLocation}
                             placeholder="Enter your location"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textTertiary}
                         />
                         <View style={styles.editButtons}>
                             <TouchableOpacity
-                                style={[styles.editBtn, styles.cancelBtn]}
+                                style={[styles.editBtn, dynamicStyles.cancelBtn]}
                                 onPress={cancelEditing}
                             >
-                                <Text style={styles.cancelBtnText}>Cancel</Text>
+                                <Text style={dynamicStyles.cancelBtnText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.editBtn, styles.saveBtn]}
@@ -458,30 +530,30 @@ export default function AccountPage() {
                     </View>
                 ) : (
                     <>
-                        <Text style={styles.name}>{userName || 'User'}</Text>
-                        <Text style={styles.location}>{userLocation || 'Location not set'}</Text>
+                        <Text style={dynamicStyles.name}>{userName || 'User'}</Text>
+                        <Text style={dynamicStyles.location}>{userLocation || 'Location not set'}</Text>
                     </>
                 )}
             </View>
 
             {/* Stats Row */}
             <View style={styles.statsRow}>
-                <View style={styles.statCard}>
+                <View style={dynamicStyles.statCard}>
                     <Text style={styles.statValue}>{numVisits}</Text>
-                    <Text style={styles.statLabel}>Visits</Text>
+                    <Text style={dynamicStyles.statLabel}>Visits</Text>
                 </View>
-                <View style={styles.statCard}>
+                <View style={dynamicStyles.statCard}>
                     <Text style={styles.statValue}>{numFavourites}</Text>
-                    <Text style={styles.statLabel}>{favouritesLabel}</Text>
+                    <Text style={dynamicStyles.statLabel}>{favouritesLabel}</Text>
                 </View>
-                <View style={styles.statCard}>
+                <View style={dynamicStyles.statCard}>
                     <Text style={[styles.statValue, { color: '#FE902A' }]}>${dollarsSaved}</Text>
-                    <Text style={styles.statLabel}>Saved</Text>
+                    <Text style={dynamicStyles.statLabel}>Saved</Text>
                 </View>
             </View>
 
             {/* Recent Activity */}
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <Text style={dynamicStyles.sectionTitle}>Recent Activity</Text>
             <View style={{ paddingHorizontal: 16 }}>
                 {recentActivity.length > 0 ? (
                     recentActivity.map((activity, idx) => {
@@ -514,7 +586,7 @@ export default function AccountPage() {
                         return (
                             <RecentActivityCard
                                 key={activity.id}
-                                logo={activity.restaurants?.logo_url || "https://via.placeholder.com/56x56?text=R"}
+                                logo={activity.restaurants?.logo_url}
                                 name={activity.restaurants?.name || 'Unknown Restaurant'}
                                 description={description}
                                 date={dateString}
@@ -525,7 +597,7 @@ export default function AccountPage() {
                     })
                 ) : (
                     <View style={{ padding: 20, alignItems: 'center' }}>
-                        <Text style={{ color: '#888', fontSize: 16 }}>No recent activity</Text>
+                        <Text style={dynamicStyles.emptyText}>No recent activity</Text>
                     </View>
                 )}
             </View>
@@ -551,7 +623,6 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     backIconBox: {
-        backgroundColor: '#fff',
         borderRadius: 16,
         padding: 8,
         shadowColor: '#000',
@@ -574,24 +645,6 @@ const styles = StyleSheet.create({
         borderRadius: 48,
         borderWidth: 4,
         borderColor: '#fff',
-        backgroundColor: '#eee',
-    },
-    avatarPlaceholder: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-    },
-    name: {
-        fontSize: 32,
-        fontWeight: '700',
-        marginTop: 56,
-        color: '#222',
-    },
-    location: {
-        fontSize: 18,
-        color: '#888',
-        marginTop: 4,
-        marginBottom: 16,
     },
     statsRow: {
         flexDirection: 'row',
@@ -600,51 +653,25 @@ const styles = StyleSheet.create({
         marginTop: 16,
         marginBottom: 24,
     },
-    statCard: {
-        flex: 1,
-        backgroundColor: '#F7F7F7',
-        borderRadius: 20,
-        alignItems: 'center',
-        paddingVertical: 20,
-        marginHorizontal: 8,
-        shadowColor: '#000',
-        shadowOpacity: 0.03,
-        shadowRadius: 2,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 1,
-    },
     statValue: {
         fontSize: 24,
         fontWeight: '700',
         color: '#FE902A',
         marginBottom: 2,
     },
-    statLabel: {
-        fontSize: 15,
-        color: '#888',
-        fontWeight: '500',
-    },
-    sectionTitle: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#222',
-        marginLeft: 16,
-        marginBottom: 12,
-    },
     editButton: {
         position: 'absolute',
-        top: '30%', // Use percentage values for better zoom scaling
-        right: '6%', // Percentage of header width
+        top: '30%',
+        right: '6%',
         zIndex: 2,
     },
     adminButton: {
         position: 'absolute',
         top: '30%',
-        right: '20%', // Position to the left of edit button
+        right: '20%',
         zIndex: 2,
     },
     adminIconBox: {
-        backgroundColor: '#fff',
         borderRadius: 16,
         padding: 8,
         shadowColor: '#000',
@@ -654,7 +681,6 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     editIconBox: {
-        backgroundColor: '#fff',
         borderRadius: 16,
         padding: 8,
         shadowColor: '#000',
@@ -674,18 +700,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    editInput: {
-        borderWidth: 2,
-        borderColor: '#FE902A',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#222',
-        backgroundColor: '#fff',
-        minWidth: 200,
-    },
     editButtons: {
         flexDirection: 'row',
         marginTop: 16,
@@ -698,18 +712,8 @@ const styles = StyleSheet.create({
         minWidth: 100,
         alignItems: 'center',
     },
-    cancelBtn: {
-        backgroundColor: '#f5f5f5',
-        borderWidth: 1,
-        borderColor: '#ddd',
-    },
     saveBtn: {
         backgroundColor: '#FE902A',
-    },
-    cancelBtnText: {
-        color: '#666',
-        fontSize: 16,
-        fontWeight: '600',
     },
     saveBtnText: {
         color: '#fff',

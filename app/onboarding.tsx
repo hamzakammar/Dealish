@@ -1,6 +1,8 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import React, { useState, useMemo } from "react";
 import {
@@ -32,11 +34,95 @@ const COMMON_CITIES = [
 
 export default function OnboardingScreen() {
   const { session, refetchProfile } = useAuthContext();
+  const colors = useThemeColors();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome");
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    description: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: 8,
+      paddingHorizontal: 20,
+      lineHeight: 24,
+    },
+    subDescription: {
+      fontSize: 14,
+      color: colors.textTertiary,
+      textAlign: "center",
+    },
+    stepTitle: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    stepDescription: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: 32,
+    },
+    input: {
+      width: "100%",
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: "#FE902A",
+      fontSize: 16,
+      color: colors.text,
+      backgroundColor: colors.inputBackground,
+    },
+    suggestionsContainer: {
+      position: "absolute",
+      top: "100%",
+      left: 0,
+      right: 0,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 4,
+      maxHeight: 200,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 5,
+      zIndex: 1000,
+    },
+    suggestionItem: {
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    suggestionText: {
+      fontSize: 16,
+      color: colors.text,
+    },
+    skipButtonText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+  }), [colors]);
 
   // Move useMemo OUTSIDE of renderStep to avoid conditional hook call
   // This hook MUST be called unconditionally on every render
@@ -67,7 +153,9 @@ export default function OnboardingScreen() {
   };
 
   const handleSkip = async () => {
-    // Allow skipping onboarding, but mark that it was skipped
+    // Mark onboarding as complete so it never shows again on this device
+    await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    
     // Check role before redirecting
     if (session?.user?.id) {
       const { data: profile } = await supabase
@@ -117,6 +205,9 @@ export default function OnboardingScreen() {
         return;
       }
 
+      // Mark onboarding as complete so it never shows again on this device
+      await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+
       // Refresh profile to get updated role
       await refetchProfile();
       
@@ -146,12 +237,12 @@ export default function OnboardingScreen() {
             <View style={styles.iconContainer}>
               <AntDesign name="user" size={64} color="#FE902A" />
             </View>
-            <Text style={styles.title}>Welcome to Dealish!</Text>
-            <Text style={styles.description}>
+            <Text style={dynamicStyles.title}>Welcome to Dealish!</Text>
+            <Text style={dynamicStyles.description}>
               Let's set up your profile to get the most out of your deals
               experience.
             </Text>
-            <Text style={styles.subDescription}>
+            <Text style={dynamicStyles.subDescription}>
               This will only take a minute.
             </Text>
           </View>
@@ -160,14 +251,14 @@ export default function OnboardingScreen() {
       case "name":
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>What's your name?</Text>
-            <Text style={styles.stepDescription}>
+            <Text style={dynamicStyles.stepTitle}>What's your name?</Text>
+            <Text style={dynamicStyles.stepDescription}>
               This will be displayed on your profile
             </Text>
             <TextInput
-              style={styles.input}
+              style={dynamicStyles.input}
               placeholder="Enter your name"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textTertiary}
               value={name}
               onChangeText={setName}
               autoFocus
@@ -179,15 +270,15 @@ export default function OnboardingScreen() {
       case "location":
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Where are you located?</Text>
-            <Text style={styles.stepDescription}>
+            <Text style={dynamicStyles.stepTitle}>Where are you located?</Text>
+            <Text style={dynamicStyles.stepDescription}>
               Help us show you deals near you
             </Text>
             <View style={styles.inputContainer}>
               <TextInput
-                style={styles.input}
+                style={dynamicStyles.input}
                 placeholder="Enter your city or area"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textTertiary}
                 value={location}
                 onChangeText={(text) => {
                   setLocation(text);
@@ -199,19 +290,19 @@ export default function OnboardingScreen() {
                 autoCapitalize="words"
               />
               {showCitySuggestions && citySuggestions.length > 0 && (
-                <View style={styles.suggestionsContainer}>
+                <View style={dynamicStyles.suggestionsContainer}>
                   <FlatList
                     data={citySuggestions}
                     keyExtractor={(item) => item}
                     renderItem={({ item }) => (
                       <TouchableOpacity
-                        style={styles.suggestionItem}
+                        style={dynamicStyles.suggestionItem}
                         onPress={() => {
                           setLocation(item);
                           setShowCitySuggestions(false);
                         }}
                       >
-                        <Text style={styles.suggestionText}>{item}</Text>
+                        <Text style={dynamicStyles.suggestionText}>{item}</Text>
                       </TouchableOpacity>
                     )}
                     scrollEnabled={false}
@@ -228,8 +319,8 @@ export default function OnboardingScreen() {
             <View style={styles.iconContainer}>
               <AntDesign name="check-circle" size={64} color="#4CAF50" />
             </View>
-            <Text style={styles.title}>All set!</Text>
-            <Text style={styles.description}>
+            <Text style={dynamicStyles.title}>All set!</Text>
+            <Text style={dynamicStyles.description}>
               Your profile has been set up successfully.
             </Text>
           </View>
@@ -242,7 +333,7 @@ export default function OnboardingScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={dynamicStyles.container}
       contentContainerStyle={styles.contentContainer}
     >
       {renderStep()}
@@ -273,7 +364,7 @@ export default function OnboardingScreen() {
               onPress={handleSkip}
               disabled={saving}
             >
-              <Text style={styles.skipButtonText}>Skip for now</Text>
+              <Text style={dynamicStyles.skipButtonText}>Skip for now</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -283,10 +374,6 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
   contentContainer: {
     flexGrow: 1,
     padding: 24,
@@ -299,81 +386,9 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginBottom: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#333",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  description: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 8,
-    paddingHorizontal: 20,
-    lineHeight: 24,
-  },
-  subDescription: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-  },
-  stepTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#333",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  stepDescription: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 32,
-  },
   inputContainer: {
     width: "100%",
     position: "relative",
-  },
-  input: {
-    width: "100%",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#FE902A",
-    fontSize: 16,
-    color: "#333",
-    backgroundColor: "#fff",
-  },
-  suggestionsContainer: {
-    position: "absolute",
-    top: "100%",
-    left: 0,
-    right: 0,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
-    marginTop: 4,
-    maxHeight: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1000,
-  },
-  suggestionItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
-  },
-  suggestionText: {
-    fontSize: 16,
-    color: "#333",
   },
   buttonContainer: {
     width: "100%",
@@ -398,9 +413,5 @@ const styles = StyleSheet.create({
   skipButton: {
     paddingVertical: 12,
     alignItems: "center",
-  },
-  skipButtonText: {
-    color: "#666",
-    fontSize: 14,
   },
 });

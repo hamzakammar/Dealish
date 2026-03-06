@@ -1,7 +1,8 @@
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import {
     Dimensions,
     FlatList,
@@ -53,8 +54,38 @@ const slides: WelcomeSlide[] = [
 ];
 
 export default function WelcomeScreen() {
+  const colors = useThemeColors();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    skipText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    description: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 24,
+    },
+    inactiveDot: {
+      width: 8,
+      backgroundColor: colors.isDark ? '#444' : '#E5E5EA',
+    },
+  }), [colors]);
 
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
@@ -100,17 +131,17 @@ export default function WelcomeScreen() {
       <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
         <Ionicons name={item.icon} size={80} color="#FFFFFF" />
       </View>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.description}>{item.description}</Text>
+      <Text style={dynamicStyles.title}>{item.title}</Text>
+      <Text style={dynamicStyles.description}>{item.description}</Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Skip Button */}
       {currentIndex < slides.length - 1 && (
         <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipText}>Skip</Text>
+          <Text style={dynamicStyles.skipText}>Skip</Text>
         </TouchableOpacity>
       )}
 
@@ -138,7 +169,7 @@ export default function WelcomeScreen() {
               key={index}
               style={[
                 styles.dot,
-                index === currentIndex ? styles.activeDot : styles.inactiveDot,
+                index === currentIndex ? styles.activeDot : dynamicStyles.inactiveDot,
               ]}
             />
           ))}
@@ -157,10 +188,6 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
   skipButton: {
     position: 'absolute',
     top: 60,
@@ -168,11 +195,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
-  },
-  skipText: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '600',
   },
   slide: {
     width,
@@ -188,19 +210,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000000',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    color: '#8E8E93',
-    textAlign: 'center',
-    lineHeight: 24,
   },
   bottomContainer: {
     paddingHorizontal: 40,
@@ -220,10 +229,6 @@ const styles = StyleSheet.create({
   activeDot: {
     width: 24,
     backgroundColor: '#FE902A',
-  },
-  inactiveDot: {
-    width: 8,
-    backgroundColor: '#E5E5EA',
   },
   nextButton: {
     flexDirection: 'row',

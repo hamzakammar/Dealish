@@ -167,8 +167,8 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
             type: r.type ?? undefined,
             rating: r.rating ?? undefined,
             rating_count: r.num_ratings ?? undefined,
-            image_url: r.hero_image_url ?? undefined,
-            logo_url: r.hero_image_url ?? undefined,
+            image_url: r.hero_image_url ?? r.display_image ?? undefined,
+            logo_url: r.hero_image_url ?? r.display_image ?? undefined,
             display_image: r.display_image ?? undefined,
           })) ?? [];
 
@@ -381,9 +381,9 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                     onPress={() => handleFavouriteSelect(item)}
                   >
                     <View style={styles.favoriteImageContainer}>
-                      {item.logo_url ? (
+                      {(item.logo_url || item.display_image) ? (
                         <Image
-                          source={{ uri: item.logo_url }}
+                          source={{ uri: item.logo_url || item.display_image }}
                           style={styles.favoriteImage}
                           resizeMode="cover"
                         />

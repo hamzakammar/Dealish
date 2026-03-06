@@ -9,7 +9,8 @@ const FILTER_STORAGE_KEY = "@dealish_filters";
 
 export function useRestaurantFilters(
   restaurants: Restaurant[],
-  userLocation: UserLocation | null
+  userLocation: UserLocation | null,
+  activeDealsMap?: Map<string, boolean>
 ) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -91,18 +92,17 @@ export function useRestaurantFilters(
         return false;
       }
 
-      // Has deals filter - Note: This requires checking deals for each restaurant
-      // For performance, we'll skip this filter in the initial implementation
-      // It can be added later with a more efficient approach (e.g., server-side filtering)
-      if (filters.hasDealsOnly) {
-        // This would require fetching deals for each restaurant, which is expensive
-        // For now, we'll skip this filter or implement it with a cached approach
-        // TODO: Implement efficient hasDealsOnly filter
+      // Has deals filter - use the activeDealsMap if provided
+      if (filters.hasDealsOnly && activeDealsMap) {
+        const hasActiveDeal = activeDealsMap.get(restaurant.id);
+        if (!hasActiveDeal) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [restaurants, filters, userLocation]);
+  }, [restaurants, filters, userLocation, activeDealsMap]);
 
   return {
     filters,

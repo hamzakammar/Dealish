@@ -4,7 +4,6 @@ import FilterPanel from "@/components/FilterPanel";
 import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
-import UserLocationMarker from "@/components/UserLocationMarker";
 import { useDirections } from "@/hooks/useDirections";
 import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
@@ -46,6 +45,9 @@ export default function MapScreen() {
   const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
   const { settings } = useUserSettings();
   const colors = useThemeColors();
+  
+  // Batch fetch active deals for ALL restaurants (needed for filtering)
+  const { activeDealsMap } = useActiveDealsMap(restaurants);
   
   const systemColorScheme = useColorScheme();
   
@@ -146,7 +148,7 @@ export default function MapScreen() {
     return settings?.appearance?.defaultMapType || "standard";
   });
   
-  // Filter restaurants
+  // Filter restaurants (pass activeDealsMap for hasDealsOnly filter)
   const {
     filters,
     updateFilters,
@@ -155,7 +157,7 @@ export default function MapScreen() {
     isFilterPanelOpen,
     setIsFilterPanelOpen,
     activeFilterCount,
-  } = useRestaurantFilters(restaurants, userLocation);
+  } = useRestaurantFilters(restaurants, userLocation, activeDealsMap);
 
   // Apply search filter on top of existing filters
   const filteredRestaurants = React.useMemo(() => {
@@ -169,9 +171,6 @@ export default function MapScreen() {
       restaurant.type?.toLowerCase().includes(query)
     );
   }, [filteredByFilters, searchQuery]);
-
-  // Batch fetch active deals for filtered restaurants
-  const { activeDealsMap } = useActiveDealsMap(filteredRestaurants);
 
   // Update map type when settings change
   useEffect(() => {
@@ -334,9 +333,11 @@ export default function MapScreen() {
             style={{ flex: 1 }}
             initialRegion={region ?? fallbackRegion}
             showsMyLocationButton={false}
+            showsUserLocation={true}
             mapType={mapType}
-            provider={PROVIDER_GOOGLE}
-            customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
+            customMapStyle={isDarkMode && mapType === "standard" && Platform.OS === 'android' ? darkMapStyle : undefined}
+            pitchEnabled={Platform.OS !== 'android'}
             onRegionChangeComplete={(r) => {
               currentRegionRef.current = r;
               // Sync blurred map background with main map
@@ -355,8 +356,6 @@ export default function MapScreen() {
               }
             }}
           >
-            {userLocation && <UserLocationMarker location={userLocation} />}
-
             {filteredRestaurants.map((r) => {
               const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
               const hasActiveDeal = activeDealsMap.get(r.id) ?? false;
@@ -415,7 +414,7 @@ export default function MapScreen() {
           )}
           {/* Simple background for Android */}
           {viewMode === "map" && Platform.OS === 'android' && (
-            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(26, 26, 26, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
+            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(34, 34, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
           )}
           <View style={styles.topBarContent}>
             <View style={styles.topBar}>
@@ -480,7 +479,7 @@ export default function MapScreen() {
           </View>
 
           {/* List/Map Toggle */}
-          <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#2a2a2a" : "#E9EAEB" }]}>
+          <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#2d2d2d" : "#E9EAEB" }]}>
             <TouchableOpacity
               style={[
                 styles.viewToggleSegment,

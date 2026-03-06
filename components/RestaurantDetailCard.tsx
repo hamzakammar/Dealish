@@ -3,6 +3,7 @@ import DealCard from "@/components/DealCard";
 import RatingDisplay from "@/components/RatingDisplay";
 import { getPartnerRequestCount } from "@/hooks/usePartnerRequests";
 import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { trackVisit } from "@/utils/activity";
 import { calculateDistance, formatDistance } from "@/utils/distance";
@@ -120,10 +121,13 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   userLocation,
   initialState = 'half', // Default to 'half' for backward compatibility
 }, ref) => {
+  const colors = useThemeColors();
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
   const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
   const [requestCount, setRequestCount] = useState<number>(0);
+  const [logoError, setLogoError] = useState(false);
+  const [heroError, setHeroError] = useState(false);
   
   // Fetch partner request count for this restaurant
   useEffect(() => {
@@ -312,6 +316,8 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     isDragging.current = false;
     closingRestaurantIdRef.current = null;
     setSheetState(initialState); // Reset to initial state
+    setLogoError(false); // Reset image error states
+    setHeroError(false);
   
     // Animate card entrance
     const entranceAnimation = Animated.timing(slideAnim, {
@@ -527,30 +533,23 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         {
           height: sheetHeightAnim,
           transform: [{ translateY }],
+          backgroundColor: colors.card,
         },
       ]}
       pointerEvents="box-none"
     >
       {/* Hero image section - full state only, positioned absolutely to fill from top */}
-      {sheetState === 'full' && (restaurant.display_image || restaurant.image_url) && (
+      {sheetState === 'full' && (restaurant.display_image || restaurant.image_url) && !heroError && (
         <View style={styles.heroFullContainer}>
           <Image
             source={{ uri: restaurant.display_image || restaurant.image_url }}
             style={styles.heroImage}
             resizeMode="cover"
+            onError={() => setHeroError(true)}
           />
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
             <Text style={styles.heroTitle}>{restaurant.name}</Text>
-            <View style={styles.heroRatingContainer}>
-              <RatingDisplay
-                rating={restaurant.rating}
-                ratingCount={restaurant.rating_count}
-                size={18}
-                showCount={true}
-                textColor="#fff"
-              />
-            </View>
             {restaurant.address && (
               <View style={styles.heroAddressRow}>
                 <AntDesign name="environment" size={14} color="#fff" />
@@ -561,6 +560,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         </View>
       )}
 
+
       {/* Draggable area: handle + header */}
       <Animated.View
         {...panResponder.panHandlers}
@@ -570,27 +570,32 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         ]}
         pointerEvents="box-none"
       >
-        <View style={styles.dragHandle} />
+        <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
-        <View style={[styles.header, sheetState === 'full' && styles.headerOverlayFull]} pointerEvents="auto">
+        <View style={[styles.header, { borderBottomColor: colors.border }, sheetState === 'full' && styles.headerOverlayFull]} pointerEvents="auto">
           <View style={styles.headerMain}>
             {sheetState !== 'full' && (
               <View style={styles.logoContainer}>
-                {(restaurant.logo_url || restaurant.image_url) ? (
+                {(restaurant.logo_url || restaurant.image_url || restaurant.display_image) && !logoError ? (
                   <Image
-                    source={{ uri: restaurant.logo_url || restaurant.image_url }}
+                    source={{ uri: restaurant.logo_url || restaurant.image_url || restaurant.display_image }}
                     style={styles.logo}
                     resizeMode="cover"
+                    onError={() => setLogoError(true)}
                   />
                 ) : (
-                  <View style={[styles.logo, styles.logoPlaceholder]}>
-                    <AntDesign name="picture" size={24} color="#ccc" />
+                  <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: colors.cardSecondary }]}>
+                    <AntDesign name="picture" size={24} color={colors.textTertiary} />
                   </View>
                 )}
               </View>
             )}
             <View style={styles.headerContent}>
-              <Text style={[styles.restaurantName, sheetState === 'full' && styles.restaurantNameOverlayFull]}>
+              <Text style={[
+                styles.restaurantName,
+                { color: colors.text },
+                sheetState === 'full' && (restaurant.display_image || restaurant.image_url) && styles.restaurantNameOverlayFull,
+              ]}>
                 {restaurant.name}
               </Text>
               {sheetState === 'half' && (
@@ -604,8 +609,8 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               {/* Show address and distance in half and full states */}
               {sheetState !== 'peek' && sheetState !== 'full' && restaurant.address && (
                 <View style={styles.addressRow}>
-                  <AntDesign name="environment" size={14} color="#666" />
-                  <Text style={styles.addressText}>{restaurant.address}</Text>
+                  <AntDesign name="environment" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.addressText, { color: colors.textSecondary }]}>{restaurant.address}</Text>
                 </View>
               )}
               {sheetState !== 'peek' && sheetState !== 'full' && distance && (
@@ -624,7 +629,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             style={[styles.closeButton, sheetState === 'full' && styles.closeButtonOverlayFull]}
             onPress={handleClose}
           >
-            <AntDesign name="close" size={20} color={sheetState === 'full' ? '#fff' : '#333'} />
+            <AntDesign name="close" size={20} color={sheetState === 'full' ? '#fff' : colors.text} />
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -641,7 +646,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
           {/* Description - show in half state only */}
           {sheetState === 'half' && restaurant.description && (
             <View style={styles.section}>
-              <Text style={styles.description}>{restaurant.description}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{restaurant.description}</Text>
             </View>
           )}
 
@@ -672,7 +677,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
 
           {/* Deals section */}
           <View style={sheetState === 'full' ? styles.fullDealsSection : styles.dealsSection}>
-            <Text style={styles.sectionTitle}>Available Deals</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Deals</Text>
             {dealsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FE902A" />
@@ -681,8 +686,8 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
             ) : (
               <View style={styles.emptyState}>
-                <AntDesign name="inbox" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>No deals available</Text>
+                <AntDesign name="inbox" size={48} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No deals available</Text>
               </View>
             )}
           </View>
@@ -697,7 +702,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       )}
 
       {/* Footer - always visible */}
-      <View style={styles.footer} pointerEvents="auto">
+      <View style={[styles.footer, { borderTopColor: colors.border }]} pointerEvents="auto">
         {isDirectionsAvailable && (
           <TouchableOpacity
             style={styles.directionsButton}
@@ -718,7 +723,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         <TouchableOpacity
           style={[
             styles.favoriteButton,
-            { backgroundColor: isFavouriteState ? "#fff" : "#FE902A" }
+            { backgroundColor: isFavouriteState ? colors.card : "#FE902A" }
           ]}
           onPress={() => {
             toggleFavourite(restaurant.id);
@@ -824,7 +829,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 14,
-    backgroundColor: "#f5f5f5",
   },
   logoPlaceholder: {
     alignItems: "center",

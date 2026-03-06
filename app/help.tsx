@@ -50,7 +50,7 @@ export default function HelpScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Need More Help?</Text>
           <Text style={styles.description}>
-            If you have additional questions or need support, please contact us at support@dealish.com
+            If you have additional questions or need support, please contact us at hello@dealish.io
           </Text>
         </View>
       </ScrollView>

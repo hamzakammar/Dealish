@@ -1,15 +1,17 @@
 import { Restaurant } from "@/types/restaurant";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import React, { useMemo, useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, View, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { StyleSheet, View, Platform } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
   restaurant: Restaurant;
   isSelected: boolean;
   onPress: (restaurant: Restaurant) => void;
-  hasActiveDeal: boolean; // Whether restaurant has an active deal right now
+  hasActiveDeal: boolean;
 };
+
+const isAndroid = Platform.OS === "android";
 
 export default function RestaurantMarker({
   restaurant,
@@ -19,283 +21,152 @@ export default function RestaurantMarker({
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
 
-  const markerContent = useMemo(
-    () => {
-      // If no active deal, show simple orange dot
-      if (!hasActiveDeal) {
-        return (
-          <View style={styles.markerWrapper}>
-            <View
-              style={[
-                styles.markerDot,
-                isSelected && styles.markerDotSelected,
-              ]}
-            />
-          </View>
-        );
-      }
-
-      // If has active deal, show full icon with shop icon
-      return (
-        <View style={styles.markerWrapper}>
-          <View
-            style={[
-              styles.markerContainer,
-              isPartner && styles.markerContainerPartner,
-              isSelected && styles.markerContainerSelected,
-            ]}
-          >
-            {isPartner && (
-              <View style={styles.partnerBadge}>
-                <AntDesign name="check-circle" size={12} color="#2E7D32" />
-              </View>
-            )}
-            <AntDesign
-              name="shop"
-              size={18}
-              color="#fff"
-            />
-          </View>
-          {/* Pointer under the circle - triangle on iOS, rotated square on Android (triangle clips on Android) */}
-          {Platform.OS === 'android' ? (
-            <View
-              style={[
-                styles.markerPinAndroid,
-                isPartner && styles.markerPinPartnerAndroid,
-                isSelected && styles.markerPinSelected,
-              ]}
-            />
-          ) : (
-            <View
-              style={[
-                styles.markerPin,
-                isPartner && styles.markerPinPartner,
-                isSelected && styles.markerPinSelected,
-              ]}
-            />
-          )}
-        </View>
-      );
-    },
-    [isSelected, hasActiveDeal, isPartner]
-  );
-
   const handleMarkerPress = React.useCallback(() => {
-    // Ensure onPress is called even if there's lag
     onPress(restaurant);
   }, [restaurant, onPress]);
 
-  // Stable key prop - never changes during component lifecycle
-  // This prevents unnecessary remounting that causes flicker
-  const markerKey = `restaurant-${restaurant.id}`;
+  // Android-safe wrapper props to ensure bitmap capture works
+  const androidWrapperProps = isAndroid
+    ? { collapsable: false as const, renderToHardwareTextureAndroid: true }
+    : {};
 
+  // ── No active deal → orange dot (partner gets gold glow + larger size) ──
+  if (!hasActiveDeal) {
+    return (
+      <Marker
+        coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
+        onPress={handleMarkerPress}
+        anchor={{ x: 0.5, y: 0.5 }}
+        tracksViewChanges={isPartner}
+        tappable={true}
+      >
+        <View style={styles.dotWrapper} {...androidWrapperProps}>
+          {isPartner && <View style={styles.partnerGlow} />}
+          <View
+            style={[
+              styles.markerDot,
+              isPartner && styles.markerDotPartner,
+              isSelected && styles.markerDotSelected,
+            ]}
+          />
+        </View>
+      </Marker>
+    );
+  }
+
+  // ── Active deal → circle with pricetag icon (partner gets gold glow + larger size) ──
   return (
     <Marker
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      // Google Maps on iOS requires tracksViewChanges=true for custom marker views to render correctly
-      // (otherwise only partial content like the pin triangle may show)
       tracksViewChanges={true}
       tappable={true}
-      // Android-specific optimizations
-      {...(Platform.OS === 'android' && {
-        flat: false,
-        centerOffset: { x: 0, y: 0 },
-      })}
-      key={markerKey}
     >
-      {markerContent}
+      <View style={styles.dealMarkerWrapper} {...androidWrapperProps}>
+        {isPartner && <View style={styles.partnerGlowLarge} />}
+        <View
+          style={[
+            styles.markerCircle,
+            isPartner && styles.markerCirclePartner,
+            isSelected && styles.markerCircleSelected,
+          ]}
+        >
+          <Ionicons name="pricetag" size={isPartner ? 24 : 20} color="#fff" />
+        </View>
+      </View>
     </Marker>
   );
 }
 
 const styles = StyleSheet.create({
-  markerWrapper: {
+  // ── Dot wrapper — sized for a decent tap target ──
+  dotWrapper: {
     alignItems: "center",
-    justifyContent: "flex-start",
-    overflow: "visible", // Required for pointer to show below circle
+    justifyContent: "center",
+    width: 44,
+    height: 44,
   },
+
+  // ── Deal marker wrapper — explicit size for Android bitmap capture ──
+  dealMarkerWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 68,
+    height: 68,
+  },
+
+  // ── Gold glow effect for partnered restaurants ──
+  partnerGlow: {
+    position: "absolute",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFD54F",
+    opacity: 0.5,
+  },
+  partnerGlowLarge: {
+    position: "absolute",
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: "#FFD54F",
+    opacity: 0.4,
+  },
+
+  // ── Dot ──
   markerDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#FE902A",
     borderWidth: 2,
     borderColor: "#fff",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    ...Platform.select({
-      ios: {
-        zIndex: 1,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+  },
+  markerDotPartner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderColor: "#FFD54F",
+    borderWidth: 3,
   },
   markerDotSelected: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 3,
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    ...Platform.select({
-      ios: {
-        zIndex: 2,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
   },
-  titleContainer: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    ...Platform.select({
-      ios: {
-        zIndex: 1,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-    maxWidth: 120,
-  },
-  markerTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
-  },
-  markerContainer: {
+
+  // ── Circle (shared, both platforms — NO elevation) ──
+  markerCircle: {
     backgroundColor: "#FE902A",
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 3,
-    borderColor: "#FE902A",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    ...Platform.select({
-      ios: {
-        zIndex: 1,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  markerContainerPartner: {
     width: 48,
     height: 48,
     borderRadius: 24,
+    borderWidth: 3,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+  },
+  markerCirclePartner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 4,
     borderColor: "#FFD54F",
   },
-  markerContainerSelected: {
-    borderWidth: 4,
+  markerCircleSelected: {
+    borderWidth: 3.5,
+    borderColor: "#fff",
     shadowOpacity: 0.5,
     shadowRadius: 6,
-    ...Platform.select({
-      ios: {
-        zIndex: 2,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
-  },
-  partnerBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    ...Platform.select({
-      ios: {
-        zIndex: 3,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  markerPin: {
-    width: 0,
-    height: 0,
-    backgroundColor: "transparent",
-    borderStyle: "solid",
-    borderLeftWidth: 12,
-    borderRightWidth: 12,
-    borderTopWidth: 20,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#FE902A",
-    marginTop: -8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    zIndex: 0,
-    overflow: "visible",
-  },
-  markerPinAndroid: {
-    width: 20,
-    height: 20,
-    backgroundColor: "#FE902A",
-    borderRadius: 10,
-    marginTop: -14,
-    transform: [{ rotate: '45deg' }],
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  markerPinPartner: {
-    borderLeftWidth: 13,
-    borderRightWidth: 13,
-    borderTopWidth: 20,
-    borderTopColor: "#FFD54F",
-    marginTop: -8,
-  },
-  markerPinPartnerAndroid: {
-    backgroundColor: "#FFD54F",
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    marginTop: -15,
-  },
-  markerPinSelected: {
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  markerPinShadow: {
-    width: 12,
-    height: 8,
-    borderRadius: 6,
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    marginTop: -4,
-    transform: [{ scaleX: 0.8 }],
   },
 });
-

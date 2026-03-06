@@ -21,7 +21,13 @@ export default function UserLocationMarker({ location }: UserLocationMarkerProps
         centerOffset: { x: 0, y: 0 },
       })}
     >
-      <View style={styles.userLocationMarker}>
+      <View
+        style={styles.userLocationMarker}
+        {...(Platform.OS === 'android' && {
+          collapsable: false,
+          renderToHardwareTextureAndroid: true,
+        })}
+      >
         <View style={styles.userLocationHalo} />
         <View style={styles.userLocationCircle}>
           <MaterialCommunityIcons name="navigation" size={18} color="#fff" />
@@ -35,6 +41,8 @@ const styles = StyleSheet.create({
   userLocationMarker: {
     alignItems: "center",
     justifyContent: "center",
+    width: 44,
+    height: 44,
     ...Platform.select({
       ios: {
         overflow: "visible",
@@ -51,14 +59,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#4285F4",
     opacity: 0.3,
-    ...Platform.select({
-      ios: {
-        zIndex: 0,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    zIndex: 0,
   },
   userLocationCircle: {
     width: 32,
@@ -73,13 +74,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+    zIndex: 1,
     ...Platform.select({
       ios: {
-        zIndex: 1,
         overflow: "visible",
       },
       android: {
-        elevation: 3,
         overflow: "hidden",
       },
     }),

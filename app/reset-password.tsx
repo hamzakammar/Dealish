@@ -1,9 +1,10 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Redirect, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -21,6 +22,7 @@ const validateEmail = (email: string) => {
 
 export default function ResetPasswordScreen() {
     const { session, isLoading } = useAuthContext();
+    const colors = useThemeColors();
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -33,6 +35,70 @@ export default function ResetPasswordScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [hasRecoveryToken, setHasRecoveryToken] = useState(false);
+
+    const dynamicStyles = useMemo(() => StyleSheet.create({
+        container: {
+            flex: 1,
+            padding: 20,
+            backgroundColor: colors.background,
+        },
+        title: {
+            fontSize: 32,
+            fontFamily: 'Manrope',
+            fontWeight: 'bold',
+            marginTop: 99,
+            marginBottom: 8,
+            textAlign: 'center',
+            color: colors.text,
+        },
+        subtitle: {
+            fontSize: 16,
+            fontFamily: 'Manrope',
+            fontWeight: '400',
+            color: colors.textSecondary,
+            marginBottom: 40,
+            textAlign: 'center',
+        },
+        input: {
+            width: '100%',
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.inputBorder,
+            marginBottom: 12,
+            fontSize: 16,
+            backgroundColor: colors.inputBackground,
+            color: colors.text,
+        },
+        passwordContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            width: '100%',
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.inputBorder,
+            marginBottom: 12,
+            backgroundColor: colors.inputBackground,
+        },
+        passwordInput: {
+            flex: 1,
+            fontSize: 16,
+            color: colors.text,
+        },
+        backText: {
+            color: colors.textSecondary,
+            fontSize: 14,
+        },
+        successText: {
+            color: colors.textSecondary,
+            fontSize: 14,
+            textAlign: 'center',
+            marginBottom: 24,
+        },
+    }), [colors]);
 
     // If already logged in, redirect to map
     if (session && !hasRecoveryToken) {
@@ -154,7 +220,7 @@ export default function ResetPasswordScreen() {
     // Show loading state
     if (isLoading) {
         return (
-            <View style={styles.container}>
+            <View style={dynamicStyles.container}>
                 <ActivityIndicator size="large" color="#FE902A" />
             </View>
         );
@@ -163,16 +229,16 @@ export default function ResetPasswordScreen() {
     // Show email input form if no recovery token
     if (!hasRecoveryToken) {
         return (
-            <View style={styles.container}>
-                <Text style={styles.title}>Reset Password</Text>
-                <Text style={styles.subtitle}>
+            <View style={dynamicStyles.container}>
+                <Text style={dynamicStyles.title}>Reset Password</Text>
+                <Text style={dynamicStyles.subtitle}>
                     Enter your email address and we'll send you a link to reset your password
                 </Text>
 
                 <View style={styles.form}>
                     {emailSent ? (
                         <View style={styles.successContainer}>
-                            <Text style={styles.successText}>
+                            <Text style={dynamicStyles.successText}>
                                 If an account exists with this email, you'll receive password reset instructions.
                             </Text>
                             <TouchableOpacity
@@ -192,11 +258,11 @@ export default function ResetPasswordScreen() {
                             <View>
                                 <TextInput
                                     style={[
-                                        styles.input,
+                                        dynamicStyles.input,
                                         emailError && styles.inputError,
                                     ]}
                                     placeholder="Your Email"
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={colors.textTertiary}
                                     value={email}
                                     onChangeText={(text) => {
                                         setEmail(text);
@@ -237,7 +303,7 @@ export default function ResetPasswordScreen() {
                         accessibilityLabel="Back to Sign In"
                         accessibilityHint="Returns to the sign in page"
                     >
-                        <Text style={styles.backText}>Back to Sign In</Text>
+                        <Text style={dynamicStyles.backText}>Back to Sign In</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -246,22 +312,22 @@ export default function ResetPasswordScreen() {
 
     // Show password reset form if recovery token exists
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Set New Password</Text>
-            <Text style={styles.subtitle}>
+        <View style={dynamicStyles.container}>
+            <Text style={dynamicStyles.title}>Set New Password</Text>
+            <Text style={dynamicStyles.subtitle}>
                 Enter your new password below
             </Text>
 
             <View style={styles.form}>
                 <View>
                     <View style={[
-                        styles.passwordContainer,
+                        dynamicStyles.passwordContainer,
                         passwordError && styles.inputError,
                     ]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={dynamicStyles.passwordInput}
                             placeholder="New Password"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textTertiary}
                             value={newPassword}
                             onChangeText={(text) => {
                                 setNewPassword(text);
@@ -280,7 +346,7 @@ export default function ResetPasswordScreen() {
                             <Ionicons
                                 name={showPassword ? 'eye-off' : 'eye'}
                                 size={20}
-                                color="#999"
+                                color={colors.textTertiary}
                             />
                         </TouchableOpacity>
                     </View>
@@ -291,13 +357,13 @@ export default function ResetPasswordScreen() {
 
                 <View>
                     <View style={[
-                        styles.passwordContainer,
+                        dynamicStyles.passwordContainer,
                         confirmPasswordError && styles.inputError,
                     ]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={dynamicStyles.passwordInput}
                             placeholder="Confirm New Password"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={colors.textTertiary}
                             value={confirmPassword}
                             onChangeText={(text) => {
                                 setConfirmPassword(text);
@@ -316,7 +382,7 @@ export default function ResetPasswordScreen() {
                             <Ionicons
                                 name={showConfirmPassword ? 'eye-off' : 'eye'}
                                 size={20}
-                                color="#999"
+                                color={colors.textTertiary}
                             />
                         </TouchableOpacity>
                     </View>
@@ -348,42 +414,9 @@ export default function ResetPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 20,
-        backgroundColor: '#fff',
-    },
-    title: {
-        fontSize: 32,
-        fontFamily: 'Manrope',
-        fontWeight: 'bold',
-        marginTop: 99,
-        marginBottom: 8,
-        textAlign: 'center',
-        color: '#333',
-    },
-    subtitle: {
-        fontSize: 16,
-        fontFamily: 'Manrope',
-        fontWeight: '400',
-        color: '#666',
-        marginBottom: 40,
-        textAlign: 'center',
-    },
     form: {
         width: '100%',
         marginBottom: 20,
-    },
-    input: {
-        width: '100%',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        marginBottom: 12,
-        fontSize: 16,
-        backgroundColor: '#fff',
     },
     button: {
         width: '100%',
@@ -408,10 +441,6 @@ const styles = StyleSheet.create({
         marginTop: 12,
         alignItems: 'center',
     },
-    backText: {
-        color: '#666',
-        fontSize: 14,
-    },
     inputError: {
         borderColor: '#ff4444',
         borderWidth: 1,
@@ -423,22 +452,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         marginLeft: 4,
     },
-    passwordContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        width: '100%',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        marginBottom: 12,
-        backgroundColor: '#fff',
-    },
-    passwordInput: {
-        flex: 1,
-        fontSize: 16,
-    },
     eyeIcon: {
         position: 'absolute',
         right: 16,
@@ -449,12 +462,6 @@ const styles = StyleSheet.create({
     },
     successContainer: {
         alignItems: 'center',
-    },
-    successText: {
-        color: '#666',
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 24,
     },
 });
 

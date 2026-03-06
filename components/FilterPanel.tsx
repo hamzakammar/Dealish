@@ -1,7 +1,9 @@
-import { FilterState, DISTANCE_OPTIONS, RATING_OPTIONS } from "@/types/filters";
+import { FilterState } from "@/types/filters";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { Restaurant } from "@/types/restaurant";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import React, { useEffect, useState } from "react";
+import Slider from "@react-native-community/slider";
+import React, { useEffect, useMemo } from "react";
 import {
   Animated,
   Dimensions,
@@ -31,12 +33,122 @@ export default function FilterPanel({
   restaurants,
   activeFilterCount,
 }: FilterPanelProps) {
+  const colors = useThemeColors();
   const screenWidth = Dimensions.get("window").width;
   const panelWidth = screenWidth * 0.85;
   const slideAnim = React.useRef(new Animated.Value(-panelWidth)).current;
 
-  // Get unique restaurant types
-  const availableTypes = React.useMemo(() => {
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    panel: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      bottom: 0,
+      backgroundColor: colors.isDark ? colors.card : "#F5E6D3",
+      zIndex: 7,
+      shadowColor: "#000",
+      shadowOffset: { width: 2, height: 0 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.text,
+      marginBottom: 12,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 4,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.isDark ? colors.cardSecondary : "#fff",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxLabel: {
+      fontSize: 16,
+      color: colors.text,
+    },
+    toggleLabel: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: colors.text,
+      marginBottom: 4,
+    },
+    toggleDescription: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    footer: {
+      paddingHorizontal: 20,
+      paddingVertical: 20,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      gap: 12,
+    },
+    sliderValue: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.text,
+      marginBottom: 8,
+    },
+    sliderContainer: {
+      paddingHorizontal: 4,
+    },
+    sliderLabels: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 4,
+    },
+    sliderLabel: {
+      fontSize: 12,
+      color: colors.textTertiary,
+    },
+    typeChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.isDark ? colors.cardSecondary : "#fff",
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    typeChipActive: {
+      backgroundColor: "#FE902A",
+      borderColor: "#FE902A",
+    },
+    typeChipText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: "500",
+    },
+    typeChipTextActive: {
+      color: "#fff",
+      fontWeight: "600",
+    },
+  }), [colors]);
+
+  // Get unique restaurant types from database
+  const availableTypes = useMemo(() => {
     const types = new Set<string>();
     restaurants.forEach((r) => {
       if (r.type) {
@@ -45,6 +157,7 @@ export default function FilterPanel({
     });
     return Array.from(types).sort();
   }, [restaurants]);
+
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -68,6 +181,16 @@ export default function FilterPanel({
     updateFilter("types", newTypes);
   };
 
+  const formatRating = (rating: number | null) => {
+    if (rating === null || rating === 0) return "Any";
+    return `${rating.toFixed(1)}+ stars`;
+  };
+
+  const formatDistance = (distance: number | null) => {
+    if (distance === null || distance === 0) return "Any";
+    return `${distance} km`;
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -82,7 +205,7 @@ export default function FilterPanel({
       {/* Slide Panel */}
       <Animated.View
         style={[
-          styles.panel,
+          dynamicStyles.panel,
           {
             width: panelWidth,
             transform: [{ translateX: slideAnim }],
@@ -90,9 +213,9 @@ export default function FilterPanel({
         ]}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={dynamicStyles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.title}>Filters</Text>
+            <Text style={dynamicStyles.title}>Filters</Text>
             {activeFilterCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{activeFilterCount}</Text>
@@ -100,85 +223,85 @@ export default function FilterPanel({
             )}
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <AntDesign name="close" size={24} color="#333" />
+            <AntDesign name="close" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Distance Filter */}
+          {/* Rating Filter - Slider */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Distance</Text>
-            <View style={styles.optionsContainer}>
-              {DISTANCE_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.value ?? "all"}
-                  style={[
-                    styles.optionButton,
-                    filters.maxDistance === option.value && styles.optionButtonActive,
-                  ]}
-                  onPress={() => updateFilter("maxDistance", option.value)}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      filters.maxDistance === option.value && styles.optionTextActive,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={dynamicStyles.sectionTitle}>Minimum Rating</Text>
+            <Text style={dynamicStyles.sliderValue}>
+              {formatRating(filters.minRating)}
+            </Text>
+            <View style={dynamicStyles.sliderContainer}>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={0}
+                maximumValue={5}
+                step={0.5}
+                value={filters.minRating ?? 0}
+                onValueChange={(value) => updateFilter("minRating", value === 0 ? null : value)}
+                minimumTrackTintColor="#FE902A"
+                maximumTrackTintColor={colors.isDark ? "#444" : "#ddd"}
+                thumbTintColor="#FE902A"
+              />
+              <View style={dynamicStyles.sliderLabels}>
+                <Text style={dynamicStyles.sliderLabel}>Any</Text>
+                <Text style={dynamicStyles.sliderLabel}>2.5</Text>
+                <Text style={dynamicStyles.sliderLabel}>5.0</Text>
+              </View>
             </View>
           </View>
 
-          {/* Rating Filter */}
+          {/* Distance Filter - Slider */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Minimum Rating</Text>
-            <View style={styles.optionsContainer}>
-              {RATING_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.value ?? "any"}
-                  style={[
-                    styles.optionButton,
-                    filters.minRating === option.value && styles.optionButtonActive,
-                  ]}
-                  onPress={() => updateFilter("minRating", option.value)}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      filters.minRating === option.value && styles.optionTextActive,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={dynamicStyles.sectionTitle}>Maximum Distance</Text>
+            <Text style={dynamicStyles.sliderValue}>
+              {formatDistance(filters.maxDistance)}
+            </Text>
+            <View style={dynamicStyles.sliderContainer}>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={0}
+                maximumValue={50}
+                step={1}
+                value={filters.maxDistance ?? 0}
+                onValueChange={(value) => updateFilter("maxDistance", value === 0 ? null : value)}
+                minimumTrackTintColor="#FE902A"
+                maximumTrackTintColor={colors.isDark ? "#444" : "#ddd"}
+                thumbTintColor="#FE902A"
+              />
+              <View style={dynamicStyles.sliderLabels}>
+                <Text style={dynamicStyles.sliderLabel}>Any</Text>
+                <Text style={dynamicStyles.sliderLabel}>25 km</Text>
+                <Text style={dynamicStyles.sliderLabel}>50 km</Text>
+              </View>
             </View>
           </View>
 
-          {/* Type Filter */}
+          {/* Type Filter - Chips from DB */}
           {availableTypes.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Cuisine Type</Text>
-              <View style={styles.checkboxContainer}>
+              <Text style={dynamicStyles.sectionTitle}>Cuisine Type</Text>
+              <View style={styles.chipContainer}>
                 {availableTypes.map((type) => (
                   <TouchableOpacity
                     key={type}
-                    style={styles.checkboxRow}
+                    style={[
+                      dynamicStyles.typeChip,
+                      filters.types.includes(type) && dynamicStyles.typeChipActive,
+                    ]}
                     onPress={() => toggleType(type)}
                   >
-                    <View
+                    <Text
                       style={[
-                        styles.checkbox,
-                        filters.types.includes(type) && styles.checkboxChecked,
+                        dynamicStyles.typeChipText,
+                        filters.types.includes(type) && dynamicStyles.typeChipTextActive,
                       ]}
                     >
-                      {filters.types.includes(type) && (
-                        <AntDesign name="check" size={16} color="#fff" />
-                      )}
-                    </View>
-                    <Text style={styles.checkboxLabel}>{type}</Text>
+                      {type}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -189,8 +312,8 @@ export default function FilterPanel({
           <View style={styles.section}>
             <View style={styles.toggleRow}>
               <View style={styles.toggleContent}>
-                <Text style={styles.toggleLabel}>Partner Restaurants Only</Text>
-                <Text style={styles.toggleDescription}>
+                <Text style={dynamicStyles.toggleLabel}>Partner Restaurants Only</Text>
+                <Text style={dynamicStyles.toggleDescription}>
                   Show only restaurants partnered with Dealish
                 </Text>
               </View>
@@ -215,8 +338,8 @@ export default function FilterPanel({
           <View style={styles.section}>
             <View style={styles.toggleRow}>
               <View style={styles.toggleContent}>
-                <Text style={styles.toggleLabel}>Active Deals Only</Text>
-                <Text style={styles.toggleDescription}>
+                <Text style={dynamicStyles.toggleLabel}>Active Deals Only</Text>
+                <Text style={dynamicStyles.toggleDescription}>
                   Show only restaurants with active deals
                 </Text>
               </View>
@@ -239,7 +362,7 @@ export default function FilterPanel({
         </ScrollView>
 
         {/* Footer */}
-        <View style={styles.footer}>
+        <View style={dynamicStyles.footer}>
           {activeFilterCount > 0 && (
             <TouchableOpacity
               style={styles.clearButton}
@@ -267,38 +390,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     zIndex: 6,
   },
-  panel: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    bottom: 0,
-    backgroundColor: "#F5E6D3",
-    zIndex: 7,
-    shadowColor: "#000",
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#333",
   },
   badge: {
     backgroundColor: "#FE902A",
@@ -324,63 +419,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 8,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-  },
-  optionsContainer: {
+  chipContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  optionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  optionButtonActive: {
-    backgroundColor: "#FE902A",
-    borderColor: "#FE902A",
-  },
-  optionText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-  },
-  optionTextActive: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  checkboxContainer: {
-    gap: 12,
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: "#ccc",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: "#FE902A",
-    borderColor: "#FE902A",
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: "#333",
   },
   toggleRow: {
     flexDirection: "row",
@@ -391,16 +432,6 @@ const styles = StyleSheet.create({
   toggleContent: {
     flex: 1,
     marginRight: 16,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#333",
-    marginBottom: 4,
-  },
-  toggleDescription: {
-    fontSize: 13,
-    color: "#666",
   },
   toggle: {
     width: 50,
@@ -426,13 +457,6 @@ const styles = StyleSheet.create({
   },
   toggleThumbActive: {
     transform: [{ translateX: 20 }],
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    gap: 12,
   },
   clearButton: {
     paddingVertical: 12,

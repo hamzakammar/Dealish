@@ -1,4 +1,5 @@
 import { Deal } from "@/types/restaurant";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { calculateSavings } from "@/utils/activity";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
@@ -10,6 +11,7 @@ type DealCardProps = {
 };
 
 export default function DealCard({ deal }: DealCardProps) {
+  const colors = useThemeColors();
   const [showQRCode, setShowQRCode] = useState(false);
   const formatTime = (dateString?: string) => {
     if (!dateString) return null;
@@ -189,9 +191,9 @@ export default function DealCard({ deal }: DealCardProps) {
 
   return (
     <>
-      <View style={styles.dealCard}>
+      <View style={[styles.dealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.dealHeader}>
-        <Text style={styles.dealTitle}>{deal.title}</Text>
+        <Text style={[styles.dealTitle, { color: colors.text }]}>{deal.title}</Text>
         {dealStatus === 'expired' && (
           <View style={styles.expiredBadge}>
             <Text style={styles.expiredText}>Expired</Text>
@@ -218,7 +220,7 @@ export default function DealCard({ deal }: DealCardProps) {
       )}
 
       {deal.description && (
-        <Text style={styles.dealDescription}>{deal.description}</Text>
+        <Text style={[styles.dealDescription, { color: colors.textSecondary }]}>{deal.description}</Text>
       )}
 
       {deal.tags && deal.tags.length > 0 && (
@@ -234,8 +236,8 @@ export default function DealCard({ deal }: DealCardProps) {
       {formatTimeRange() && (
         <View style={styles.dateContainer}>
           <View style={styles.dateRow}>
-            <Ionicons name="time-outline" size={12} color="#666" />
-            <Text style={styles.dateText}>
+            <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>
               {formatTimeRange()}
             </Text>
           </View>

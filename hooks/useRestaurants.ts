@@ -33,8 +33,8 @@ export function useRestaurants() {
             phone: r.phone ?? undefined,
             rating: r.rating ?? undefined,
             rating_count: r.num_ratings ?? undefined,
-            image_url: r.hero_image_url ?? undefined,
-            logo_url: r.hero_image_url ?? undefined,
+            image_url: r.hero_image_url ?? r.display_image ?? undefined,
+            logo_url: r.hero_image_url ?? r.display_image ?? undefined,
             display_image: r.display_image ?? undefined,
             type: r.type ?? undefined,
           })) ?? [];

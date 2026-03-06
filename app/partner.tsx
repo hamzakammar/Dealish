@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from 'r
 
 export default function PartnerScreen() {
   const handleEmailPress = () => {
-    Linking.openURL('mailto:partners@dealish.com?subject=Partner Inquiry');
+    Linking.openURL('mailto:hello@dealish.io?subject=Partner Inquiry');
   };
 
   return (

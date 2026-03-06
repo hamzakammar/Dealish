@@ -3,7 +3,7 @@ import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -36,6 +36,7 @@ function RestaurantCard({
   userLocation?: UserLocation | null;
 }) {
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
+  const [imageError, setImageError] = useState(false);
 
   const formattedDistance = useMemo(() => {
     if (!userLocation) return null;
@@ -48,18 +49,27 @@ function RestaurantCard({
     return formatDistance(dist);
   }, [userLocation, restaurant.lat, restaurant.lng]);
 
+  const imageUrl = restaurant.logo_url || restaurant.image_url || restaurant.display_image;
+
+  const isPartner = Boolean(restaurant.partner);
+
   return (
     <TouchableOpacity
-      style={[styles.card, isSelected && styles.cardSelected]}
+      style={[
+        styles.card,
+        isSelected && styles.cardSelected,
+        isPartner && styles.cardPartner,
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.imageContainer}>
-        {(restaurant.logo_url || restaurant.image_url) ? (
+        {imageUrl && !imageError ? (
           <Image
-            source={{ uri: restaurant.logo_url || restaurant.image_url }}
+            source={{ uri: imageUrl }}
             style={styles.image}
             resizeMode="cover"
+            onError={() => setImageError(true)}
           />
         ) : (
           <View style={styles.imagePlaceholder}>
@@ -69,9 +79,16 @@ function RestaurantCard({
       </View>
       <View style={styles.content}>
         <View>
-          <Text style={styles.name} numberOfLines={1}>
-            {restaurant.name}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {restaurant.name}
+            </Text>
+            {isPartner && (
+              <View style={styles.partnerTag}>
+                <Text style={styles.partnerTagText}>Partner</Text>
+              </View>
+            )}
+          </View>
           <RatingDisplay
             rating={restaurant.rating}
             ratingCount={restaurant.rating_count}
@@ -352,13 +369,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-    height: 140, // Fixed height instead of minHeight
+    height: 140,
     borderWidth: 2,
     borderColor: "transparent",
-    overflow: "hidden", // Ensure content doesn't overflow
+    overflow: "hidden",
   },
   cardSelected: {
     borderColor: "#FE902A",
+  },
+  cardPartner: {
+    borderColor: "#FFD54F",
+    shadowColor: "#FFD54F",
+    shadowOpacity: 0.3,
   },
   imageContainer: {
     width: 120,
@@ -382,7 +404,23 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
-    justifyContent: "flex-start", // Keep content at the top
+    justifyContent: "flex-start",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  partnerTag: {
+    backgroundColor: "#E3F2FD",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  partnerTagText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#1E88E5",
   },
   cardFooter: {
     marginTop: "auto", // Push to bottom - This container ALWAYS exists
@@ -392,6 +430,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1a1a1a",
     marginBottom: 4,
+    flexShrink: 1,
   },
   metaRow: {
     flexDirection: "row",
