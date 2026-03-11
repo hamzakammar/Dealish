@@ -4,7 +4,7 @@
     "slug": "Dealish",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "dealish",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -31,9 +31,9 @@
       }
     },
     "android": {
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/app-icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/app-icon.png",
         "backgroundColor": "#FE902A"
       },
       "edgeToEdgeEnabled": true,

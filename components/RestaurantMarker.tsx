@@ -72,7 +72,7 @@ export default function RestaurantMarker({
             isSelected && styles.markerCircleSelected,
           ]}
         >
-          <Ionicons name="pricetag" size={isPartner ? 24 : 20} color="#fff" />
+          <Ionicons name="pricetag" size={isPartner ? 16 : 14} color="#fff" />
         </View>
       </View>
     </Marker>
@@ -92,24 +92,24 @@ const styles = StyleSheet.create({
   dealMarkerWrapper: {
     alignItems: "center",
     justifyContent: "center",
-    width: 68,
-    height: 68,
+    width: 48,
+    height: 48,
   },
 
   // ── Gold glow effect for partnered restaurants ──
   partnerGlow: {
     position: "absolute",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#FFD54F",
     opacity: 0.5,
   },
   partnerGlowLarge: {
     position: "absolute",
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#FFD54F",
     opacity: 0.4,
   },
@@ -144,29 +144,29 @@ const styles = StyleSheet.create({
   // ── Circle (shared, both platforms — NO elevation) ──
   markerCircle: {
     backgroundColor: "#FE902A",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 3,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2.5,
     borderColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
   markerCirclePartner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 3,
     borderColor: "#FFD54F",
   },
   markerCircleSelected: {
-    borderWidth: 3.5,
+    borderWidth: 3,
     borderColor: "#fff",
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
   },
 });

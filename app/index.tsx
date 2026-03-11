@@ -22,6 +22,10 @@ export default function Index() {
       // Wait for AsyncStorage checks to complete
       if (hasSeenWelcome === null || hasCompletedOnboarding === null) return;
 
+      // If we have a session but profile hasn't loaded yet, wait for it
+      // This prevents routing before we know the user's role
+      if (session && profile === null) return;
+
       // Prevent duplicate navigation
       if (hasNavigatedRef.current) return;
       hasNavigatedRef.current = true;
