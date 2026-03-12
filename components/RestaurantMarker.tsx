@@ -25,8 +25,8 @@ export default function RestaurantMarker({
     onPress(restaurant);
   }, [restaurant, onPress]);
 
-  // Guard against invalid coordinates — missing lat/lng causes invisible markers
-  if (!restaurant.lat || !restaurant.lng) {
+  // Guard against invalid coordinates — use explicit null/undefined check not falsy
+  if (restaurant.lat == null || restaurant.lng == null || isNaN(restaurant.lat) || isNaN(restaurant.lng)) {
     return null;
   }
 
@@ -121,15 +121,15 @@ const styles = StyleSheet.create({
 
   // ── Dot ──
   markerDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#FE902A",
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: "#fff",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 2,
   },
   markerDotPartner: {
