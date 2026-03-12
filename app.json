@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ca.hamzaammar.dealish",
+      "bundleIdentifier": "com.anonymous.Dealish",
       "buildNumber": "1",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -42,7 +42,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "ca.hamzaammar.dealish",
+      "package": "com.anonymous.Dealish",
       "versionCode": 1,
       "useNextNotificationsApi": true,
       "permissions": [
