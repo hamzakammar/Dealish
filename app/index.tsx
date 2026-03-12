@@ -45,10 +45,9 @@ export default function Index() {
           if (profile?.role === 'owner' || profile?.role === 'admin') {
             router.replace('/admin');
           } else {
-            // Route to onboarding if:
-            // 1. AsyncStorage flag not set (first install), OR
-            // 2. Profile has no display_name (new email-confirmed user whose flag may be stale)
-            const needsOnboarding = !hasCompletedOnboarding || !profile?.display_name;
+            // Always use profile.display_name as source of truth for onboarding
+            // AsyncStorage flag is a fallback only — profile check is definitive
+            const needsOnboarding = !profile?.display_name;
             if (needsOnboarding) {
               router.replace('/onboarding');
             } else {

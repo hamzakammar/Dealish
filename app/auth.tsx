@@ -652,52 +652,7 @@ export default function AuthScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Role selection for sign-up - shown upfront */}
-        {isSignUp && (
-          <View style={styles.roleSelectionContainer}>
-            <Text style={dynamicStyles.roleSelectionTitle}>I am a...</Text>
-            <View style={styles.roleButtonsContainer}>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.roleButton,
-                  selectedRole === 'user' && styles.roleButtonSelected
-                ]}
-                onPress={() => setSelectedRole('user')}
-              >
-                <Ionicons 
-                  name="person" 
-                  size={24} 
-                  color={selectedRole === 'user' ? '#fff' : colors.textSecondary} 
-                />
-                <Text style={[
-                  dynamicStyles.roleButtonText,
-                  selectedRole === 'user' && styles.roleButtonTextSelected
-                ]}>
-                  Customer
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  dynamicStyles.roleButton,
-                  selectedRole === 'owner' && styles.roleButtonSelected
-                ]}
-                onPress={() => setSelectedRole('owner')}
-              >
-                <Ionicons 
-                  name="restaurant" 
-                  size={24} 
-                  color={selectedRole === 'owner' ? '#fff' : colors.textSecondary} 
-                />
-                <Text style={[
-                  dynamicStyles.roleButtonText,
-                  selectedRole === 'owner' && styles.roleButtonTextSelected
-                ]}>
-                  Restaurant Owner
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Role selection removed - restaurant accounts are invite only */}
 
         {!isSignUp && (
           <TouchableOpacity 
