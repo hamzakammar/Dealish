@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dealish",
     "slug": "Dealish",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "dealish",
@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Dealish",
+      "bundleIdentifier": "ca.hamzaammar.dealish",
+      "buildNumber": "1",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -24,7 +25,10 @@
         "NSBonjourServices": [
           "_http._tcp"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Dealish uses your location to show nearby restaurant deals.",
+        "NSLocationAlwaysUsageDescription": "Dealish uses your location to show nearby restaurant deals.",
+        "NSCameraUsageDescription": "Dealish uses your camera to scan deal QR codes."
       },
       "entitlements": {
         "com.apple.developer.applesignin": ["Default"]
@@ -38,7 +42,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Dealish",
+      "package": "ca.hamzaammar.dealish",
+      "versionCode": 1,
       "useNextNotificationsApi": true,
       "permissions": [
         "android.permission.CAMERA",

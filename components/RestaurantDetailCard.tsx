@@ -642,7 +642,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
           showsVerticalScrollIndicator={false}
           contentContainerStyle={sheetState === 'full' ? styles.fullScrollContent : styles.scrollContent}
           pointerEvents="auto"
-          scrollEnabled={sheetState !== 'peek'} // Allow scrolling in half and full states
+          scrollEnabled={true} // Already inside sheetState !== 'peek' block
         >
           {/* Description - show in half state only */}
           {sheetState === 'half' && restaurant.description && (

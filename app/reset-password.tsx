@@ -100,11 +100,6 @@ export default function ResetPasswordScreen() {
         },
     }), [colors]);
 
-    // If already logged in, redirect to map
-    if (session && !hasRecoveryToken) {
-        return <Redirect href="/map" />;
-    }
-
     // Check if we have a recovery token from deep link or URL params
     useEffect(() => {
         const checkRecoveryToken = async () => {
@@ -224,6 +219,11 @@ export default function ResetPasswordScreen() {
                 <ActivityIndicator size="large" color="#FE902A" />
             </View>
         );
+    }
+
+    // If already logged in (and not doing a password recovery), redirect to map
+    if (session && !hasRecoveryToken) {
+        return <Redirect href="/map" />;
     }
 
     // Show email input form if no recovery token

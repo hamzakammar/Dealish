@@ -401,8 +401,8 @@ export default function MapScreen() {
                 style={StyleSheet.absoluteFillObject}
                 region={currentRegionRef.current || region || fallbackRegion}
                 mapType={mapType}
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
-                customMapStyle={isDarkMode && mapType === "standard" && Platform.OS === 'android' ? darkMapStyle : undefined}
+                provider={PROVIDER_DEFAULT}
+                customMapStyle={undefined}
                 scrollEnabled={false}
                 zoomEnabled={false}
                 pitchEnabled={false}
