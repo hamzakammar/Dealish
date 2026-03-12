@@ -42,7 +42,7 @@ const SPRING_ANIMATION_FRICTION = 11;
 const CLOSE_ANIMATION_DURATION_MS = 600;
 
 // Duration for state transitions (peek/half/full) - matches entrance animation timing
-const STATE_TRANSITION_DURATION_MS = 800;
+const STATE_TRANSITION_DURATION_MS = 300;
 
 // Vertical offset for card entrance/exit animation (pixels off-screen)
 const CARD_ANIMATION_OFFSET = 600;
@@ -319,10 +319,11 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     setLogoError(false); // Reset image error states
     setHeroError(false);
   
-    // Animate card entrance
-    const entranceAnimation = Animated.timing(slideAnim, {
+    // Animate card entrance — use spring for immediate interactivity
+    const entranceAnimation = Animated.spring(slideAnim, {
       toValue: 1,
-      duration: 600,
+      tension: SPRING_ANIMATION_TENSION,
+      friction: SPRING_ANIMATION_FRICTION,
       useNativeDriver: false,
     });
     
@@ -641,7 +642,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
           showsVerticalScrollIndicator={false}
           contentContainerStyle={sheetState === 'full' ? styles.fullScrollContent : styles.scrollContent}
           pointerEvents="auto"
-          scrollEnabled={sheetState === 'full'} // Only allow scrolling in full state
+          scrollEnabled={sheetState !== 'peek'} // Allow scrolling in half and full states
         >
           {/* Description - show in half state only */}
           {sheetState === 'half' && restaurant.description && (

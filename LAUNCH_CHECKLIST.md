@@ -51,6 +51,16 @@
 - [ ] Test push notifications (if enabled)
 - [ ] Verify OAuth flows work correctly
 
+### Google OAuth Display Name
+- [ ] In Google Cloud Console → OAuth consent screen → App name: set to "Dealish"
+- [ ] Upload Dealish logo to OAuth consent screen
+- [ ] Set support email and developer contact on OAuth consent screen
+- [ ] This will show "Dealish" instead of the raw Supabase URL (hpsoqjpzebkkxdqapegl.supabase.co) during Google sign-in
+
+### Supabase Auth Configuration
+- [ ] In Supabase Dashboard → Authentication → URL Configuration → Redirect URLs: add `dealish://auth/callback`
+- [ ] This is required for email confirmation links to deep-link back into the app correctly
+
 ### Production Build
 - [ ] Run `eas build --platform ios --profile production`
 - [ ] Run `eas build --platform android --profile production`

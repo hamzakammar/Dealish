@@ -35,7 +35,17 @@ export function useUserLocation(mapRef: React.RefObject<any>) {
             info.title,
             info.settingsDescription
           );
-          if (mounted) setLoading(false);
+          if (mounted) {
+            // Default to Toronto when location permission is denied
+            const torontoRegion: Region = {
+              latitude: 43.6532,
+              longitude: -79.3832,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            };
+            setRegion(torontoRegion);
+            setLoading(false);
+          }
           return;
         }
 

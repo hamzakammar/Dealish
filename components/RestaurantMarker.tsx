@@ -25,6 +25,11 @@ export default function RestaurantMarker({
     onPress(restaurant);
   }, [restaurant, onPress]);
 
+  // Guard against invalid coordinates — missing lat/lng causes invisible markers
+  if (!restaurant.lat || !restaurant.lng) {
+    return null;
+  }
+
   // Android-safe wrapper props to ensure bitmap capture works
   const androidWrapperProps = isAndroid
     ? { collapsable: false as const, renderToHardwareTextureAndroid: true }
@@ -60,7 +65,7 @@ export default function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={true}
+      tracksViewChanges={false}
       tappable={true}
     >
       <View style={styles.dealMarkerWrapper} {...androidWrapperProps}>

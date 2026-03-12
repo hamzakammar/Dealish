@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import * as Linking from 'expo-linking';
 
 // Use static property access so Expo's Babel plugin can inline these at build time
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -29,7 +28,11 @@ export const getAuthRedirectUrl = () => {
     // We're in a Node.js/server environment (static export)
     throw new Error('Cannot generate auth redirect URL in server environment');
   }
-  return Linking.createURL(AUTH_REDIRECT_PATH);
+  // Use the app scheme directly for consistent deep linking across dev/prod.
+  // Linking.createURL() would generate exp://172.x.x.x:8081/--/auth/callback in dev
+  // which breaks email confirmation links sent to users. Using the scheme directly
+  // ensures the link always works regardless of dev/prod environment.
+  return 'dealish://auth/callback';
 };
 
 // Determine if we're in a static export/server environment

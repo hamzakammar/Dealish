@@ -44,10 +44,16 @@ export default function Index() {
         try {
           if (profile?.role === 'owner' || profile?.role === 'admin') {
             router.replace('/admin');
-          } else if (!hasCompletedOnboarding) {
-            router.replace('/onboarding');
           } else {
-            router.replace('/map');
+            // Route to onboarding if:
+            // 1. AsyncStorage flag not set (first install), OR
+            // 2. Profile has no display_name (new email-confirmed user whose flag may be stale)
+            const needsOnboarding = !hasCompletedOnboarding || !profile?.display_name;
+            if (needsOnboarding) {
+              router.replace('/onboarding');
+            } else {
+              router.replace('/map');
+            }
           }
         } catch (error) {
           if (__DEV__) console.error('Navigation error:', error);

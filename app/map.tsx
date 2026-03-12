@@ -20,10 +20,10 @@ import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TextInput, Tou
 import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
 const fallbackRegion: Region = {
-  latitude: 43.46946,
-  longitude: -80.55348,
-  latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
+  latitude: 43.6532,
+  longitude: -79.3832,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
 };
 
 export default function MapScreen() {
