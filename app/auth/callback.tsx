@@ -1,48 +1,38 @@
 import { useAuthContext } from '@/app/providers/auth';
 import { supabase } from '@/app/lib/supabase';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
-  const { session, profile, isLoading } = useAuthContext();
+  const params = useLocalSearchParams();
+  const { session } = useAuthContext();
   const [processing, setProcessing] = useState(true);
 
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // Wait a moment for Supabase to process the callback
         await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Get the current session - Supabase should have processed the callback URL by now
+
+        // Check if this is a password recovery callback
+        const isRecovery = params.type === 'recovery';
+        if (isRecovery) {
+          router.replace('/reset-password?type=recovery');
+          return;
+        }
+
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-        
+
         if (error) {
-          console.error('Error getting session in callback:', error);
-          // Try to refresh the session
           const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
-          if (refreshedSession) {
-            // Session refreshed successfully
-            setTimeout(() => {
-              router.replace('/map');
-            }, 200);
-          } else {
-            // No valid session, redirect to auth
-            router.replace('/auth');
-          }
+          router.replace(refreshedSession ? '/map' : '/auth');
         } else if (currentSession) {
-          // Session is set, redirect based on profile
-          // Small delay to ensure profile is loaded
-          setTimeout(() => {
-            router.replace('/map');
-          }, 200);
+          router.replace('/');
         } else {
-          // No session, redirect to auth
           router.replace('/auth');
         }
       } catch (error) {
-        console.error('Error processing auth callback:', error);
         router.replace('/auth');
       } finally {
         setProcessing(false);
@@ -50,9 +40,8 @@ export default function AuthCallbackScreen() {
     };
 
     processCallback();
-  }, [router]);
+  }, [router, params]);
 
-  // Show loading screen while processing
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#FE902A" />

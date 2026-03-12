@@ -145,9 +145,8 @@ export default function ResetPasswordScreen() {
 
         setLoading(true);
         try {
-            const redirectUrl = getAuthRedirectUrl();
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${redirectUrl}?type=recovery`,
+                redirectTo: 'dealish://reset-password?type=recovery',
             });
 
             if (error) {
