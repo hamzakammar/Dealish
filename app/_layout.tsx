@@ -8,6 +8,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -133,10 +134,11 @@ function RootLayoutNav() {
   }, []);
   
   return (
-    <AuthProvider>
-      <ThemeWrapper>
-        <NotificationHandler />
-        <Stack screenOptions={{ headerShown: false }}>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ThemeWrapper>
+          <NotificationHandler />
+          <Stack screenOptions={{ headerShown: false }}>
           {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
@@ -154,8 +156,9 @@ function RootLayoutNav() {
           <Stack.Screen name="admin/analytics" options={{ headerShown: false }} />
           <Stack.Screen name="admin/create-restaurant" options={{ headerShown: false }} />
         </Stack>
-      </ThemeWrapper>
-    </AuthProvider>
+        </ThemeWrapper>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

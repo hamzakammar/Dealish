@@ -236,7 +236,7 @@ export default function MapScreen() {
     const { lat, lng, name } = selectedRestaurant;
     const label = encodeURIComponent(name || "Restaurant");
     const url = Platform.OS === "ios"
-      ? `maps://app?daddr=${lat},${lng}&q=${label}`
+      ? `maps://?daddr=${lat},${lng}&q=${label}`
       : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}&travelmode=driving`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) {
@@ -421,7 +421,7 @@ export default function MapScreen() {
           )}
           {/* Simple background for Android */}
           {viewMode === "map" && Platform.OS === 'android' && (
-            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(34, 34, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
+            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
           )}
           <View style={styles.topBarContent}>
             <View style={styles.topBar}>
@@ -486,7 +486,7 @@ export default function MapScreen() {
           </View>
 
           {/* List/Map Toggle */}
-          <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#2d2d2d" : "#E9EAEB" }]}>
+          <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#3A3A3C" : "#E9EAEB" }]}>
             <TouchableOpacity
               style={[
                 styles.viewToggleSegment,
