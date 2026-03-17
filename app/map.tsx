@@ -4,7 +4,6 @@ import FilterPanel from "@/components/FilterPanel";
 import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker from "@/components/RestaurantMarker";
-import { useDirections } from "@/hooks/useDirections";
 import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
@@ -17,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Camera, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -34,7 +33,6 @@ export default function MapScreen() {
   const regionBeforeSelectRef = useRef<Region | null>(null);
   const cameraBeforeSelectRef = useRef<Camera | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [isShowingDirections, setIsShowingDirections] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
@@ -42,7 +40,6 @@ export default function MapScreen() {
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
-  // useDirections no longer needed — directions open Google Maps natively
   const { settings } = useUserSettings();
   const colors = useThemeColors();
   
@@ -219,6 +216,21 @@ export default function MapScreen() {
     }
   }, [viewMode]);
 
+  const handleCloseRestaurant = async () => {
+    // If we zoomed/panned into a restaurant, restore the previous map view on close.
+    if (viewMode === "map") {
+      if (cameraBeforeSelectRef.current) {
+        mapRef.current?.animateCamera(cameraBeforeSelectRef.current, { duration: 800 });
+        cameraBeforeSelectRef.current = null;
+        regionBeforeSelectRef.current = null;
+      } else if (regionBeforeSelectRef.current) {
+        mapRef.current?.animateToRegion(regionBeforeSelectRef.current, 800);
+        regionBeforeSelectRef.current = null;
+      }
+    }
+    setSelectedRestaurant(null);
+  };
+
   const handleGetDirections = () => {
     if (!selectedRestaurant) return;
     const { lat, lng, name } = selectedRestaurant;
@@ -241,33 +253,16 @@ export default function MapScreen() {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
       if (selectedRestaurant) {
         handleCloseRestaurant();
-        return true; // Consume the event
+        return true;
       }
       if (isAccountPanelOpen) {
         setIsAccountPanelOpen(false);
         return true;
       }
-      return false; // Let system handle (exit app)
+      return false;
     });
     return () => handler.remove();
   }, [selectedRestaurant, isAccountPanelOpen]);
-
-  const handleCloseRestaurant = async () => {
-    // If we zoomed/panned into a restaurant, restore the previous map view on close.
-    // Prefer restoring the full camera (keeps rotation/bearing + pitch), fallback to region.
-    if (viewMode === "map") {
-      if (cameraBeforeSelectRef.current) {
-        mapRef.current?.animateCamera(cameraBeforeSelectRef.current, { duration: 800 });
-        cameraBeforeSelectRef.current = null;
-        regionBeforeSelectRef.current = null;
-      } else if (regionBeforeSelectRef.current) {
-        mapRef.current?.animateToRegion(regionBeforeSelectRef.current, 800);
-        regionBeforeSelectRef.current = null;
-      }
-    }
-    setSelectedRestaurant(null);
-    setIsShowingDirections(false);
-  };
 
   const handleRestaurantSelect = React.useCallback((restaurant: Restaurant) => {
     // Prevent multiple rapid clicks
