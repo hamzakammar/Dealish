@@ -16,7 +16,7 @@ import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
 const fallbackRegion: Region = {
@@ -42,7 +42,7 @@ export default function MapScreen() {
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
-  const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
+  // useDirections no longer needed — directions open Google Maps natively
   const { settings } = useUserSettings();
   const colors = useThemeColors();
   
@@ -220,11 +220,37 @@ export default function MapScreen() {
   }, [viewMode]);
 
   const handleGetDirections = () => {
-    if (selectedRestaurant) {
-      setIsShowingDirections(true);
-      getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
-    }
+    if (!selectedRestaurant) return;
+    const { lat, lng, name } = selectedRestaurant;
+    const label = encodeURIComponent(name || "Restaurant");
+    const url = Platform.OS === "ios"
+      ? `maps://app?daddr=${lat},${lng}&q=${label}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}&travelmode=driving`;
+    Linking.canOpenURL(url).then((supported) => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+      }
+    });
   };
+
+  // Android back button — close restaurant card if open, otherwise default behavior
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (selectedRestaurant) {
+        handleCloseRestaurant();
+        return true; // Consume the event
+      }
+      if (isAccountPanelOpen) {
+        setIsAccountPanelOpen(false);
+        return true;
+      }
+      return false; // Let system handle (exit app)
+    });
+    return () => handler.remove();
+  }, [selectedRestaurant, isAccountPanelOpen]);
 
   const handleCloseRestaurant = async () => {
     // If we zoomed/panned into a restaurant, restore the previous map view on close.
@@ -241,7 +267,6 @@ export default function MapScreen() {
     }
     setSelectedRestaurant(null);
     setIsShowingDirections(false);
-    clearRoute();
   };
 
   const handleRestaurantSelect = React.useCallback((restaurant: Restaurant) => {
@@ -306,12 +331,6 @@ export default function MapScreen() {
     mapRef.current?.animateToRegion(targetRegion, 600);
   };
 
-  useEffect(() => {
-    if (isShowingDirections && selectedRestaurant && userLocation) {
-      getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
-    }
-  }, [userLocation, isShowingDirections, selectedRestaurant]);
-
   // Show minimal loading - don't block if we have restaurants or location
   // This prevents 10-second loading times
   if (loading && restaurants.length === 0 && !region) {
@@ -370,13 +389,6 @@ export default function MapScreen() {
               );
             })}
 
-            {routeCoordinates.length > 0 && (
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeColor="#FE902A"
-                strokeWidth={4}
-              />
-            )}
           </MapView>
         ) : (
           <RestaurantList
@@ -530,7 +542,7 @@ export default function MapScreen() {
             restaurant={selectedRestaurant}
             onClose={handleCloseRestaurant}
             onGetDirections={handleGetDirections}
-            isDirectionsAvailable={isDirectionsAvailable}
+            isDirectionsAvailable={true}
             userLocation={userLocation}
           />
         </>

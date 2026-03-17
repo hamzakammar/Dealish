@@ -25,6 +25,7 @@ import {
   UIManager,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -122,6 +123,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   initialState = 'half', // Default to 'half' for backward compatibility
 }, ref) => {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
   const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
@@ -592,13 +594,11 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               </View>
             )}
             <View style={styles.headerContent}>
-              <Text style={[
-                styles.restaurantName,
-                { color: colors.text },
-                sheetState === 'full' && (restaurant.display_image || restaurant.image_url) && styles.restaurantNameOverlayFull,
-              ]}>
-                {restaurant.name}
-              </Text>
+              {!(sheetState === 'full' && (restaurant.display_image || restaurant.image_url)) && (
+                <Text style={[styles.restaurantName, { color: colors.text }]}>
+                  {restaurant.name}
+                </Text>
+              )}
               {sheetState === 'half' && (
                 <RatingDisplay
                   rating={restaurant.rating}
@@ -703,7 +703,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       )}
 
       {/* Footer - always visible */}
-      <View style={[styles.footer, { borderTopColor: colors.border }]} pointerEvents="auto">
+      <View style={[styles.footer, { borderTopColor: colors.border, paddingBottom: Math.max(20, insets.bottom + 8) }]} pointerEvents="auto">
         {isDirectionsAvailable && (
           <TouchableOpacity
             style={styles.directionsButton}

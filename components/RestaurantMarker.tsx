@@ -86,7 +86,7 @@ export default function RestaurantMarker({
             isSelected && styles.markerCircleSelected,
           ]}
         >
-          <Ionicons name="pricetag" size={isPartner ? 16 : 14} color="#fff" />
+          <Ionicons name="pricetag" size={isPartner ? 20 : 18} color="#fff" />
         </View>
       </View>
     </Marker>
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
   dealMarkerWrapper: {
     alignItems: "center",
     justifyContent: "center",
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
   },
   partnerGlow: {
     position: "absolute",
@@ -116,9 +116,9 @@ const styles = StyleSheet.create({
   },
   partnerGlowLarge: {
     position: "absolute",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#FFD54F",
     opacity: 0.4,
   },
@@ -129,7 +129,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FE902A",
     borderWidth: 2.5,
     borderColor: "#fff",
-    // No shadow props — don't work on Android and can cause bitmap capture issues
   },
   markerDotPartner: {
     width: 28,
@@ -146,19 +145,18 @@ const styles = StyleSheet.create({
   },
   markerCircle: {
     backgroundColor: "#FE902A",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2.5,
     borderColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-    // No shadow props on Android
   },
   markerCirclePartner: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 3,
     borderColor: "#FFD54F",
   },
