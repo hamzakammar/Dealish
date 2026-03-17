@@ -21,14 +21,16 @@ export default function RestaurantMarker({
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
 
-  // Android: tracksViewChanges must start true to capture bitmap, then false to prevent re-render glitches
+  // Android: tracksViewChanges must start true to capture bitmap, then false to prevent re-render glitches.
+  // Re-arm whenever isSelected or hasActiveDeal changes so the marker bitmap updates.
   const [tracksViewChanges, setTracksViewChanges] = useState(isAndroid);
   useEffect(() => {
     if (isAndroid) {
+      setTracksViewChanges(true);
       const timer = setTimeout(() => setTracksViewChanges(false), 500);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [isSelected, hasActiveDeal]);
 
   const handleMarkerPress = React.useCallback(() => {
     onPress(restaurant);

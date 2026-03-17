@@ -12,6 +12,22 @@ export default function Index() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const hasNavigatedRef = useRef(false);
+  const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Safety net: if profile fetch hangs (network failure), unblock after 8s
+  useEffect(() => {
+    if (session && profile === null) {
+      profileTimeoutRef.current = setTimeout(() => {
+        if (!hasNavigatedRef.current) {
+          hasNavigatedRef.current = true;
+          router.replace('/map');
+        }
+      }, 8000);
+    }
+    return () => {
+      if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+    };
+  }, [session, profile]);
 
   // Initialize: Check session FIRST, then welcome/onboarding status
   useEffect(() => {
