@@ -38,7 +38,6 @@ export default function AuthScreen() {
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'user' | 'owner'>('user');
   const redirectingRef = useRef(false);
   
   // Dynamic styles based on theme
@@ -194,27 +193,6 @@ export default function AuthScreen() {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     if (!isLoading && session && !redirectingRef.current) {
       redirectingRef.current = true;
-      const checkAndSetRole = async () => {
-        try {
-          const preferredRole = session.user.user_metadata?.preferred_role;
-          if (preferredRole && (preferredRole === 'user' || preferredRole === 'owner')) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', session.user.id)
-              .single();
-            if (profile && !profile.role) {
-              await supabase
-                .from('profiles')
-                .update({ role: preferredRole })
-                .eq('id', session.user.id);
-            }
-          }
-        } catch (error) {
-          console.error('Error checking/setting role:', error);
-        }
-      };
-      checkAndSetRole();
       // Redirect to index so it can route to admin/onboarding/map (single source of truth)
       timeoutId = setTimeout(() => {
         router.replace('/');
@@ -308,43 +286,13 @@ export default function AuthScreen() {
           // If not required, user is automatically signed in
           const { data: { session } } = await supabase.auth.getSession();
           if (session && data.user) {
-            // Update profile with selected role
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .update({ role: selectedRole })
-              .eq('id', data.user.id);
-
-            if (profileError) {
-              console.error('Error updating profile role:', profileError);
-              // Continue anyway - role can be updated later
-            }
-
-            // Refresh profile in auth context to ensure it's up to date
+            // Refresh profile so index.tsx has up-to-date display_name
             await refetchProfile();
-
-            // User is signed in immediately, redirect based on role
-            setTimeout(() => {
-              if (selectedRole === 'owner') {
-                router.replace('/admin');
-              } else {
-                router.replace('/map');
-              }
-            }, 200);
+            // Route through index — it will send to /onboarding if display_name is null
+            setTimeout(() => router.replace('/'), 200);
           } else {
-            // Email confirmation required
-            // Store role preference in user metadata so we can set it after confirmation
-            if (data.user) {
-              const { error: metadataError } = await supabase.auth.updateUser({
-                data: { preferred_role: selectedRole }
-              });
-              if (metadataError) {
-                console.error('Error storing role preference:', metadataError);
-              }
-            }
-            Alert.alert(
-              'Success', 
-              'Check your email for the confirmation link!'
-            );
+            // Email confirmation required — nothing to do until they confirm
+            Alert.alert('Success', 'Check your email for the confirmation link!');
           }
         }
       } else {
@@ -668,7 +616,6 @@ export default function AuthScreen() {
         <TouchableOpacity 
           onPress={() => {
             setIsSignUp(!isSignUp);
-            setSelectedRole('user');
           }}
           style={styles.toggleButton}
           accessibilityLabel={isSignUp ? "Switch to Sign In" : "Switch to Sign Up"}
