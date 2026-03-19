@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 
 export default function Index() {
   // ALL hooks MUST be called unconditionally at the top level
@@ -13,6 +14,11 @@ export default function Index() {
   const [isInitializing, setIsInitializing] = useState(true);
   const hasNavigatedRef = useRef(false);
   const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hide native splash as soon as JS splash is mounted — prevents double-splash overlap
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
 
   // Safety net: if profile fetch hangs (network failure), unblock after 8s
   useEffect(() => {

@@ -40,7 +40,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      // Don't hide native splash here — index.tsx will hide it once
+      // its own JS splash is mounted, preventing the double-splash overlap.
     }
   }, [loaded]);
 
