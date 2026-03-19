@@ -1,7 +1,7 @@
 import { Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Platform } from "react-native";
+import { StyleSheet, View, Platform, PixelRatio } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
@@ -9,44 +9,57 @@ type RestaurantMarkerProps = {
   isSelected: boolean;
   onPress: (restaurant: Restaurant) => void;
   hasActiveDeal: boolean;
+  scale?: number; // 0.6–1.4 from zoom level
 };
 
 const isAndroid = Platform.OS === "android";
+
+// Round to nearest pixel for crisp rendering on all densities (fixes Samsung crop)
+const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
 
 export default function RestaurantMarker({
   restaurant,
   isSelected,
   onPress,
   hasActiveDeal,
+  scale = 1,
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
+  const s = Math.max(0.5, Math.min(1.6, scale)); // clamp scale
 
-  // Android: tracksViewChanges must start true to capture bitmap, then false to prevent re-render glitches.
-  // Re-arm whenever isSelected or hasActiveDeal changes so the marker bitmap updates.
+  // Android: re-arm tracksViewChanges on prop changes so bitmap updates
   const [tracksViewChanges, setTracksViewChanges] = useState(isAndroid);
   useEffect(() => {
     if (isAndroid) {
       setTracksViewChanges(true);
-      const timer = setTimeout(() => setTracksViewChanges(false), 500);
+      const timer = setTimeout(() => setTracksViewChanges(false), 600);
       return () => clearTimeout(timer);
     }
-  }, [isSelected, hasActiveDeal]);
+  }, [isSelected, hasActiveDeal, s]);
 
   const handleMarkerPress = React.useCallback(() => {
     onPress(restaurant);
   }, [restaurant, onPress]);
 
-  // Guard against invalid coordinates
   if (restaurant.lat == null || restaurant.lng == null || isNaN(restaurant.lat) || isNaN(restaurant.lng)) {
     return null;
   }
 
-  // Android-safe wrapper props
+  // Samsung fix: explicit pixel-rounded dimensions + overflow visible
   const androidWrapperProps = isAndroid
     ? { collapsable: false as const, renderToHardwareTextureAndroid: true }
     : {};
 
-  // ── No active deal → orange dot ──
+  // Scaled sizes
+  const dotSize = rnd(26 * s);
+  const dotBorder = rnd(2.5 * s);
+  const circleSize = rnd(36 * s);
+  const circleBorder = rnd(2.5 * s);
+  const iconSize = rnd((isPartner ? 20 : 18) * s);
+  const glowSize = rnd(36 * s);
+  const glowLargeSize = rnd(44 * s);
+  const wrapperPad = rnd(10 * s); // generous wrapper padding to avoid crop
+
   if (!hasActiveDeal) {
     return (
       <Marker
@@ -56,21 +69,28 @@ export default function RestaurantMarker({
         tracksViewChanges={tracksViewChanges}
         tappable={true}
       >
-        <View style={styles.dotWrapper} {...androidWrapperProps}>
-          {isPartner && <View style={styles.partnerGlow} />}
-          <View
-            style={[
-              styles.markerDot,
-              isPartner && styles.markerDotPartner,
-              isSelected && styles.markerDotSelected,
-            ]}
-          />
+        <View
+          style={{ width: dotSize + wrapperPad * 2, height: dotSize + wrapperPad * 2, alignItems: "center", justifyContent: "center" }}
+          {...androidWrapperProps}
+        >
+          {isPartner && (
+            <View style={{
+              position: "absolute",
+              width: glowSize, height: glowSize, borderRadius: glowSize / 2,
+              backgroundColor: "#FFD54F", opacity: 0.5,
+            }} />
+          )}
+          <View style={{
+            width: dotSize, height: dotSize, borderRadius: dotSize / 2,
+            backgroundColor: isSelected ? "#FF6B00" : "#FE902A",
+            borderWidth: dotBorder,
+            borderColor: isPartner ? "#FFD54F" : "#fff",
+          }} />
         </View>
       </Marker>
     );
   }
 
-  // ── Active deal → circle with pricetag icon ──
   return (
     <Marker
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
@@ -79,91 +99,29 @@ export default function RestaurantMarker({
       tracksViewChanges={tracksViewChanges}
       tappable={true}
     >
-      <View style={styles.dealMarkerWrapper} {...androidWrapperProps}>
-        {isPartner && <View style={styles.partnerGlowLarge} />}
-        <View
-          style={[
-            styles.markerCircle,
-            isPartner && styles.markerCirclePartner,
-            isSelected && styles.markerCircleSelected,
-          ]}
-        >
-          <Ionicons name="pricetag" size={isPartner ? 20 : 18} color="#fff" />
+      <View
+        style={{ width: circleSize + wrapperPad * 2, height: circleSize + wrapperPad * 2, alignItems: "center", justifyContent: "center" }}
+        {...androidWrapperProps}
+      >
+        {isPartner && (
+          <View style={{
+            position: "absolute",
+            width: glowLargeSize, height: glowLargeSize, borderRadius: glowLargeSize / 2,
+            backgroundColor: "#FFD54F", opacity: 0.4,
+          }} />
+        )}
+        <View style={{
+          width: circleSize, height: circleSize, borderRadius: circleSize / 2,
+          backgroundColor: isSelected ? "#FF6B00" : "#FE902A",
+          borderWidth: circleBorder,
+          borderColor: isPartner ? "#FFD54F" : "#fff",
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <Ionicons name="pricetag" size={iconSize} color="#fff" />
         </View>
       </View>
     </Marker>
   );
 }
 
-const styles = StyleSheet.create({
-  dotWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 44,
-    height: 44,
-  },
-  dealMarkerWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 52,
-    height: 52,
-  },
-  partnerGlow: {
-    position: "absolute",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFD54F",
-    opacity: 0.5,
-  },
-  partnerGlowLarge: {
-    position: "absolute",
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#FFD54F",
-    opacity: 0.4,
-  },
-  markerDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#FE902A",
-    borderWidth: 2.5,
-    borderColor: "#fff",
-  },
-  markerDotPartner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderColor: "#FFD54F",
-    borderWidth: 3,
-  },
-  markerDotSelected: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 3,
-  },
-  markerCircle: {
-    backgroundColor: "#FE902A",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    borderColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  markerCirclePartner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: "#FFD54F",
-  },
-  markerCircleSelected: {
-    borderWidth: 3,
-    borderColor: "#fff",
-  },
-});
+const styles = StyleSheet.create({});

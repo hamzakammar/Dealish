@@ -12,7 +12,7 @@ import {
     ActivityIndicator,
     Alert,
     Animated,
-    Dimensions,
+    useWindowDimensions,
     FlatList,
     Image,
     StyleSheet,
@@ -77,8 +77,8 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
   // Dynamic labels based on count
   const favouritesLabel = favourites.length === 1 ? "Favourite" : "Favourites";
 
-  const screenWidth = Dimensions.get("window").width;
-  const panelWidth = screenWidth * 0.75;
+  const { width: screenWidth } = useWindowDimensions();
+  const panelWidth = screenWidth * 0.82;
   const slideAnim = React.useRef(new Animated.Value(-panelWidth)).current;
 
   // Animate panel in/out

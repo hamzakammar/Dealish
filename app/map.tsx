@@ -37,6 +37,7 @@ export default function MapScreen() {
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [markerScale, setMarkerScale] = useState(1);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -352,8 +353,12 @@ export default function MapScreen() {
             provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
             customMapStyle={isDarkMode && mapType === "standard" && Platform.OS === 'android' ? darkMapStyle : undefined}
             pitchEnabled={Platform.OS !== 'android'}
+            toolbarEnabled={false}
             onRegionChangeComplete={(r) => {
               currentRegionRef.current = r;
+              // Zoom-based marker scaling: smaller delta = zoomed in = bigger markers
+              const scale = Math.min(1.4, Math.max(0.6, 0.05 / r.latitudeDelta));
+              setMarkerScale(scale);
               // Sync blurred map background with main map
               if (blurredMapRef.current) {
                 blurredMapRef.current.animateToRegion(r, 0);
@@ -380,6 +385,7 @@ export default function MapScreen() {
                   isSelected={isSelected}
                   onPress={handleRestaurantSelect}
                   hasActiveDeal={hasActiveDeal}
+                  scale={markerScale}
                 />
               );
             })}
