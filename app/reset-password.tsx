@@ -146,7 +146,7 @@ export default function ResetPasswordScreen() {
         setLoading(true);
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: 'https://dealish--g72nqgd45v.expo.app/auth/callback?type=recovery',
+                redirectTo: 'dealish://auth/callback',
             });
 
             if (error) {
