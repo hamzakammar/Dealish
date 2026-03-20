@@ -93,12 +93,6 @@ function RootLayoutNav() {
         }
       }
     };
-          } catch (sessionError) {
-            console.error('Error getting session after deep link:', sessionError);
-          }
-        }
-      }
-    };
 
     // Initialize linking - must always execute to maintain hook consistency
     // Even if it fails, we still need the cleanup function structure to be consistent
