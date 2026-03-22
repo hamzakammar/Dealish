@@ -38,6 +38,7 @@ export default function MapScreen() {
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [markerScale, setMarkerScale] = useState(1);
+  const [mapIsTransitioning, setMapIsTransitioning] = useState(false);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -266,10 +267,12 @@ export default function MapScreen() {
   }, [selectedRestaurant, isAccountPanelOpen]);
 
   const handleRestaurantSelect = React.useCallback((restaurant: Restaurant) => {
-    // Prevent multiple rapid clicks
     if (selectedRestaurant?.id === restaurant.id) {
-      return; // Already selected
+      return;
     }
+    // Signal transition so markers re-arm after animation settles
+    setMapIsTransitioning(true);
+    setTimeout(() => setMapIsTransitioning(false), 50);
 
     // Capture current view before zooming in, so we can restore it on close.
     if (!regionBeforeSelectRef.current) {
@@ -386,6 +389,7 @@ export default function MapScreen() {
                   onPress={handleRestaurantSelect}
                   hasActiveDeal={hasActiveDeal}
                   scale={markerScale}
+                  mapIsTransitioning={mapIsTransitioning}
                 />
               );
             })}

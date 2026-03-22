@@ -9,7 +9,8 @@ type RestaurantMarkerProps = {
   isSelected: boolean;
   onPress: (restaurant: Restaurant) => void;
   hasActiveDeal: boolean;
-  scale?: number; // 0.6–1.4 from zoom level
+  scale?: number;
+  mapIsTransitioning?: boolean;
 };
 
 const isAndroid = Platform.OS === "android";
@@ -23,9 +24,10 @@ export default function RestaurantMarker({
   onPress,
   hasActiveDeal,
   scale = 1,
+  mapIsTransitioning = false,
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
-  const s = Math.max(0.5, Math.min(1.6, scale)); // clamp scale
+  const s = Math.max(0.5, Math.min(1.6, scale));
 
   // Android: re-arm tracksViewChanges on prop changes so bitmap updates
   const [tracksViewChanges, setTracksViewChanges] = useState(isAndroid);
@@ -36,6 +38,15 @@ export default function RestaurantMarker({
       return () => clearTimeout(timer);
     }
   }, [isSelected, hasActiveDeal, s]);
+
+  // Re-arm after map layout transition (e.g. restaurant card opening) to prevent quarter-circle crop
+  useEffect(() => {
+    if (isAndroid && !mapIsTransitioning) {
+      setTracksViewChanges(true);
+      const timer = setTimeout(() => setTracksViewChanges(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [mapIsTransitioning]);
 
   const handleMarkerPress = React.useCallback(() => {
     onPress(restaurant);
