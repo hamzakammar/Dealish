@@ -29,6 +29,17 @@ export default function RestaurantMarker({
 
   // Android: re-arm tracksViewChanges on prop changes so bitmap updates
   const [tracksViewChanges, setTracksViewChanges] = useState(isAndroid);
+
+  // Force re-arm on initial mount — fixes markers not rendering correctly on first load
+  useEffect(() => {
+    if (isAndroid) {
+      setTracksViewChanges(true);
+      const timer = setTimeout(() => setTracksViewChanges(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Re-arm on prop changes
   useEffect(() => {
     if (isAndroid) {
       setTracksViewChanges(true);
