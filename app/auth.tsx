@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Image, Platform, StyleSheet,
+    Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -505,7 +505,11 @@ export default function AuthScreen() {
 
 
   return (
-    <View style={dynamicStyles.container}>
+    <KeyboardAvoidingView
+      style={dynamicStyles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
       <Text style={dynamicStyles.title}>Take advantage of this deal</Text>
       <Text style={dynamicStyles.subtitle}>{isSignUp ? 'Sign up to continue' : 'Sign in to continue'}</Text>
 
@@ -664,7 +668,8 @@ export default function AuthScreen() {
           <Text style={dynamicStyles.socialButtonText}>Apple</Text>
         </TouchableOpacity>
       </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -270,9 +270,9 @@ export default function MapScreen() {
     if (selectedRestaurant?.id === restaurant.id) {
       return;
     }
-    // Signal transition so markers re-arm after animation settles
+    // Signal transition so markers re-arm AFTER card spring animation settles (~650ms)
     setMapIsTransitioning(true);
-    setTimeout(() => setMapIsTransitioning(false), 50);
+    setTimeout(() => setMapIsTransitioning(false), 650);
 
     // Capture current view before zooming in, so we can restore it on close.
     if (!regionBeforeSelectRef.current) {

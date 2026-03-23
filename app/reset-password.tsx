@@ -8,6 +8,9 @@ import { useEffect, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -311,7 +314,8 @@ export default function ResetPasswordScreen() {
 
     // Show password reset form if recovery token exists
     return (
-        <View style={dynamicStyles.container}>
+        <KeyboardAvoidingView style={dynamicStyles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
             <Text style={dynamicStyles.title}>Set New Password</Text>
             <Text style={dynamicStyles.subtitle}>
                 Enter your new password below
@@ -408,7 +412,8 @@ export default function ResetPasswordScreen() {
                     )}
                 </TouchableOpacity>
             </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
