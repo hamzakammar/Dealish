@@ -2,7 +2,6 @@ import { useAuthContext } from '@/app/providers/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 
 export default function Index() {
@@ -15,17 +14,17 @@ export default function Index() {
   const hasNavigatedRef = useRef(false);
   const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Hide native splash as soon as JS splash is mounted — prevents double-splash overlap
-  useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+  // Hide native splash only right before we navigate — keeps native splash visible
+  // the entire time we're initializing, no JS splash needed at all.
+  // This eliminates the flicker between native splash and JS splash.
 
   // Safety net: if profile fetch hangs (network failure), unblock after 8s
   useEffect(() => {
     if (session && profile === null) {
-      profileTimeoutRef.current = setTimeout(() => {
+      profileTimeoutRef.current = setTimeout(async () => {
         if (!hasNavigatedRef.current) {
           hasNavigatedRef.current = true;
+          await SplashScreen.hideAsync().catch(() => {});
           router.replace('/map');
         }
       }, 8000);
@@ -51,6 +50,9 @@ export default function Index() {
       // Prevent duplicate navigation
       if (hasNavigatedRef.current) return;
       hasNavigatedRef.current = true;
+
+      // Hide native splash right before navigating — no JS splash needed
+      await SplashScreen.hideAsync().catch(() => {});
 
       if (session) {
         // Validate token freshness
@@ -111,31 +113,7 @@ export default function Index() {
     });
   }, []);
 
-  // Show branded loading screen while initializing
-  return (
-    <View style={styles.container}>
-      <Image 
-        source={require('../assets/images/splash-icon.png')} 
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
-    </View>
-  );
+  // Native splash stays visible until hideAsync() fires right before navigation.
+  // Return null — nothing to render here.
+  return null;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FE902A',
-  },
-  logo: {
-    width: 120,
-    height: 120,
-  },
-  spinner: {
-    marginTop: 32,
-  },
-});
