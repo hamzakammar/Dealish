@@ -1,48 +1,73 @@
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function AboutScreen() {
+  const colors = useThemeColors();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    headerTitle: { fontSize: 18, fontWeight: '600', fontFamily: 'Manrope', color: '#fff' },
+    sectionTitle: { fontSize: 15, fontWeight: '700', fontFamily: 'Manrope', color: colors.text, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+    body: { fontSize: 15, fontFamily: 'Manrope', color: colors.textSecondary, lineHeight: 23 },
+    cardBox: { backgroundColor: colors.cardSecondary, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+    versionText: { fontSize: 15, fontFamily: 'Manrope', color: colors.text },
+    versionSub: { fontSize: 13, fontFamily: 'Manrope', color: colors.textSecondary, marginTop: 2 },
+  }), [colors]);
+
+  const features = [
+    { icon: 'map-outline' as const, text: 'Browse restaurants and deals on the map' },
+    { icon: 'pricetag-outline' as const, text: 'Find exclusive discounts and special offers' },
+    { icon: 'qr-code-outline' as const, text: 'Scan QR codes at partner restaurants to redeem deals' },
+    { icon: 'heart-outline' as const, text: 'Save your favourite restaurants for quick access' },
+  ];
+
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <View style={styles.backIconBox}>
+            <Ionicons name="arrow-back" size={20} color="#FE902A" />
+          </View>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>About Dealish</Text>
+        <Text style={dynamicStyles.headerTitle}>About Dealish</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.section}>
-          <Text style={styles.title}>Welcome to Dealish</Text>
-          <Text style={styles.description}>
-            Dealish is your go-to app for discovering exclusive deals and discounts at restaurants near you. 
-            We connect food lovers with amazing offers from local restaurants, making dining out more affordable and enjoyable.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Our Mission</Text>
-          <Text style={styles.description}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Mission */}
+        <Text style={[dynamicStyles.sectionTitle, { marginBottom: 8 }]}>Our Mission</Text>
+        <View style={dynamicStyles.cardBox}>
+          <Text style={dynamicStyles.body}>
             To help you discover great food at great prices while supporting local restaurants in your community.
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How It Works</Text>
-          <Text style={styles.description}>
-            • Browse restaurants and deals on the map{'\n'}
-            • Find exclusive discounts and special offers{'\n'}
-            • Scan QR codes at partner restaurants to redeem deals{'\n'}
-            • Save your favorite restaurants for quick access
-          </Text>
-        </View>
+        {/* How It Works */}
+        <Text style={[dynamicStyles.sectionTitle, { marginTop: 8 }]}>How It Works</Text>
+        {features.map((f, i) => (
+          <View key={i} style={[dynamicStyles.cardBox, styles.featureRow]}>
+            <View style={styles.iconCircle}>
+              <Ionicons name={f.icon} size={20} color="#FE902A" />
+            </View>
+            <Text style={[dynamicStyles.body, { flex: 1 }]}>{f.text}</Text>
+          </View>
+        ))}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Version</Text>
-          <Text style={styles.description}>1.0.1</Text>
+        {/* Version */}
+        <Text style={[dynamicStyles.sectionTitle, { marginTop: 8 }]}>App Info</Text>
+        <View style={dynamicStyles.cardBox}>
+          <View style={styles.versionRow}>
+            <Text style={dynamicStyles.versionText}>Version</Text>
+            <Text style={dynamicStyles.versionText}>1.0.1</Text>
+          </View>
+          <View style={[styles.versionRow, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 12, paddingTop: 12 }]}>
+            <Text style={dynamicStyles.versionText}>Contact</Text>
+            <Text style={dynamicStyles.versionSub}>hello@dealish.io</Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -50,55 +75,39 @@ export default function AboutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    backgroundColor: '#FE902A',
   },
-  backButton: {
-    padding: 8,
+  backButton: { padding: 4 },
+  backIconBox: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+  placeholder: { width: 44 },
+  content: { padding: 16, paddingBottom: 40 },
+  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(254,144,42,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  description: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
+  versionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });

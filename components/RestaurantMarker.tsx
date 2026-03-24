@@ -1,6 +1,6 @@
 import { Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, View, Platform, PixelRatio } from "react-native";
 import { Marker } from "react-native-maps";
 
@@ -29,24 +29,22 @@ export default function RestaurantMarker({
   const isPartner = Boolean(restaurant.partner);
   const s = Math.max(0.5, Math.min(1.6, scale));
 
-  // Android: re-arm tracksViewChanges on prop changes so bitmap updates
+  // Android: start true so first render is always correct, then lock to false.
+  // Only re-arm when actual visible content changes (isSelected, hasActiveDeal, scale).
+  // DO NOT re-arm on mapIsTransitioning — doing so on all markers simultaneously causes
+  // simultaneous bitmap flushes that result in crop artifacts on Samsung.
   const [tracksViewChanges, setTracksViewChanges] = useState(isAndroid);
-  useEffect(() => {
-    if (isAndroid) {
-      setTracksViewChanges(true);
-      const timer = setTimeout(() => setTracksViewChanges(false), 600);
-      return () => clearTimeout(timer);
-    }
-  }, [isSelected, hasActiveDeal, s]);
+  const rearmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Re-arm after map layout transition (e.g. restaurant card opening) to prevent quarter-circle crop
   useEffect(() => {
-    if (isAndroid && !mapIsTransitioning) {
-      setTracksViewChanges(true);
-      const timer = setTimeout(() => setTracksViewChanges(false), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [mapIsTransitioning]);
+    if (!isAndroid) return;
+    if (rearmTimer.current) clearTimeout(rearmTimer.current);
+    setTracksViewChanges(true);
+    rearmTimer.current = setTimeout(() => setTracksViewChanges(false), 400);
+    return () => {
+      if (rearmTimer.current) clearTimeout(rearmTimer.current);
+    };
+  }, [isSelected, hasActiveDeal, s]);
 
   const handleMarkerPress = React.useCallback(() => {
     onPress(restaurant);
