@@ -1,5 +1,6 @@
 import { supabase } from '@/app/lib/supabase';
 import AuthProvider from '@/app/providers/auth';
+import { setRecoveryFlow } from '@/app/lib/recoveryState';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -72,16 +73,19 @@ function RootLayoutNav() {
           const accessToken = params.get('access_token');
           const type = params.get('type');
 
+          // Route to reset-password screen if this is a recovery link
+          if (type === 'recovery') {
+            setRecoveryFlow(); // set BEFORE getSession so index.tsx won't redirect away
+            await supabase.auth.getSession();
+            router.replace('/reset-password?type=recovery');
+            return;
+          }
+
           if (accessToken) {
             await new Promise(resolve => setTimeout(resolve, 200));
             await supabase.auth.getSession();
           } else {
             await supabase.auth.getSession();
-          }
-
-          // Route to reset-password screen if this is a recovery link
-          if (type === 'recovery') {
-            router.replace('/reset-password?type=recovery');
           }
         } catch (error) {
           console.error('Error handling OAuth deep link:', error);

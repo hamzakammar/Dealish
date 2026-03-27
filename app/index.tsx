@@ -1,4 +1,5 @@
 import { useAuthContext } from '@/app/providers/auth';
+import { isRecoveryFlow } from '@/app/lib/recoveryState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -49,6 +50,11 @@ export default function Index() {
 
       // Prevent duplicate navigation
       if (hasNavigatedRef.current) return;
+
+      // If this is a password recovery deep link, _layout.tsx owns navigation
+      // Don't redirect to map/auth or we'll race with router.replace('/reset-password')
+      if (isRecoveryFlow()) return;
+
       hasNavigatedRef.current = true;
 
       // Hide native splash right before navigating — no JS splash needed

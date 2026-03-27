@@ -267,8 +267,8 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     { label: "Filters", icon: "filter", action: handleFiltersPress },
     { label: "Favourites", icon: "heart", action: handleFavouritesPress },
     { label: "Settings", icon: "setting", action: handleSettingsPress },
-    { label: "About", icon: "info", action: () => router.push('/about' as any) },
-    { label: "Help", icon: "question", action: () => router.push('/help' as any) },
+    { label: "About", icon: "information-circle", action: () => router.push('/about' as any) },
+    { label: "Help", icon: "help-circle", action: () => router.push('/help' as any) },
     { label: "Partner with us", icon: "like", action: () => router.push('/partner' as any) },
   ];
 
@@ -328,7 +328,10 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
                   style={styles.menuItem}
                   onPress={item.action}
                 >
-                  <AntDesign name={item.icon as any} size={20} color={colors.text} />
+                  {item.icon === 'information-circle' || item.icon === 'help-circle'
+                    ? <Ionicons name={item.icon as any} size={22} color={colors.text} />
+                    : <AntDesign name={item.icon as any} size={20} color={colors.text} />
+                  }
                   <Text style={[styles.menuLabel, dynamicStyles.menuLabel]}>{item.label}</Text>
                 </TouchableOpacity>
               ))}
