@@ -131,10 +131,10 @@ export default function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      // image prop: Google Maps uses this directly as a bitmap — no child view,
-      // no React Native layout snapshot, no Samsung crop race condition possible.
-      image={{ uri: imageUri }}
-      // tracksViewChanges not needed — no child view to track
+      // Pass explicit logical-pixel dimensions so Google Maps doesn't guess from
+      // the SVG physical-pixel canvas. Without this, Pixel (3x DPR) renders the
+      // marker 3x too large because the SVG canvas is in physical pixels.
+      image={{ uri: imageUri, width: totalLogical, height: totalLogical }}
       tracksViewChanges={false}
       tappable={true}
     />
