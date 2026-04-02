@@ -388,8 +388,7 @@ export default function MapScreen() {
                   isSelected={isSelected}
                   onPress={handleRestaurantSelect}
                   hasActiveDeal={hasActiveDeal}
-                  scale={Math.min(1.4, Math.max(0.6, 0.05 / latitudeDelta))}
-                  mapIsTransitioning={mapIsTransitioning}
+                  scale={1 + Math.max(0, (0.05 - latitudeDelta) * 50)}
                 />
               );
             })}
