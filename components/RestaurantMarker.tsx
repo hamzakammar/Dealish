@@ -15,7 +15,6 @@ type RestaurantMarkerProps = {
 const PRICETAG_PATH =
   "M467,45.2A44.45,44.45,0,0,0,435.29,32H312.36a30.63,30.63,0,0,0-21.52,8.89L45.09,286.59a44.82,44.82,0,0,0,0,63.32l117,117a44.83,44.83,0,0,0,63.34,0l245.65-245.6A30.6,30.6,0,0,0,480,199.8v-123A44.24,44.24,0,0,0,467,45.2ZM384,160a32,32,0,1,1,32-32A32,32,0,0,1,384,160Z";
 
-// Pure-JS base64 encoder — no Buffer/btoa needed in React Native
 function toBase64(str: string): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const bytes: number[] = [];
@@ -36,32 +35,31 @@ function toBase64(str: string): string {
   return result;
 }
 
-function makeMarkerUri(opts: {
+function makeMarker(opts: {
   hasActiveDeal: boolean;
   isSelected: boolean;
   isPartner: boolean;
   logicalSize: number;
   pixelRatio: number;
-}): string {
+}): { uri: string; width: number; height: number } {
   const { hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio } = opts;
 
-  // Render at physical pixels for crispness
   const px = Math.round(logicalSize * pixelRatio);
   const pad = Math.round(px * 0.18);
   const total = px + pad * 2;
   const cx = total / 2;
   const cy = total / 2;
   const r = px / 2;
-
   const fill = isSelected ? '#FF6B00' : '#FE902A';
   const stroke = isPartner ? '#FFD54F' : '#FFFFFF';
   const sw = Math.max(2, px * 0.07);
+  const totalLogical = total / pixelRatio;
 
   let svg: string;
   if (!hasActiveDeal) {
     const dr = px * 0.36;
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="${total}" viewBox="0 0 ${total} ${total}">`
-      + (isPartner ? `<circle cx="${cx}" cy="${cy}" r="${dr*1.45}" fill="#FFD54F" opacity="0.5"/>` : '')
+      + (isPartner ? `<circle cx="${cx}" cy="${cy}" r="${dr * 1.45}" fill="#FFD54F" opacity="0.5"/>` : '')
       + `<circle cx="${cx}" cy="${cy}" r="${dr}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
       + `</svg>`;
   } else {
@@ -69,21 +67,18 @@ function makeMarkerUri(opts: {
     const ix = cx - iconSize / 2;
     const iy = cy - iconSize / 2;
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="${total}" viewBox="0 0 ${total} ${total}">`
-      + (isPartner ? `<circle cx="${cx}" cy="${cy}" r="${r*1.25}" fill="#FFD54F" opacity="0.4"/>` : '')
+      + (isPartner ? `<circle cx="${cx}" cy="${cy}" r="${r * 1.25}" fill="#FFD54F" opacity="0.4"/>` : '')
       + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
-      + `<g transform="translate(${ix},${iy}) scale(${iconSize/512})">`
+      + `<g transform="translate(${ix},${iy}) scale(${iconSize / 512})">`
       + `<path d="${PRICETAG_PATH}" fill="#FFFFFF"/>`
       + `</g></svg>`;
   }
 
-  const totalLogical = total / pixelRatio;
-  return `data:image/svg+xml;base64,${toBase64(svg)}|||${totalLogical}`;
-}
-
-// Split the URI from the encoded size hint
-function parseUri(encoded: string): { uri: string; size: number } {
-  const [uri, sizeStr] = encoded.split('|||');
-  return { uri, size: parseFloat(sizeStr) };
+  return {
+    uri: `data:image/svg+xml;base64,${toBase64(svg)}`,
+    width: totalLogical,
+    height: totalLogical,
+  };
 }
 
 const DEAL_BASE = 32;
@@ -101,12 +96,10 @@ function RestaurantMarker({
   const logicalSize = Math.round((hasActiveDeal ? DEAL_BASE : DOT_BASE) * s);
   const pixelRatio = PixelRatio.get();
 
-  const encoded = useMemo(
-    () => makeMarkerUri({ hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio }),
+  const marker = useMemo(
+    () => makeMarker({ hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio }),
     [hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio]
   );
-
-  const { uri, size } = parseUri(encoded);
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
@@ -126,7 +119,7 @@ function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 0.5 }}
-      image={{ uri, width: size, height: size }}
+      image={marker}
       tracksViewChanges={false}
       tappable={true}
     />
