@@ -29,8 +29,10 @@ function RestaurantMarker({
   hasActiveDeal,
   scale = 1,
 }: RestaurantMarkerProps) {
-  const s = Math.max(0.5, Math.min(1.6, scale));
-  const size = Math.round((hasActiveDeal ? DEAL_SIZE : DOT_SIZE) * s);
+  // Fixed sizes — no zoom scaling. Zoom scaling caused inconsistent sizes
+  // because markers mount/re-render at different times during zoom.
+  // Apple Maps handles visual density via native clustering.
+  const size = hasActiveDeal ? DEAL_SIZE : DOT_SIZE;
 
   const source = hasActiveDeal
     ? (isSelected ? MARKER_IMAGES.dealSelected : MARKER_IMAGES.deal)
