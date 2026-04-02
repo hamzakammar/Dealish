@@ -37,7 +37,7 @@ export default function MapScreen() {
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [markerScale, setMarkerScale] = useState(1);
+  const [latitudeDelta, setLatitudeDelta] = useState(0.05);
   const [mapIsTransitioning, setMapIsTransitioning] = useState(false);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
@@ -359,9 +359,7 @@ export default function MapScreen() {
             toolbarEnabled={false}
             onRegionChangeComplete={(r) => {
               currentRegionRef.current = r;
-              // Zoom-based marker scaling: smaller delta = zoomed in = bigger markers
-              const scale = Math.min(1.4, Math.max(0.6, 0.05 / r.latitudeDelta));
-              setMarkerScale(scale);
+              setLatitudeDelta(r.latitudeDelta);
               // Sync blurred map background with main map
               if (blurredMapRef.current) {
                 blurredMapRef.current.animateToRegion(r, 0);
@@ -388,7 +386,7 @@ export default function MapScreen() {
                   isSelected={isSelected}
                   onPress={handleRestaurantSelect}
                   hasActiveDeal={hasActiveDeal}
-                  scale={markerScale}
+                  scale={Math.min(1.4, Math.max(0.6, 0.05 / latitudeDelta))}
                   mapIsTransitioning={mapIsTransitioning}
                 />
               );

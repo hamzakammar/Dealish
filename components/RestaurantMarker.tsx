@@ -12,10 +12,7 @@ type RestaurantMarkerProps = {
 };
 
 // Pre-baked PNG assets — no SVG, no runtime generation, no encoding.
-// Static PNGs are 96x96 (deal) and 48x48 (dot) physical pixels.
-// We use require() which gives us the asset module — Google Maps accepts
-// { uri, width, height } or a require() directly. We use require() + explicit
-// width/height via a wrapper to control logical display size.
+// Static PNGs eliminate all Samsung/Android bitmap rendering issues.
 const MARKER_IMAGES = {
   deal:         require('@/assets/images/marker-deal.png'),
   dealSelected: require('@/assets/images/marker-deal-selected.png'),
@@ -23,9 +20,7 @@ const MARKER_IMAGES = {
   dotSelected:  require('@/assets/images/marker-dot-selected.png'),
 };
 
-// Fixed display sizes in logical pixels — no zoom scaling.
-// Zoom scaling via state caused size inconsistency between markers
-// (some rendered before scale update, some after).
+// Base display sizes in logical pixels
 const DEAL_SIZE = 32;
 const DOT_SIZE  = 20;
 
@@ -34,12 +29,16 @@ export default function RestaurantMarker({
   isSelected,
   onPress,
   hasActiveDeal,
+  scale = 1,
 }: RestaurantMarkerProps) {
+  // Scale is computed in map.tsx from latitudeDelta — all markers get the same
+  // value in the same render pass, so no size inconsistency is possible.
+  const s = Math.max(0.5, Math.min(1.6, scale));
+  const size = Math.round((hasActiveDeal ? DEAL_SIZE : DOT_SIZE) * s);
+
   const image = hasActiveDeal
     ? (isSelected ? MARKER_IMAGES.dealSelected : MARKER_IMAGES.deal)
     : (isSelected ? MARKER_IMAGES.dotSelected  : MARKER_IMAGES.dot);
-
-  const size = hasActiveDeal ? DEAL_SIZE : DOT_SIZE;
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
