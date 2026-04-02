@@ -78,7 +78,7 @@ export default function RestaurantMarker({
         coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
         onPress={handleMarkerPress}
         anchor={{ x: 0.5, y: 0.5 }}
-        tracksViewChanges={false}
+        tracksViewChanges={isAndroid}
         tappable={true}
       >
         <View 
@@ -118,7 +118,7 @@ export default function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handleMarkerPress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={false}
+      tracksViewChanges={isAndroid}
       tappable={true}
     >
       <View 
