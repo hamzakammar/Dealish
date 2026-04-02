@@ -12,34 +12,34 @@ type RestaurantMarkerProps = {
 };
 
 // Pre-baked PNG assets — no SVG, no runtime generation, no encoding.
-// Static PNGs are the only 100% reliable marker format on all Android devices.
-// Samsung bitmap snapshot race condition is impossible with image= prop (no child view).
-const MARKERS = {
-  deal: require('@/assets/images/marker-deal.png'),
+// Static PNGs are 96x96 (deal) and 48x48 (dot) physical pixels.
+// We use require() which gives us the asset module — Google Maps accepts
+// { uri, width, height } or a require() directly. We use require() + explicit
+// width/height via a wrapper to control logical display size.
+const MARKER_IMAGES = {
+  deal:         require('@/assets/images/marker-deal.png'),
   dealSelected: require('@/assets/images/marker-deal-selected.png'),
-  dot: require('@/assets/images/marker-dot.png'),
-  dotSelected: require('@/assets/images/marker-dot-selected.png'),
+  dot:          require('@/assets/images/marker-dot.png'),
+  dotSelected:  require('@/assets/images/marker-dot-selected.png'),
 };
 
-// Rendered size in logical pixels (points)
-// PNGs are 3x resolution: 96px PNG → 32dp, 48px PNG → 16dp
+// Fixed display sizes in logical pixels — no zoom scaling.
+// Zoom scaling via state caused size inconsistency between markers
+// (some rendered before scale update, some after).
 const DEAL_SIZE = 32;
-const DOT_SIZE  = 16;
+const DOT_SIZE  = 20;
 
 export default function RestaurantMarker({
   restaurant,
   isSelected,
   onPress,
   hasActiveDeal,
-  scale = 1,
 }: RestaurantMarkerProps) {
-  const s = Math.max(0.5, Math.min(1.6, scale));
-
   const image = hasActiveDeal
-    ? (isSelected ? MARKERS.dealSelected : MARKERS.deal)
-    : (isSelected ? MARKERS.dotSelected : MARKERS.dot);
+    ? (isSelected ? MARKER_IMAGES.dealSelected : MARKER_IMAGES.deal)
+    : (isSelected ? MARKER_IMAGES.dotSelected  : MARKER_IMAGES.dot);
 
-  const displaySize = (hasActiveDeal ? DEAL_SIZE : DOT_SIZE) * s;
+  const size = hasActiveDeal ? DEAL_SIZE : DOT_SIZE;
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
@@ -62,7 +62,6 @@ export default function RestaurantMarker({
       image={image}
       tracksViewChanges={false}
       tappable={true}
-      style={{ width: displaySize, height: displaySize }}
     />
   );
 }
