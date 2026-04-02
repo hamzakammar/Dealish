@@ -1,6 +1,6 @@
 import { Restaurant } from "@/types/restaurant";
-import React, { memo, useEffect, useRef, useState } from "react";
-import { Image, View } from "react-native";
+import React, { memo, useMemo } from "react";
+import { PixelRatio } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
@@ -12,15 +12,82 @@ type RestaurantMarkerProps = {
   mapIsTransitioning?: boolean;
 };
 
-const MARKER_IMAGES = {
-  deal:         require('@/assets/images/marker-deal.png'),
-  dealSelected: require('@/assets/images/marker-deal-selected.png'),
-  dot:          require('@/assets/images/marker-dot.png'),
-  dotSelected:  require('@/assets/images/marker-dot-selected.png'),
-};
+const PRICETAG_PATH =
+  "M467,45.2A44.45,44.45,0,0,0,435.29,32H312.36a30.63,30.63,0,0,0-21.52,8.89L45.09,286.59a44.82,44.82,0,0,0,0,63.32l117,117a44.83,44.83,0,0,0,63.34,0l245.65-245.6A30.6,30.6,0,0,0,480,199.8v-123A44.24,44.24,0,0,0,467,45.2ZM384,160a32,32,0,1,1,32-32A32,32,0,0,1,384,160Z";
 
-const DEAL_SIZE = 32;
-const DOT_SIZE  = 20;
+// Pure-JS base64 encoder — no Buffer/btoa needed in React Native
+function toBase64(str: string): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const bytes: number[] = [];
+  for (let j = 0; j < str.length; j++) {
+    const c = str.charCodeAt(j);
+    if (c < 128) bytes.push(c);
+    else if (c < 2048) bytes.push((c >> 6) | 192, (c & 63) | 128);
+    else bytes.push((c >> 12) | 224, ((c >> 6) & 63) | 128, (c & 63) | 128);
+  }
+  let result = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i], b1 = bytes[i+1] ?? 0, b2 = bytes[i+2] ?? 0;
+    result += chars[b0 >> 2];
+    result += chars[((b0 & 3) << 4) | (b1 >> 4)];
+    result += i + 1 < bytes.length ? chars[((b1 & 15) << 2) | (b2 >> 6)] : '=';
+    result += i + 2 < bytes.length ? chars[b2 & 63] : '=';
+  }
+  return result;
+}
+
+function makeMarkerUri(opts: {
+  hasActiveDeal: boolean;
+  isSelected: boolean;
+  isPartner: boolean;
+  logicalSize: number;
+  pixelRatio: number;
+}): string {
+  const { hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio } = opts;
+
+  // Render at physical pixels for crispness
+  const px = Math.round(logicalSize * pixelRatio);
+  const pad = Math.round(px * 0.18);
+  const total = px + pad * 2;
+  const cx = total / 2;
+  const cy = total / 2;
+  const r = px / 2;
+
+  const fill = isSelected ? '#FF6B00' : '#FE902A';
+  const stroke = isPartner ? '#FFD54F' : '#FFFFFF';
+  const sw = Math.max(2, px * 0.07);
+
+  let svg: string;
+  if (!hasActiveDeal) {
+    const dr = px * 0.36;
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="${total}" viewBox="0 0 ${total} ${total}">`
+      + (isPartner ? `<circle cx="${cx}" cy="${cy}" r="${dr*1.45}" fill="#FFD54F" opacity="0.5"/>` : '')
+      + `<circle cx="${cx}" cy="${cy}" r="${dr}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
+      + `</svg>`;
+  } else {
+    const iconSize = r * 1.04;
+    const ix = cx - iconSize / 2;
+    const iy = cy - iconSize / 2;
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="${total}" viewBox="0 0 ${total} ${total}">`
+      + (isPartner ? `<circle cx="${cx}" cy="${cy}" r="${r*1.25}" fill="#FFD54F" opacity="0.4"/>` : '')
+      + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`
+      + `<g transform="translate(${ix},${iy}) scale(${iconSize/512})">`
+      + `<path d="${PRICETAG_PATH}" fill="#FFFFFF"/>`
+      + `</g></svg>`;
+  }
+
+  const totalLogical = total / pixelRatio;
+  return `data:image/svg+xml;base64,${toBase64(svg)}|||${totalLogical}`;
+}
+
+// Split the URI from the encoded size hint
+function parseUri(encoded: string): { uri: string; size: number } {
+  const [uri, sizeStr] = encoded.split('|||');
+  return { uri, size: parseFloat(sizeStr) };
+}
+
+const DEAL_BASE = 32;
+const DOT_BASE  = 20;
 
 function RestaurantMarker({
   restaurant,
@@ -29,39 +96,17 @@ function RestaurantMarker({
   hasActiveDeal,
   scale = 1,
 }: RestaurantMarkerProps) {
-  // Fixed sizes — no zoom scaling. Zoom scaling caused inconsistent sizes
-  // because markers mount/re-render at different times during zoom.
-  // Apple Maps handles visual density via native clustering.
-  const size = hasActiveDeal ? DEAL_SIZE : DOT_SIZE;
+  const isPartner = Boolean(restaurant.partner);
+  const s = Math.max(0.5, Math.min(1.6, scale));
+  const logicalSize = Math.round((hasActiveDeal ? DEAL_BASE : DOT_BASE) * s);
+  const pixelRatio = PixelRatio.get();
 
-  const source = hasActiveDeal
-    ? (isSelected ? MARKER_IMAGES.dealSelected : MARKER_IMAGES.deal)
-    : (isSelected ? MARKER_IMAGES.dotSelected  : MARKER_IMAGES.dot);
+  const encoded = useMemo(
+    () => makeMarkerUri({ hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio }),
+    [hasActiveDeal, isSelected, isPartner, logicalSize, pixelRatio]
+  );
 
-  // tracksViewChanges: must be true briefly when size changes so Google Maps
-  // re-snapshots the marker. We flip it true for one frame then back to false.
-  // This is the standard pattern for dynamic-size markers on Android.
-  const [tracksViewChanges, setTracksViewChanges] = useState(true);
-  const prevSizeRef = useRef(size);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (prevSizeRef.current !== size) {
-      prevSizeRef.current = size;
-      setTracksViewChanges(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setTracksViewChanges(false), 100);
-    }
-  }, [size]);
-
-  // Initial mount: disable tracking after first render
-  useEffect(() => {
-    const t = setTimeout(() => setTracksViewChanges(false), 300);
-    return () => {
-      clearTimeout(t);
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  const { uri, size } = parseUri(encoded);
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
@@ -81,18 +126,10 @@ function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={tracksViewChanges}
+      image={{ uri, width: size, height: size }}
+      tracksViewChanges={false}
       tappable={true}
-    >
-      <View style={{ width: size, height: size }}>
-        <Image
-          source={source}
-          style={{ width: size, height: size }}
-          resizeMode="contain"
-          fadeDuration={0}
-        />
-      </View>
-    </Marker>
+    />
   );
 }
 
