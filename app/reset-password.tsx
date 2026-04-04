@@ -38,6 +38,7 @@ export default function ResetPasswordScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [hasRecoveryToken, setHasRecoveryToken] = useState(false);
+    const [sessionReady, setSessionReady] = useState(false);
 
     const dynamicStyles = useMemo(() => StyleSheet.create({
         container: {
@@ -102,6 +103,19 @@ export default function ResetPasswordScreen() {
             marginBottom: 24,
         },
     }), [colors]);
+
+    // Listen for the PASSWORD_RECOVERY auth event — this fires when Supabase
+    // processes the recovery token from the deep link. Only then is the session
+    // valid for updateUser(). Without waiting for this, "auth session missing" occurs.
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                setHasRecoveryToken(true);
+                setSessionReady(true);
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, []);
 
     // Check if we have a recovery token from deep link or URL params
     useEffect(() => {
@@ -184,6 +198,11 @@ export default function ResetPasswordScreen() {
 
         if (newPassword !== confirmPassword) {
             setConfirmPasswordError('Passwords do not match');
+            return;
+        }
+
+        if (!sessionReady) {
+            Alert.alert('Error', 'Recovery session not ready yet. Please wait a moment and try again.');
             return;
         }
 

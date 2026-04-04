@@ -278,7 +278,18 @@ export default function AuthScreen() {
   
         if (error) {
           await recordFailedAttempt();
-          Alert.alert('Error', error.message);
+          // Supabase returns this specific message for existing accounts
+          if (error.message?.toLowerCase().includes('already registered') || 
+              error.message?.toLowerCase().includes('already been registered') ||
+              error.message?.toLowerCase().includes('user already exists')) {
+            Alert.alert('Account Exists', 'An account with this email already exists. Please sign in instead.');
+          } else {
+            Alert.alert('Error', error.message);
+          }
+        } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+          // Supabase silently "succeeds" for existing emails when email confirmation is on
+          // but returns a user with empty identities array
+          Alert.alert('Account Exists', 'An account with this email already exists. Please sign in instead.');
         } else {
           // Clear rate limit on success
           await clearRateLimit();

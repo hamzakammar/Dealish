@@ -73,11 +73,13 @@ function filterActiveDeals(deals: Deal[]): Deal[] {
  */
 export function useActiveDealsMap(restaurants: Restaurant[]) {
   const [activeDealsMap, setActiveDealsMap] = useState<Map<string, boolean>>(new Map());
+  const [dealTitlesMap, setDealTitlesMap] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (restaurants.length === 0) {
       setActiveDealsMap(new Map());
+      setDealTitlesMap(new Map());
       setLoading(false);
       return;
     }
@@ -104,28 +106,35 @@ export function useActiveDealsMap(restaurants: Restaurant[]) {
 
         // Create a map: restaurant_id -> hasActiveDeal
         const dealsMap = new Map<string, boolean>();
+        const titlesMap = new Map<string, string[]>();
         
         // Initialize all restaurants to false
         restaurantIds.forEach((id) => {
           dealsMap.set(id, false);
+          titlesMap.set(id, []);
         });
 
-        // Mark restaurants with active deals as true
+        // Mark restaurants with active deals as true and collect titles
         activeDeals.forEach((deal) => {
           dealsMap.set(deal.restaurant_id, true);
+          const existing = titlesMap.get(deal.restaurant_id) || [];
+          titlesMap.set(deal.restaurant_id, [...existing, deal.title || '', deal.description || '']);
         });
 
         setActiveDealsMap(dealsMap);
+        setDealTitlesMap(titlesMap);
         setLoading(false);
       } catch (e: any) {
         console.error("Error fetching active deals:", e);
         if (mounted) {
-          // On error, assume no active deals (show dots)
           const emptyMap = new Map<string, boolean>();
+          const emptyTitles = new Map<string, string[]>();
           restaurants.forEach((r) => {
             emptyMap.set(r.id, false);
+            emptyTitles.set(r.id, []);
           });
           setActiveDealsMap(emptyMap);
+          setDealTitlesMap(emptyTitles);
           setLoading(false);
         }
       }
@@ -133,11 +142,8 @@ export function useActiveDealsMap(restaurants: Restaurant[]) {
 
     fetchActiveDeals();
 
-    // Refresh every minute to check for new active deals
     const interval = setInterval(() => {
-      if (mounted) {
-        fetchActiveDeals();
-      }
+      if (mounted) fetchActiveDeals();
     }, 60000);
 
     return () => {
@@ -146,5 +152,5 @@ export function useActiveDealsMap(restaurants: Restaurant[]) {
     };
   }, [restaurants]);
 
-  return { activeDealsMap, loading };
+  return { activeDealsMap, dealTitlesMap, loading };
 }

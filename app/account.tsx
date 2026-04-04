@@ -187,12 +187,15 @@ export default function AccountPage() {
             if (editingAvatar && editingAvatar !== userAvatar && editingAvatar.startsWith('file://')) {
                 try {
                     const response = await fetch(editingAvatar);
-                    const blob = await response.blob();
+                    const arrayBuffer = await response.arrayBuffer();
                     const fileName = `${session.user.id}_${Date.now()}.jpg`;
 
                     const { data: uploadData, error: uploadError } = await supabase.storage
                         .from('avatars')
-                        .upload(fileName, blob);
+                        .upload(fileName, arrayBuffer, {
+                            contentType: 'image/jpeg',
+                            upsert: true,
+                        });
 
                     if (uploadError) {
                         console.error('Error uploading image:', uploadError);

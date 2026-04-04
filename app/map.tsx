@@ -46,7 +46,7 @@ export default function MapScreen() {
   const colors = useThemeColors();
   
   // Batch fetch active deals for ALL restaurants (needed for filtering)
-  const { activeDealsMap } = useActiveDealsMap(restaurants);
+  const { activeDealsMap, dealTitlesMap } = useActiveDealsMap(restaurants);
   
   const systemColorScheme = useColorScheme();
   
@@ -167,9 +167,10 @@ export default function MapScreen() {
     return filteredByFilters.filter((restaurant) =>
       restaurant.name.toLowerCase().includes(query) ||
       restaurant.address?.toLowerCase().includes(query) ||
-      restaurant.type?.toLowerCase().includes(query)
+      restaurant.type?.toLowerCase().includes(query) ||
+      (dealTitlesMap.get(restaurant.id) || []).some(t => t.toLowerCase().includes(query))
     );
-  }, [filteredByFilters, searchQuery]);
+  }, [filteredByFilters, searchQuery, dealTitlesMap]);
 
   // Update map type when settings change
   useEffect(() => {
@@ -187,10 +188,11 @@ export default function MapScreen() {
     const matches = filteredByFilters.filter((restaurant) =>
       restaurant.name.toLowerCase().includes(query) ||
       restaurant.address?.toLowerCase().includes(query) ||
-      restaurant.type?.toLowerCase().includes(query)
+      restaurant.type?.toLowerCase().includes(query) ||
+      (dealTitlesMap.get(restaurant.id) || []).some(t => t.toLowerCase().includes(query))
     );
-    return matches.slice(0, 5); // Limit to 5 suggestions
-  }, [filteredByFilters, searchQuery]);
+    return matches.slice(0, 5);
+  }, [filteredByFilters, searchQuery, dealTitlesMap]);
 
   const handleSuggestionPress = (restaurant: Restaurant) => {
     setSearchQuery("");
@@ -354,7 +356,7 @@ export default function MapScreen() {
             showsUserLocation={true}
             mapType={mapType}
             provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
-            customMapStyle={isDarkMode && mapType === "standard" && Platform.OS === 'android' ? darkMapStyle : undefined}
+            customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
             pitchEnabled={Platform.OS !== 'android'}
             toolbarEnabled={false}
             onRegionChangeComplete={(r) => {
