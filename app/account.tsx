@@ -600,7 +600,7 @@ export default function AccountPage() {
                     })
                 ) : (
                     <View style={{ padding: 20, alignItems: 'center' }}>
-                        <Text style={dynamicStyles.emptyText}>No recent activity</Text>
+                        <Text style={dynamicStyles.emptyText}>No activity yet</Text>
                     </View>
                 )}
             </View>
