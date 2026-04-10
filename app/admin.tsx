@@ -530,6 +530,33 @@ export default function AdminDashboard() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              try {
+                router.push({
+                  pathname: '/admin/integrations' as any,
+                  params: { restaurantId: selectedRestaurantId }
+                });
+              } catch (error) {
+                console.error('Navigation error:', error);
+                Alert.alert('Error', 'Failed to navigate. Please try again.');
+              }
+            }}
+            disabled={!selectedRestaurantId}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={styles.menuItemIcon}>
+                <Ionicons name="git-network-outline" size={20} color="#64748B" />
+              </View>
+              <View>
+                <Text style={styles.menuItemTitle}>Integrations</Text>
+                <Text style={styles.menuItemSubtitle}>Sync Google Sheets inventory</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.menuItem, styles.menuItemHighlight]}
             onPress={() => {
               try {
