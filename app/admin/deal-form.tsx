@@ -188,6 +188,7 @@ export default function DealForm() {
         discount_type: discountType,
         discount_value: discountValue ? parseFloat(discountValue) : undefined,
         original_price: originalPrice ? parseFloat(originalPrice) : undefined,
+        source: 'manual',
       };
 
       if (isRecurring) {

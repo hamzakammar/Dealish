@@ -160,6 +160,9 @@ function RootLayoutNav() {
           <Stack.Screen name="admin/analytics" options={{ headerShown: false }} />
           <Stack.Screen name="admin/integrations" options={{ headerShown: false }} />
           <Stack.Screen name="admin/create-restaurant" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/inventory" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/inventory/alerts" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/partner-requests" options={{ headerShown: false }} />
         </Stack>
         </ThemeWrapper>
       </AuthProvider>
