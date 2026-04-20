@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "8DWMM7XN54.com.anonymous.Dealish",
+        "paths": ["/auth/callback*", "/reset-password*"]
+      }
+    ]
+  }
+}

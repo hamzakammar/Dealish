@@ -84,7 +84,11 @@ export default function IntegrationsScreen() {
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [generatingKey, setGeneratingKey] = useState(false);
 
-  const redirectUri = makeRedirectUri({ scheme: 'dealish', path: 'auth/callback' });
+  const redirectUri = makeRedirectUri(
+    __DEV__
+      ? { useProxy: true }
+      : { native: 'https://dealish.io/auth/callback' }
+  );
 
   const [request, response, promptAsync] = useAuthRequest(
     {
