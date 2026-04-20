@@ -39,15 +39,12 @@ async function getValidAccessToken(
   tokenRow: { id: string; access_token: string; refresh_token: string; token_expiry: string }
 ): Promise<string | null> {
   const expiry = new Date(tokenRow.token_expiry);
-  const nowPlus5 = new Date(Date.now() + 5 * 60 * 1000); // refresh if <5 min left
-
+  const nowPlus5 = new Date(Date.now() + 5 * 60 * 1000);
   if (expiry > nowPlus5) return tokenRow.access_token;
 
-  // Refresh
   const refreshed = await refreshAccessToken(tokenRow.refresh_token);
   if (!refreshed) return null;
 
-  // Update in DB
   await supabase
     .from('google_oauth_tokens')
     .update({
@@ -86,51 +83,55 @@ async function fetchSheetData(
   return { headers, rows };
 }
 
-// --- LLM schema detection ---
+// --- Fuzzy Schema Detection (no LLM) ---
 
-async function detectSchema(headers: string[], sampleRows: unknown[][]): Promise<Record<string, string | null>> {
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!anthropicKey) return {};
+const FIELD_SYNONYMS: Record<string, string[]> = {
+  title: ['title', 'name', 'item', 'product', 'deal', 'dish', 'menu item', 'item name', 'deal name', 'offer', 'food item'],
+  description: ['description', 'details', 'notes', 'info', 'about', 'promo', 'text', 'body', 'summary', 'note'],
+  original_price: ['original price', 'regular price', 'full price', 'normal price', 'retail price', 'original', 'reg price', 'base price', 'msrp'],
+  deal_price: ['deal price', 'sale price', 'discounted price', 'offer price', 'promo price', 'discount price', 'new price', 'special price', 'deal', 'sale', 'cost', 'price'],
+  discount_percent: ['discount', 'discount %', 'discount percent', '% off', 'percent off', 'savings %', 'off %', 'reduction'],
+  is_active: ['active', 'available', 'enabled', 'live', 'on', 'status', 'visible', 'show', 'published', 'active?', 'available?'],
+  valid_from: ['valid from', 'start date', 'start', 'from', 'begins', 'start time', 'valid start', 'effective date'],
+  valid_until: ['valid until', 'expiry', 'expires', 'end date', 'end', 'until', 'valid to', 'expiration', 'expiry date', 'ends', 'deadline'],
+  category: ['category', 'type', 'kind', 'group', 'section', 'cuisine', 'food type', 'item type', 'tag', 'tags'],
+};
 
-  const prompt = `You are analyzing a restaurant inventory/menu Google Sheet to map columns to deal fields.
+function normalizeHeader(h: string): string {
+  return h.toLowerCase().trim().replace(/[_\-\/\\]+/g, ' ').replace(/\s+/g, ' ');
+}
 
-Headers: ${JSON.stringify(headers)}
-Sample rows (first 5):
-${sampleRows.slice(0, 5).map((r, i) => `Row ${i + 1}: ${JSON.stringify(r)}`).join('\n')}
+function detectSchema(headers: string[]): Record<string, string | null> {
+  const mapping: Record<string, string | null> = {};
+  const normalizedHeaders = headers.map(h => ({ original: h, normalized: normalizeHeader(h) }));
 
-Map the headers to these Dealish deal fields (use null if no suitable column exists):
-- title: deal or item name
-- description: details, notes, promo text
-- original_price: regular/full price (number)
-- deal_price: sale/discounted price (number)
-- discount_percent: percentage off (number)
-- is_active: whether deal is active (boolean/checkbox/Y-N/Yes-No)
-- valid_from: start date
-- valid_until: end date or expiry
-- category: food category or type
+  for (const [field, synonyms] of Object.entries(FIELD_SYNONYMS)) {
+    let matched: string | null = null;
 
-Return ONLY a JSON object using exact header names as values, or null:
-{"title":"...", "description":null, ...}`;
+    // Exact match first
+    for (const { original, normalized } of normalizedHeaders) {
+      if (synonyms.includes(normalized)) { matched = original; break; }
+    }
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
+    // Partial match fallback
+    if (!matched) {
+      for (const { original, normalized } of normalizedHeaders) {
+        if (synonyms.some(s => normalized.includes(s) || s.includes(normalized))) {
+          matched = original; break;
+        }
+      }
+    }
 
-  const json = await resp.json();
-  const text = json.content?.[0]?.text || '{}';
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return {};
-  try { return JSON.parse(match[0]); } catch { return {}; }
+    mapping[field] = matched;
+  }
+
+  // If deal_price not found but original_price is, use it as deal_price
+  if (!mapping.deal_price && mapping.original_price) {
+    mapping.deal_price = mapping.original_price;
+    mapping.original_price = null;
+  }
+
+  return mapping;
 }
 
 // --- Row normalization ---
@@ -139,11 +140,10 @@ function simpleHash(obj: unknown): string {
   return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).slice(0, 32);
 }
 
-async function normalizeRow(
+function normalizeRow(
   rowObj: Record<string, unknown>,
   mapping: Record<string, string | null>
-): Promise<Record<string, unknown> | null> {
-  // Apply direct mapping first
+): Record<string, unknown> | null {
   const mapped: Record<string, unknown> = {};
   for (const [field, col] of Object.entries(mapping)) {
     if (col && rowObj[col] !== undefined && rowObj[col] !== '') {
@@ -151,40 +151,10 @@ async function normalizeRow(
     }
   }
 
-  if (!mapped.title) {
-    // Try LLM for tricky rows
-    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!anthropicKey) return null;
-
-    const prompt = `Convert this restaurant inventory row to a deal. Row: ${JSON.stringify(rowObj)}
-Return ONLY JSON: {"title":"...","description":"...","deal_price":0,"original_price":0,"discount_percent":0,"is_active":true,"valid_until":null,"category":"..."}
-Omit fields you can't determine.`;
-
-    try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5',
-          max_tokens: 256,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      });
-      const json = await resp.json();
-      const text = json.content?.[0]?.text || '{}';
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) Object.assign(mapped, JSON.parse(match[0]));
-    } catch (_) {}
-  }
-
   if (!mapped.title) return null;
 
-  // Normalize types
   const deal: Record<string, unknown> = { title: String(mapped.title) };
+
   if (mapped.description) deal.description = String(mapped.description);
 
   const toNum = (v: unknown) => {
@@ -197,11 +167,9 @@ Omit fields you can't determine.`;
   if (mapped.discount_percent) deal.discount_percent = toNum(mapped.discount_percent);
   if (mapped.category) deal.category = String(mapped.category);
 
-  // is_active
   const activeRaw = String(mapped.is_active ?? 'true').toLowerCase().trim();
   deal.is_active = ['true', 'yes', 'y', '1', 'active', 'on', 'x', '✓', '✅', 'TRUE'].includes(activeRaw);
 
-  // Dates
   const toISO = (v: unknown) => {
     try { const d = new Date(String(v)); return isNaN(d.getTime()) ? undefined : d.toISOString(); }
     catch { return undefined; }
@@ -217,7 +185,6 @@ Omit fields you can't determine.`;
 async function pollIntegration(supabase: any, integration: any) {
   const { id: integrationId, restaurant_id, sheet_id, sheet_tab, detected_mapping } = integration;
 
-  // Get token for this restaurant
   const { data: tokenRow, error: tokenErr } = await supabase
     .from('google_oauth_tokens')
     .select('*')
@@ -235,7 +202,6 @@ async function pollIntegration(supabase: any, integration: any) {
     return { skipped: true, reason: 'token_refresh_failed' };
   }
 
-  // Fetch sheet data
   const sheetData = await fetchSheetData(accessToken, sheet_id, sheet_tab || 'Sheet1');
   if (!sheetData || !sheetData.headers.length) {
     console.log(`Empty sheet for integration ${integrationId}`);
@@ -244,28 +210,23 @@ async function pollIntegration(supabase: any, integration: any) {
 
   const { headers, rows } = sheetData;
 
-  // Detect schema if not yet done
+  // Detect/re-detect schema if not confirmed
   let mapping = detected_mapping;
   if (!mapping || Object.keys(mapping).length === 0) {
     console.log(`Detecting schema for integration ${integrationId}`);
-    mapping = await detectSchema(headers, rows);
-    await supabase
-      .from('sheet_integrations')
-      .update({ detected_mapping: mapping })
-      .eq('id', integrationId);
+    mapping = detectSchema(headers);
+    await supabase.from('sheet_integrations').update({ detected_mapping: mapping }).eq('id', integrationId);
   }
 
   const results = { created: 0, updated: 0, skipped: 0, errors: 0 };
 
   for (let i = 0; i < rows.length; i++) {
-    const rowIndex = i + 2; // 1-based, +1 for header row
+    const rowIndex = i + 2;
     const rowData = rows[i];
 
-    // Build named object
     const rowObj: Record<string, unknown> = {};
     headers.forEach((h, j) => { if (h) rowObj[h] = rowData[j] ?? ''; });
 
-    // Skip completely empty rows
     if (Object.values(rowObj).every(v => v === '' || v === null || v === undefined)) {
       results.skipped++;
       continue;
@@ -273,7 +234,6 @@ async function pollIntegration(supabase: any, integration: any) {
 
     const rowHash = simpleHash(rowObj);
 
-    // Check if unchanged
     const { data: existingSync } = await supabase
       .from('sheet_synced_rows')
       .select('*')
@@ -286,8 +246,7 @@ async function pollIntegration(supabase: any, integration: any) {
       continue;
     }
 
-    // Normalize
-    const deal = await normalizeRow(rowObj, mapping);
+    const deal = normalizeRow(rowObj, mapping);
     if (!deal) { results.skipped++; continue; }
 
     const dealPayload: any = {
@@ -334,19 +293,13 @@ async function pollIntegration(supabase: any, integration: any) {
     }
   }
 
-  // Update last_synced_at
-  await supabase
-    .from('sheet_integrations')
-    .update({ last_synced_at: new Date().toISOString() })
-    .eq('id', integrationId);
-
+  await supabase.from('sheet_integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integrationId);
   return results;
 }
 
 // --- Entry point ---
 
 serve(async (req) => {
-  // Allow manual trigger via POST, or cron call
   if (req.method !== 'POST' && req.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 });
   }
@@ -357,13 +310,8 @@ serve(async (req) => {
   );
 
   try {
-    // Optionally poll a single integration (for testing)
-    let query = supabase
-      .from('sheet_integrations')
-      .select('*')
-      .eq('sync_method', 'oauth_cron');
+    let query = supabase.from('sheet_integrations').select('*').eq('sync_method', 'oauth_cron');
 
-    // If specific restaurant_id passed, filter to that one
     if (req.method === 'POST') {
       try {
         const body = await req.json();
