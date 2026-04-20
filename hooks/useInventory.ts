@@ -41,17 +41,18 @@ export function useInventory(restaurantId: string | null) {
       }
 
       // Filter out items where product join failed (product was deleted)
-      const validItems = (data || []).filter((item: any) => item.product !== null);
+      const validItems = (data || []).filter((item) => item.product !== null);
 
       if (__DEV__) {
         console.log(`Fetched ${validItems.length} inventory items (${data?.length || 0} total, ${(data?.length || 0) - validItems.length} with missing products)`);
       }
 
       setInventoryItems(validItems as InventoryItemWithProduct[]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error fetching inventory:', e);
-      setError(e);
-      Alert.alert('Error', `Failed to load inventory: ${e.message || 'Unknown error'}`);
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      setError(e instanceof Error ? e : new Error(message));
+      Alert.alert('Error', `Failed to load inventory: ${message}`);
       setInventoryItems([]); // Clear items on error
     } finally {
       setLoading(false);
@@ -90,9 +91,10 @@ export function useInventory(restaurantId: string | null) {
       }
 
       return data as InventoryItemWithProduct;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error adding inventory item:', e);
-      Alert.alert('Error', e.message || 'Failed to add inventory item.');
+      const message = e instanceof Error ? e.message : 'Failed to add inventory item.';
+      Alert.alert('Error', message);
       return null;
     }
   };
@@ -138,9 +140,10 @@ export function useInventory(restaurantId: string | null) {
       }
 
       return data as InventoryItemWithProduct;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error updating inventory item:', e);
-      Alert.alert('Error', e.message || 'Failed to update inventory item.');
+      const message = e instanceof Error ? e.message : 'Failed to update inventory item.';
+      Alert.alert('Error', message);
       return null;
     }
   };
@@ -161,9 +164,10 @@ export function useInventory(restaurantId: string | null) {
       await fetchInventory();
 
       return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error deleting inventory item:', e);
-      Alert.alert('Error', e.message || 'Failed to delete inventory item.');
+      const message = e instanceof Error ? e.message : 'Failed to delete inventory item.';
+      Alert.alert('Error', message);
       return false;
     }
   };
@@ -216,7 +220,7 @@ export function useInventoryStats(restaurantId: string | null) {
       }
 
       // Filter out items where product join failed (product was deleted)
-      const validItems = (items || []).filter((item: any) => item.product !== null);
+      const validItems = (items || []).filter((item) => item.product !== null);
 
       const stats: InventoryStats = {
         total_items: validItems.length,
@@ -228,7 +232,7 @@ export function useInventoryStats(restaurantId: string | null) {
         expired_items: 0,
       };
 
-      validItems.forEach((item: any) => {
+      validItems.forEach((item) => {
         // Calculate total value
         if (item.unit_cost) {
           stats.total_value += (item.quantity || 0) * item.unit_cost;
@@ -254,7 +258,7 @@ export function useInventoryStats(restaurantId: string | null) {
       });
 
       setStats(stats);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error fetching inventory stats:', e);
     } finally {
       setLoading(false);

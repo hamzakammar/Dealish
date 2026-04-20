@@ -34,9 +34,9 @@ export function useProducts(restaurantId: string | null) {
       if (fetchError) throw fetchError;
 
       setProducts(data || []);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error fetching products:', e);
-      setError(e);
+      setError(e instanceof Error ? e : new Error('Unknown error'));
       Alert.alert('Error', 'Failed to load products. Please try again.');
     } finally {
       setLoading(false);
@@ -64,7 +64,7 @@ export function useProducts(restaurantId: string | null) {
       }
 
       return data as Product;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error fetching product by barcode:', e);
       return null;
     }
@@ -89,9 +89,10 @@ export function useProducts(restaurantId: string | null) {
       await fetchProducts();
 
       return data as Product;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error creating product:', e);
-      Alert.alert('Error', e.message || 'Failed to create product.');
+      const message = e instanceof Error ? e.message : 'Failed to create product.';
+      Alert.alert('Error', message);
       return null;
     }
   };
@@ -151,9 +152,10 @@ export function useProducts(restaurantId: string | null) {
       }
 
       return data as Product;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error updating product:', e);
-      Alert.alert('Error', e.message || 'Failed to update product.');
+      const message = e instanceof Error ? e.message : 'Failed to update product.';
+      Alert.alert('Error', message);
       return null;
     }
   };
@@ -171,9 +173,10 @@ export function useProducts(restaurantId: string | null) {
       await fetchProducts();
 
       return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error deleting product:', e);
-      Alert.alert('Error', e.message || 'Failed to delete product.');
+      const message = e instanceof Error ? e.message : 'Failed to delete product.';
+      Alert.alert('Error', message);
       return false;
     }
   };

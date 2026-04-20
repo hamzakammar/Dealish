@@ -45,10 +45,10 @@ export function useDealQRCode(dealId: string | null) {
           const qrData = createQRCodeData(currentDealId, token);
           setQrCodeData(qrData);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Error fetching/generating QR code:", e);
         if (mounted) {
-          setError(e);
+          setError(e instanceof Error ? e : new Error('Unknown error'));
         }
       } finally {
         if (mounted) {

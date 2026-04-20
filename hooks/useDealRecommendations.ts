@@ -39,9 +39,9 @@ export function useDealRecommendations(restaurantId: string | null) {
       if (fetchError) throw fetchError;
 
       setRecommendations((data || []) as DealRecommendationWithProduct[]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error fetching recommendations:', e);
-      setError(e);
+      setError(e instanceof Error ? e : new Error('Unknown error'));
       Alert.alert('Error', 'Failed to load recommendations. Please try again.');
     } finally {
       setLoading(false);
@@ -54,7 +54,7 @@ export function useDealRecommendations(restaurantId: string | null) {
     dealId?: string
   ) => {
     try {
-      const updates: any = { status };
+      const updates: Record<string, unknown> = { status };
       if (dealId) {
         updates.deal_id = dealId;
       }
@@ -76,9 +76,10 @@ export function useDealRecommendations(restaurantId: string | null) {
       await fetchRecommendations();
 
       return data as DealRecommendationWithProduct;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error updating recommendation:', e);
-      Alert.alert('Error', e.message || 'Failed to update recommendation.');
+      const message = e instanceof Error ? e.message : 'Failed to update recommendation.';
+      Alert.alert('Error', message);
       return null;
     }
   };

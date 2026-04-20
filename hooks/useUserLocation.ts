@@ -96,9 +96,10 @@ export function useUserLocation(mapRef: React.RefObject<any>) {
             }
           }
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
-        Alert.alert("Error", e?.message ?? "Something went wrong");
+        const message = e instanceof Error ? e.message : 'Something went wrong';
+        Alert.alert("Error", message);
       } finally {
         if (mounted) setLoading(false);
       }

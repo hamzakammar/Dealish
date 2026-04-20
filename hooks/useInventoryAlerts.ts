@@ -43,11 +43,12 @@ export function useInventoryAlerts(restaurantId: string | null) {
         console.log('Fetched alerts:', data?.length || 0);
       }
       setAlerts((data || []) as InventoryAlertWithProduct[]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error fetching alerts:', e);
-      setError(e);
+      setError(e instanceof Error ? e : new Error('Unknown error'));
       // Don't show alert dialog on initial load - let UI handle it via error state
-      console.error('Failed to load inventory alerts:', e.message || e);
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      console.error('Failed to load inventory alerts:', message);
     } finally {
       setLoading(false);
     }
@@ -76,9 +77,10 @@ export function useInventoryAlerts(restaurantId: string | null) {
       await fetchAlerts();
 
       return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error marking alert as read:', e);
-      Alert.alert('Error', e.message || 'Failed to update alert.');
+      const message = e instanceof Error ? e.message : 'Failed to update alert.';
+      Alert.alert('Error', message);
       return false;
     }
   };
@@ -103,9 +105,10 @@ export function useInventoryAlerts(restaurantId: string | null) {
       await fetchAlerts();
 
       return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error marking all alerts as read:', e);
-      Alert.alert('Error', e.message || 'Failed to update alerts.');
+      const message = e instanceof Error ? e.message : 'Failed to update alerts.';
+      Alert.alert('Error', message);
       return false;
     }
   };

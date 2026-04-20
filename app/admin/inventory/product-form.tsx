@@ -101,9 +101,10 @@ export default function ProductForm() {
           }, 500);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving product:', error);
-      Alert.alert('Error', error.message || 'Failed to save product');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', message || 'Failed to save product');
     } finally {
       setIsSaving(false);
     }

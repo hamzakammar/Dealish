@@ -2,7 +2,7 @@ import { useAuthContext } from "@/app/providers/auth";
 import { useEffect, useState } from "react";
 
 export function useProfileSetup() {
-  const { profile, session } = useAuthContext();
+  const { profile, session, isLoading: authLoading } = useAuthContext();
   const [isProfileComplete, setIsProfileComplete] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -14,16 +14,19 @@ export function useProfileSetup() {
       return;
     }
 
-    // Session exists but profile hasn't loaded yet — stay in loading state.
-    // The auth provider WILL deliver the profile; we just need to wait.
+    // Wait for auth provider to finish loading profile instead of arbitrary timeout.
+    // The auth provider tracks its own loading state — trust it.
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    // Auth finished loading but profile is null — new user or profile fetch failed.
+    // Treat as incomplete so they go through onboarding.
     if (!profile) {
-      // Safety timeout: if profile never arrives after 3s, assume complete
-      // so a returning user isn't stuck on a loading screen or sent to onboarding.
-      const safetyTimeout = setTimeout(() => {
-        setLoading(false);
-        setIsProfileComplete(true);
-      }, 3000);
-      return () => clearTimeout(safetyTimeout);
+      setLoading(false);
+      setIsProfileComplete(false);
+      return;
     }
 
     // Check if profile is complete
@@ -33,7 +36,7 @@ export function useProfileSetup() {
 
     setIsProfileComplete(hasName && hasLocation);
     setLoading(false);
-  }, [profile, session]);
+  }, [profile, session, authLoading]);
 
   return {
     isProfileComplete,

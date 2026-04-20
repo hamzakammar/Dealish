@@ -175,8 +175,9 @@ export default function ResetPasswordScreen() {
                     'Please check your email for password reset instructions.'
                 );
             }
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to send reset email');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            Alert.alert('Error', message || 'Failed to send reset email');
         } finally {
             setLoading(false);
         }
@@ -226,8 +227,9 @@ export default function ResetPasswordScreen() {
                     ]
                 );
             }
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to reset password');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            Alert.alert('Error', message || 'Failed to reset password');
         } finally {
             setLoading(false);
         }

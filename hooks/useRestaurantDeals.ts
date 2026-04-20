@@ -99,10 +99,10 @@ export function useRestaurantDeals(restaurantId: string | null) {
           const activeDeals = filterActiveDeals(data || []);
           setDeals(activeDeals);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Error fetching deals:", e);
         if (mounted) {
-          setError(e);
+          setError(e instanceof Error ? e : new Error('Unknown error'));
         }
       } finally {
         if (mounted) {

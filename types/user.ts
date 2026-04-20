@@ -1,3 +1,4 @@
+import { UserActivity } from "./activity";
 import { UserSettings } from "./settings";
 
 export type Profile = {
@@ -7,7 +8,7 @@ export type Profile = {
     restaurant_ids?: string[]; // For 'owner' role
     avatar_url?: string;
     location?: string;
-    recents?: any[]; // Array of recent activities
+    recents?: UserActivity[];
     settings?: UserSettings;
     push_token?: string;
     push_token_updated_at?: string;

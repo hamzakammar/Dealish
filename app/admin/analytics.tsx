@@ -87,12 +87,12 @@ export default function Analytics() {
       if (scansError) throw scansError;
 
       const dealMap: Record<string, string> = {};
-      (deals || []).forEach((deal: any) => {
+      (deals || []).forEach((deal) => {
         dealMap[deal.id] = deal.title;
       });
 
       const dealScanMap: Record<string, { title: string; count: number }> = {};
-      (scans || []).forEach((scan: any) => {
+      (scans || []).forEach((scan) => {
         const dealId = scan.deal_id;
         const dealTitle = dealMap[dealId] || 'Unknown Deal';
         if (dealId) {
@@ -125,7 +125,7 @@ export default function Analytics() {
             const hour = (now.getHours() - (23 - i) + 24) % 24;
             return `${hour}:00`;
           });
-          (scans || []).forEach((scan: any) => {
+          (scans || []).forEach((scan) => {
             const scanDate = new Date(scan.scanned_at);
             const hoursAgo = Math.floor((now.getTime() - scanDate.getTime()) / (1000 * 60 * 60));
             if (hoursAgo >= 0 && hoursAgo < 24) {
@@ -141,7 +141,7 @@ export default function Analytics() {
             date.setDate(date.getDate() - (6 - i));
             return date.toLocaleDateString('en-US', { weekday: 'short' });
           });
-          (scans || []).forEach((scan: any) => {
+          (scans || []).forEach((scan) => {
             const scanDate = new Date(scan.scanned_at);
             const daysAgo = Math.floor((now.getTime() - scanDate.getTime()) / (1000 * 60 * 60 * 24));
             if (daysAgo >= 0 && daysAgo < 7) {
@@ -157,7 +157,7 @@ export default function Analytics() {
             date.setDate(date.getDate() - (29 - i));
             return `${date.getMonth() + 1}/${date.getDate()}`;
           });
-          (scans || []).forEach((scan: any) => {
+          (scans || []).forEach((scan) => {
             const scanDate = new Date(scan.scanned_at);
             const daysAgo = Math.floor((now.getTime() - scanDate.getTime()) / (1000 * 60 * 60 * 24));
             if (daysAgo >= 0 && daysAgo < 30) {
@@ -173,7 +173,7 @@ export default function Analytics() {
             date.setDate(date.getDate() - (11 - i) * 7);
             return `W${i + 1}`;
           });
-          (scans || []).forEach((scan: any) => {
+          (scans || []).forEach((scan) => {
             const scanDate = new Date(scan.scanned_at);
             const weeksAgo = Math.floor((now.getTime() - scanDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
             if (weeksAgo >= 0 && weeksAgo < 12) {
@@ -189,7 +189,7 @@ export default function Analytics() {
             date.setMonth(date.getMonth() - (5 - i));
             return date.toLocaleDateString('en-US', { month: 'short' });
           });
-          (scans || []).forEach((scan: any) => {
+          (scans || []).forEach((scan) => {
             const scanDate = new Date(scan.scanned_at);
             const monthsAgo = (now.getFullYear() - scanDate.getFullYear()) * 12 + (now.getMonth() - scanDate.getMonth());
             if (monthsAgo >= 0 && monthsAgo < 6) {

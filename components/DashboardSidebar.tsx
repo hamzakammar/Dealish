@@ -120,7 +120,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
         }
       }
 
-      const updateData: any = {
+      const updateData: Record<string, string | null> = {
         display_name: editedName.trim() || null,
       };
 
@@ -145,9 +145,10 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
       await refetchProfile();
       setIsEditingProfile(false);
       Alert.alert('Success', 'Profile updated successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', message || 'Failed to update profile');
     } finally {
       setIsSavingProfile(false);
     }

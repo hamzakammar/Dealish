@@ -62,9 +62,10 @@ export default function InventoryScannerScreen() {
           barcode: data
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error processing barcode scan:', error);
-      Alert.alert('Error', error.message || 'Failed to process barcode.');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', message || 'Failed to process barcode.');
       setProcessing(false);
     }
   };

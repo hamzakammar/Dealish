@@ -146,9 +146,10 @@ export default function QRScannerScreen() {
           },
         ]
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error processing QR scan:", error);
-      Alert.alert("Error", error.message || "Failed to process QR code.");
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert("Error", message || "Failed to process QR code.");
       setProcessing(false);
     }
   };

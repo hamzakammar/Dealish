@@ -193,7 +193,7 @@ export default function DealCard({ deal }: DealCardProps) {
     <>
       <View style={[styles.dealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.dealHeader}>
-        <Text style={[styles.dealTitle, { color: colors.text }]}>{deal.title}</Text>
+        <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>{deal.title}</Text>
         {dealStatus === 'expired' && (
           <View style={styles.expiredBadge}>
             <Text style={styles.expiredText}>Expired</Text>
@@ -220,7 +220,7 @@ export default function DealCard({ deal }: DealCardProps) {
       )}
 
       {deal.description && (
-        <Text style={[styles.dealDescription, { color: colors.textSecondary }]}>{deal.description}</Text>
+        <Text style={[styles.dealDescription, { color: colors.textSecondary }]} numberOfLines={4}>{deal.description}</Text>
       )}
 
       {deal.tags && deal.tags.length > 0 && (

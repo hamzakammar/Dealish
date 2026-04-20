@@ -55,7 +55,7 @@ export default function PartnerRequestsScreen() {
 
       if (error) throw error;
 
-      const formattedRequests: PartnerRequest[] = (data || []).map((req: any) => ({
+      const formattedRequests: PartnerRequest[] = (data || []).map((req) => ({
         id: req.id,
         restaurant_id: req.restaurant_id,
         user_id: req.user_id,

@@ -11,6 +11,7 @@ import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import AppErrorBoundary from '@/components/ErrorBoundary';
 import { useColorScheme } from '@/components/useColorScheme';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -140,10 +141,10 @@ function RootLayoutNav() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <AppErrorBoundary fallbackMessage="The app encountered an error. Tap retry to reload.">
         <ThemeWrapper>
           <NotificationHandler />
           <Stack screenOptions={{ headerShown: false }}>
-          {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
@@ -165,6 +166,7 @@ function RootLayoutNav() {
           <Stack.Screen name="admin/partner-requests" options={{ headerShown: false }} />
         </Stack>
         </ThemeWrapper>
+        </AppErrorBoundary>
       </AuthProvider>
     </SafeAreaProvider>
   );

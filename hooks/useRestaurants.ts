@@ -22,29 +22,29 @@ export function useRestaurants() {
         if (error) throw error;
 
         const parsed: Restaurant[] =
-          data?.map((r: any) => ({
+          data?.map((r): Restaurant => ({
             id: r.id,
             name: r.name,
             lat: Number(r.lat),
             lng: Number(r.lng),
             partner: Boolean(r.partner),
-            description: r.description ?? undefined,
             address: r.address ?? undefined,
             phone: r.phone ?? undefined,
             rating: r.rating ?? undefined,
             rating_count: r.num_ratings ?? undefined,
             image_url: r.hero_image_url ?? r.display_image ?? undefined,
-            logo_url: r.hero_image_url ?? r.display_image ?? undefined,
+            logo_url: r.display_image ?? r.hero_image_url ?? undefined,
             display_image: r.display_image ?? undefined,
             type: r.type ?? undefined,
           })) ?? [];
 
         if (mounted) setRestaurants(parsed);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
         if (mounted) {
-          setError(e);
-          Alert.alert("Error", e?.message ?? "Unable to load restaurants. Please check your internet connection and try again.");
+          setError(e instanceof Error ? e : new Error('Unknown error'));
+          const message = e instanceof Error ? e.message : "Unable to load restaurants. Please check your internet connection and try again.";
+          Alert.alert("Error", message);
         }
       } finally {
         if (mounted) setLoading(false);

@@ -69,7 +69,7 @@ export default function CreateRestaurant() {
         const res = await fetch(url);
         const data = await res.json();
         if (data.status === 'OK' && data.predictions?.length > 0) {
-          setSuggestions(data.predictions.map((p: any) => ({
+          setSuggestions(data.predictions.map((p: { place_id: string; description: string }) => ({
             place_id: p.place_id,
             description: p.description,
           })));
@@ -201,9 +201,10 @@ export default function CreateRestaurant() {
 
       Alert.alert('Success', 'Restaurant created successfully');
       setTimeout(() => router.back(), 500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating restaurant:', error);
-      Alert.alert('Error', `Failed to create restaurant: ${error?.message || String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Error', `Failed to create restaurant: ${message}`);
     } finally {
       setIsSaving(false);
     }

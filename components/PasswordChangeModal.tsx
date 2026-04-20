@@ -130,8 +130,9 @@ export default function PasswordChangeModal({
           },
         ]);
       }
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to change password");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert("Error", message || "Failed to change password");
     } finally {
       setLoading(false);
     }

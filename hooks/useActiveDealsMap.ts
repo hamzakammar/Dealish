@@ -124,7 +124,7 @@ export function useActiveDealsMap(restaurants: Restaurant[]) {
         setActiveDealsMap(dealsMap);
         setDealTitlesMap(titlesMap);
         setLoading(false);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Error fetching active deals:", e);
         if (mounted) {
           const emptyMap = new Map<string, boolean>();

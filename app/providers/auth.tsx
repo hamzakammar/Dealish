@@ -193,26 +193,39 @@ export default function AuthProvider({ children }: PropsWithChildren) {
                                  error.message?.includes('fetch');
           
           if (isNetworkError) {
-            // Network error - retry once after a short delay
+            // Network error - retry with exponential backoff
             // Don't kill session on network errors, user might still be logged in
-            // Capture timeout ID so it can be cleared on unmount
-            timeoutId = setTimeout(async () => {
-              if (!isActive || !isMountedRef.current) return
-              try {
-                const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
-                if (!retryError && retrySession) {
-                  setSession(retrySession)
-                } else if (!retryError && !retrySession) {
-                  // No session after retry - user is actually logged out
-                  setSession(null)
-                }
-                // If retry also fails, keep existing session state (don't kill it)
-              } catch (retryErr) {
-                console.error('Retry session fetch failed:', retryErr)
-                // Don't kill session on retry failure either
+            const MAX_RETRIES = 3
+            let retryCount = 0
+
+            const attemptRetry = () => {
+              if (!isActive || !isMountedRef.current || retryCount >= MAX_RETRIES) {
+                if (isActive && isMountedRef.current) setIsLoadingSession(false)
+                return
               }
-              setIsLoadingSession(false)
-            }, 1000)
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 8000) // 1s, 2s, 4s (max 8s)
+              retryCount++
+              timeoutId = setTimeout(async () => {
+                if (!isActive || !isMountedRef.current) return
+                try {
+                  const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
+                  if (!retryError && retrySession) {
+                    setSession(retrySession)
+                    setIsLoadingSession(false)
+                  } else if (!retryError && !retrySession) {
+                    setSession(null)
+                    setIsLoadingSession(false)
+                  } else {
+                    attemptRetry() // Retry again
+                  }
+                } catch (retryErr) {
+                  console.error('Retry session fetch failed:', retryErr)
+                  attemptRetry() // Retry again
+                }
+              }, delay)
+            }
+
+            attemptRetry()
             return
           }
           

@@ -134,8 +134,8 @@ export function useDirections() {
           1000
         );
       }
-    } catch (error: any) {
-      const errorMessage = (error && typeof error === "object" && "message" in error && (error as any).message) || (typeof error === "string" ? error : "Failed to get directions");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : (typeof error === "string" ? error : "Failed to get directions");
       console.error("Directions error:", errorMessage, error);
       Alert.alert("Error", errorMessage);
     }

@@ -192,8 +192,9 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         });
         if (error) throw error;
       }
-    } catch (e: any) {
-      console.warn("toggleFavourite error:", e.message ?? e);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn("toggleFavourite error:", message);
       setIsFavouriteState(prev); // rollback
     }
   }
@@ -230,8 +231,9 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         const result = await getPartnerRequestCount(restaurant.id);
         setRequestCount(result.count);
       }
-    } catch (e: any) {
-      console.error("Partner request error:", e.message ?? e);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("Partner request error:", message);
       Alert.alert("Error", "Failed to submit partner request. Please try again.");
     } finally {
       setIsRequestingPartner(false);

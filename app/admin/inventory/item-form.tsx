@@ -111,7 +111,7 @@ export default function InventoryItemForm() {
       setBatchNumber(item.batch_number || '');
       setSupplier(item.supplier || '');
       setNotes(item.notes || '');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading item:', error);
       Alert.alert('Error', 'Failed to load inventory item');
     } finally {
@@ -172,9 +172,10 @@ export default function InventoryItemForm() {
           router.back();
         }, 500);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving inventory item:', error);
-      Alert.alert('Error', error.message || 'Failed to save inventory item');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', message || 'Failed to save inventory item');
     } finally {
       setIsSaving(false);
     }

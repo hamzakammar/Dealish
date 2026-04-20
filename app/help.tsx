@@ -31,7 +31,7 @@ const FAQ_ITEMS = [
   },
 ];
 
-function FaqItem({ item, colors }: { item: typeof FAQ_ITEMS[0]; colors: any }) {
+function FaqItem({ item, colors }: { item: typeof FAQ_ITEMS[0]; colors: ReturnType<typeof useThemeColors> }) {
   const [open, setOpen] = useState(false);
 
   const dynamicStyles = useMemo(() => StyleSheet.create({

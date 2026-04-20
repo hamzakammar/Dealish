@@ -49,7 +49,7 @@ export type InventorySyncLog = {
   items_synced: number;
   items_created: number;
   items_updated: number;
-  errors?: any;
+  errors?: Record<string, string> | string[];
   synced_at: string;
   created_at: string;
 };

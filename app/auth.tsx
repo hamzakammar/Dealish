@@ -349,9 +349,10 @@ export default function AuthScreen() {
           }, 200);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       await recordFailedAttempt();
-      Alert.alert('Error', error.message || 'Authentication failed');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', message || 'Authentication failed');
     } finally {
       setLoading(false);
     }

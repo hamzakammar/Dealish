@@ -10,7 +10,7 @@ export type NotificationPayload = {
     deal_id?: string;
     restaurant_id?: string;
     screen?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 };
 

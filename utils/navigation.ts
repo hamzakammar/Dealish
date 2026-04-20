@@ -4,7 +4,7 @@ import { router } from 'expo-router';
  * Safe navigation wrapper that handles errors gracefully
  */
 export const safeNavigate = {
-  push: (path: string | { pathname: string; params?: any }) => {
+  push: (path: string | { pathname: string; params?: Record<string, string | number> }) => {
     try {
       if (typeof path === 'string') {
         router.push(path as any);
@@ -22,7 +22,7 @@ export const safeNavigate = {
     }
   },
   
-  replace: (path: string | { pathname: string; params?: any }) => {
+  replace: (path: string | { pathname: string; params?: Record<string, string | number> }) => {
     try {
       if (typeof path === 'string') {
         router.replace(path as any);

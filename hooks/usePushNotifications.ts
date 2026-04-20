@@ -29,9 +29,10 @@ function getNotifications() {
       return Notifications;
     }
     return null;
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Check if it's the specific Expo Go error
-    if (e?.message?.includes('removed from Expo Go') || e?.message?.includes('SDK 53')) {
+    const message = e instanceof Error ? e.message : '';
+    if (message.includes('removed from Expo Go') || message.includes('SDK 53')) {
       return null;
     }
     // For other errors, still return null
@@ -67,10 +68,12 @@ function configureNotificationHandler() {
 export function usePushNotifications() {
   const { profile, isLoggedIn } = useAuthContext();
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
-  const [notification, setNotification] = useState<any | null>(null);
-  const [lastNotificationResponse, setLastNotificationResponse] = useState<any | null>(null);
-  const notificationListener = useRef<any | null>(null);
-  const responseListener = useRef<any | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [notification, setNotification] = useState<Record<string, any> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [lastNotificationResponse, setLastNotificationResponse] = useState<Record<string, any> | null>(null);
+  const notificationListener = useRef<{ remove: () => void } | null>(null);
+  const responseListener = useRef<{ remove: () => void } | null>(null);
 
   useEffect(() => {
     // Lazy load and configure notifications
@@ -94,12 +97,12 @@ export function usePushNotifications() {
 
     // Listen for notifications received while app is foregrounded
     try {
-      notificationListener.current = NotificationsModule.addNotificationReceivedListener((notification: any) => {
+      notificationListener.current = NotificationsModule.addNotificationReceivedListener((notification: Record<string, unknown>) => {
         setNotification(notification);
       });
 
       // Listen for notification taps (when app is in background/closed)
-      responseListener.current = NotificationsModule.addNotificationResponseReceivedListener((response: any) => {
+      responseListener.current = NotificationsModule.addNotificationResponseReceivedListener((response: Record<string, unknown>) => {
         if (__DEV__) {
           console.log('Notification tapped:', response);
         }

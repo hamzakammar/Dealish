@@ -386,7 +386,7 @@ export default function AccountPage() {
                                     rating_count: restaurant.num_ratings
                                 } : {
                                     name: 'Unknown Restaurant',
-                                    logo_url: null,
+                                    logo_url: undefined,
                                     rating: undefined,
                                     rating_count: undefined
                                 }
@@ -397,7 +397,9 @@ export default function AccountPage() {
                                 ...activity,
                                 restaurants: {
                                     name: 'Unknown Restaurant',
-                                    logo_url: null
+                                    logo_url: undefined,
+                                    rating: undefined,
+                                    rating_count: undefined
                                 }
                             };
                         }

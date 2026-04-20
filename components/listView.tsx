@@ -1,11 +1,10 @@
 import RatingDisplay from "@/components/RatingDisplay";
-import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
-import { Restaurant, UserLocation } from "@/types/restaurant";
+import { supabase } from "@/app/lib/supabase";
+import { Deal, Restaurant, UserLocation } from "@/types/restaurant";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -24,18 +23,19 @@ interface RestaurantListProps {
   userLocation?: UserLocation | null;
 }
 
-function RestaurantCard({
+const RestaurantCard = React.memo(function RestaurantCard({
   restaurant,
   isSelected,
   onPress,
   userLocation,
+  deals,
 }: {
   restaurant: Restaurant;
   isSelected: boolean;
   onPress: () => void;
   userLocation?: UserLocation | null;
+  deals: Deal[];
 }) {
-  const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [imageError, setImageError] = useState(false);
 
   const formattedDistance = useMemo(() => {
@@ -117,13 +117,9 @@ function RestaurantCard({
         </View>
 
         <View style={styles.cardFooter}>
-          {dealsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#FE902A" />
-            </View>
-          ) : deals.length > 0 ? (
+          {deals.length > 0 ? (
             <View style={styles.dealsRow}>
-              {deals.slice(0, 2).map((deal, index) => (
+              {deals.slice(0, 2).map((deal) => (
                 <View key={deal.id} style={styles.dealPill}>
                   <Text style={styles.dealPillText} numberOfLines={1}>
                     {deal.title}
@@ -136,7 +132,7 @@ function RestaurantCard({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 export default function RestaurantList({
   restaurants,
@@ -146,6 +142,56 @@ export default function RestaurantList({
 }: RestaurantListProps) {
   const [sortBy, setSortBy] = useState<SortOption>("distance");
   const [showSortModal, setShowSortModal] = useState(false);
+  const [dealsMap, setDealsMap] = useState<Map<string, Deal[]>>(new Map());
+
+  // Batch-fetch deals for all restaurants (single query instead of N queries)
+  useEffect(() => {
+    if (restaurants.length === 0) {
+      setDealsMap(new Map());
+      return;
+    }
+
+    let mounted = true;
+
+    async function fetchAllDeals() {
+      try {
+        const ids = restaurants.map((r) => r.id);
+        const { data, error } = await supabase
+          .from("deals")
+          .select("*")
+          .in("restaurant_id", ids)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        if (!mounted) return;
+
+        const now = new Date();
+        const map = new Map<string, Deal[]>();
+        for (const deal of data || []) {
+          // Basic active check
+          if (deal.start_at && new Date(deal.start_at) > now) continue;
+          if (deal.end_at && new Date(deal.end_at) < now) continue;
+
+          const list = map.get(deal.restaurant_id) || [];
+          list.push(deal as Deal);
+          map.set(deal.restaurant_id, list);
+        }
+        setDealsMap(map);
+      } catch (e) {
+        if (__DEV__) console.error("Error batch-fetching deals:", e);
+      }
+    }
+
+    fetchAllDeals();
+
+    // Refresh every 2 minutes (single query, not N queries)
+    const interval = setInterval(fetchAllDeals, 120000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [restaurants]);
 
   // Calculate distances and sort restaurants
   const sortedRestaurants = useMemo(() => {
@@ -187,7 +233,7 @@ export default function RestaurantList({
     return sorted.map((item) => item.restaurant);
   }, [restaurants, userLocation, sortBy]);
 
-  const renderRestaurant = ({ item }: { item: Restaurant }) => {
+  const renderRestaurant = useCallback(({ item }: { item: Restaurant }) => {
     const isSelected = selectedRestaurant?.id === item.id;
 
     return (
@@ -196,9 +242,10 @@ export default function RestaurantList({
         isSelected={isSelected}
         onPress={() => onRestaurantPress(item)}
         userLocation={userLocation}
+        deals={dealsMap.get(item.id) || []}
       />
     );
-  };
+  }, [selectedRestaurant, onRestaurantPress, userLocation, dealsMap]);
 
   const sortOptions: { label: string; value: SortOption }[] = [
     { label: "Distance", value: "distance" },
@@ -464,9 +511,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#999",
     flex: 1, // Take remaining space
-  },
-  loadingContainer: {
-    paddingVertical: 4,
   },
   dealsRow: {
     flexDirection: "row",

@@ -155,7 +155,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
         if (restError) throw restError;
 
         const parsed: Restaurant[] =
-          restaurantData?.map((r: any) => ({
+          restaurantData?.map((r) => ({
             id: r.id,
             name: r.name,
             lat: Number(r.lat),
@@ -213,10 +213,11 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
           }, 100);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       Alert.alert(
         "Sign Out Failed",
-        error?.message || "An unexpected error occurred while signing out.",
+        message || "An unexpected error occurred while signing out.",
         [{ text: "OK" }]
       );
       setSigningOut(false);

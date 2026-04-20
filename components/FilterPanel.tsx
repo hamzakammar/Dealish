@@ -9,6 +9,7 @@ import {
   Dimensions,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -317,20 +318,12 @@ export default function FilterPanel({
                   Show only restaurants partnered with Dealish
                 </Text>
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.toggle,
-                  filters.partnerOnly && styles.toggleActive,
-                ]}
-                onPress={() => updateFilter("partnerOnly", !filters.partnerOnly)}
-              >
-                <View
-                  style={[
-                    styles.toggleThumb,
-                    filters.partnerOnly && styles.toggleThumbActive,
-                  ]}
-                />
-              </TouchableOpacity>
+              <Switch
+                value={filters.partnerOnly}
+                onValueChange={(val) => updateFilter("partnerOnly", val)}
+                trackColor={{ false: "#e0e0e0", true: "#FE902A" }}
+                thumbColor="#fff"
+              />
             </View>
           </View>
 
@@ -343,20 +336,12 @@ export default function FilterPanel({
                   Show only restaurants with active deals
                 </Text>
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.toggle,
-                  filters.hasDealsOnly && styles.toggleActive,
-                ]}
-                onPress={() => updateFilter("hasDealsOnly", !filters.hasDealsOnly)}
-              >
-                <View
-                  style={[
-                    styles.toggleThumb,
-                    filters.hasDealsOnly && styles.toggleThumbActive,
-                  ]}
-                />
-              </TouchableOpacity>
+              <Switch
+                value={filters.hasDealsOnly}
+                onValueChange={(val) => updateFilter("hasDealsOnly", val)}
+                trackColor={{ false: "#e0e0e0", true: "#FE902A" }}
+                thumbColor="#fff"
+              />
             </View>
           </View>
         </ScrollView>
@@ -432,31 +417,6 @@ const styles = StyleSheet.create({
   toggleContent: {
     flex: 1,
     marginRight: 16,
-  },
-  toggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#ccc",
-    justifyContent: "center",
-    paddingHorizontal: 2,
-  },
-  toggleActive: {
-    backgroundColor: "#FE902A",
-  },
-  toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 20 }],
   },
   clearButton: {
     paddingVertical: 12,

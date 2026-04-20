@@ -224,7 +224,7 @@ export default function OnboardingScreen() {
           router.replace("/map");
         }
       }, 800);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error completing onboarding:", error);
       Alert.alert("Error", "Failed to save profile. Please try again.");
       setSaving(false);
