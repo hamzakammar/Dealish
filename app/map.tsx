@@ -388,7 +388,6 @@ export default function MapScreen() {
                   isSelected={isSelected}
                   onPress={handleRestaurantSelect}
                   hasActiveDeal={hasActiveDeal}
-                  scale={1 + Math.max(0, (0.05 - latitudeDelta) * 30)}
                 />
               );
             })}
