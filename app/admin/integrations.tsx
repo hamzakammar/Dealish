@@ -2,7 +2,7 @@ import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
+import { Clipboard } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
@@ -419,7 +419,7 @@ export default function IntegrationsScreen() {
             <TouchableOpacity
               style={s.keyRevealBox}
               onPress={() => {
-                Clipboard.setStringAsync(generatedKey);
+                Clipboard.setString(generatedKey);
                 Alert.alert('Copied', 'API key copied to clipboard');
               }}
             >
@@ -470,7 +470,7 @@ export default function IntegrationsScreen() {
           <TouchableOpacity
             style={s.copyIdButton}
             onPress={() => {
-              Clipboard.setStringAsync(restaurantId);
+              Clipboard.setString(restaurantId);
               Alert.alert('Copied', 'Restaurant ID copied');
             }}
           >
