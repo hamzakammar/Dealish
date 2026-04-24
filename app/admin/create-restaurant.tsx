@@ -193,7 +193,7 @@ export default function CreateRestaurant() {
 
       const { error } = await supabase.from('restaurants').insert([payload]);
 
-      if (error) {
+      if (error && error.code !== 'PGRST204') {
         console.error('Supabase error creating restaurant:', JSON.stringify(error));
         Alert.alert('Error', `Failed to create restaurant: ${error.message || error.code || 'Unknown error'}`);
         return;
