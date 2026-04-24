@@ -83,18 +83,20 @@ async function fetchSheetData(
   return { headers, rows };
 }
 
-// --- Fuzzy Schema Detection (no LLM) ---
+// --- Fuzzy Schema Detection ---
 
 const FIELD_SYNONYMS: Record<string, string[]> = {
-  title: ['title', 'name', 'item', 'product', 'deal', 'dish', 'menu item', 'item name', 'deal name', 'offer', 'food item'],
-  description: ['description', 'details', 'notes', 'info', 'about', 'promo', 'text', 'body', 'summary', 'note'],
-  original_price: ['original price', 'regular price', 'full price', 'normal price', 'retail price', 'original', 'reg price', 'base price', 'msrp'],
-  deal_price: ['deal price', 'sale price', 'discounted price', 'offer price', 'promo price', 'discount price', 'new price', 'special price', 'deal', 'sale', 'cost', 'price'],
-  discount_percent: ['discount', 'discount %', 'discount percent', '% off', 'percent off', 'savings %', 'off %', 'reduction'],
-  is_active: ['active', 'available', 'enabled', 'live', 'on', 'status', 'visible', 'show', 'published', 'active?', 'available?'],
-  valid_from: ['valid from', 'start date', 'start', 'from', 'begins', 'start time', 'valid start', 'effective date'],
-  valid_until: ['valid until', 'expiry', 'expires', 'end date', 'end', 'until', 'valid to', 'expiration', 'expiry date', 'ends', 'deadline'],
-  category: ['category', 'type', 'kind', 'group', 'section', 'cuisine', 'food type', 'item type', 'tag', 'tags'],
+  // Product fields
+  name: ['name', 'item', 'product', 'title', 'item name', 'product name', 'food item', 'dish', 'ingredient', 'description'],
+  category: ['category', 'type', 'kind', 'group', 'section', 'food type', 'item type', 'tag', 'tags', 'cuisine'],
+  unit: ['unit', 'uom', 'unit of measure', 'measure', 'size', 'pack size', 'packaging'],
+  supplier: ['supplier', 'vendor', 'source', 'brand', 'distributor', 'from'],
+  // Inventory fields
+  quantity: ['quantity', 'qty', 'amount', 'count', 'stock', 'on hand', 'in stock', 'units', 'total', 'available', 'inventory'],
+  unit_cost: ['cost', 'price', 'unit cost', 'unit price', 'purchase price', 'buy price', 'cost per unit', 'each', 'per unit'],
+  expiration_date: ['expiry', 'expiration', 'expires', 'expiration date', 'expiry date', 'best before', 'use by', 'best by', 'sell by', 'exp', 'exp date'],
+  location: ['location', 'storage', 'store', 'where', 'place', 'area', 'section', 'zone', 'bin', 'shelf'],
+  notes: ['notes', 'note', 'comments', 'comment', 'remarks', 'memo', 'info', 'details'],
 };
 
 function normalizeHeader(h: string): string {
@@ -108,12 +110,10 @@ function detectSchema(headers: string[]): Record<string, string | null> {
   for (const [field, synonyms] of Object.entries(FIELD_SYNONYMS)) {
     let matched: string | null = null;
 
-    // Exact match first
     for (const { original, normalized } of normalizedHeaders) {
       if (synonyms.includes(normalized)) { matched = original; break; }
     }
 
-    // Partial match fallback
     if (!matched) {
       for (const { original, normalized } of normalizedHeaders) {
         if (synonyms.some(s => normalized.includes(s) || s.includes(normalized))) {
@@ -123,12 +123,6 @@ function detectSchema(headers: string[]): Record<string, string | null> {
     }
 
     mapping[field] = matched;
-  }
-
-  // If deal_price not found but original_price is, use it as deal_price
-  if (!mapping.deal_price && mapping.original_price) {
-    mapping.deal_price = mapping.original_price;
-    mapping.original_price = null;
   }
 
   return mapping;
@@ -151,33 +145,37 @@ function normalizeRow(
     }
   }
 
-  if (!mapped.title) return null;
+  // Must have at least a name
+  if (!mapped.name) return null;
 
-  const deal: Record<string, unknown> = { title: String(mapped.title) };
+  const result: Record<string, unknown> = {
+    name: String(mapped.name).trim(),
+  };
 
-  if (mapped.description) deal.description = String(mapped.description);
+  if (mapped.category) result.category = String(mapped.category).trim().toLowerCase();
+  if (mapped.unit) result.unit = String(mapped.unit).trim().toLowerCase();
+  if (mapped.supplier) result.supplier = String(mapped.supplier).trim();
+  if (mapped.notes) result.notes = String(mapped.notes).trim();
 
   const toNum = (v: unknown) => {
     const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
     return isNaN(n) ? undefined : n;
   };
 
-  if (mapped.original_price) deal.original_price = toNum(mapped.original_price);
-  if (mapped.deal_price) deal.deal_price = toNum(mapped.deal_price);
-  if (mapped.discount_percent) deal.discount_percent = toNum(mapped.discount_percent);
-  if (mapped.category) deal.category = String(mapped.category);
-
-  const activeRaw = String(mapped.is_active ?? 'true').toLowerCase().trim();
-  deal.is_active = ['true', 'yes', 'y', '1', 'active', 'on', 'x', '✓', '✅', 'TRUE'].includes(activeRaw);
+  if (mapped.quantity !== undefined) result.quantity = toNum(mapped.quantity) ?? 1;
+  if (mapped.unit_cost !== undefined) result.unit_cost = toNum(mapped.unit_cost);
 
   const toISO = (v: unknown) => {
-    try { const d = new Date(String(v)); return isNaN(d.getTime()) ? undefined : d.toISOString(); }
-    catch { return undefined; }
+    try {
+      const d = new Date(String(v));
+      return isNaN(d.getTime()) ? undefined : d.toISOString();
+    } catch { return undefined; }
   };
-  if (mapped.valid_from) deal.valid_from = toISO(mapped.valid_from);
-  if (mapped.valid_until) deal.valid_until = toISO(mapped.valid_until);
 
-  return deal;
+  if (mapped.expiration_date) result.expiration_date = toISO(mapped.expiration_date);
+  if (mapped.location) result.location = String(mapped.location).trim().toLowerCase();
+
+  return result;
 }
 
 // --- Main poll logic ---
@@ -210,7 +208,6 @@ async function pollIntegration(supabase: any, integration: any) {
 
   const { headers, rows } = sheetData;
 
-  // Detect/re-detect schema if not confirmed
   let mapping = detected_mapping;
   if (!mapping || Object.keys(mapping).length === 0) {
     console.log(`Detecting schema for integration ${integrationId}`);
@@ -246,42 +243,99 @@ async function pollIntegration(supabase: any, integration: any) {
       continue;
     }
 
-    const deal = normalizeRow(rowObj, mapping);
-    if (!deal) { results.skipped++; continue; }
-
-    const dealPayload: any = {
-      restaurant_id,
-      title: deal.title,
-      description: deal.description || null,
-      is_active: deal.is_active ?? true,
-      source: 'sheets',
-    };
-    if (deal.deal_price) dealPayload.deal_price = deal.deal_price;
-    if (deal.original_price) dealPayload.original_price = deal.original_price;
-    if (deal.discount_percent) dealPayload.discount_percent = deal.discount_percent;
-    if (deal.valid_from) dealPayload.valid_from = deal.valid_from;
-    if (deal.valid_until) dealPayload.valid_until = deal.valid_until;
-    if (deal.category) dealPayload.category = deal.category;
+    const item = normalizeRow(rowObj, mapping);
+    if (!item) { results.skipped++; continue; }
 
     try {
-      let dealId: string;
+      let productId: string;
+      let inventoryItemId: string;
 
       if (existingSync?.deal_id) {
-        const { error } = await supabase.from('deals').update(dealPayload).eq('id', existingSync.deal_id);
-        if (error) throw error;
-        dealId = existingSync.deal_id;
-        results.updated++;
+        // deal_id column reused to store inventory_item_id for backward compat
+        inventoryItemId = existingSync.deal_id;
+
+        // Get existing inventory item to find product_id
+        const { data: existingItem } = await supabase
+          .from('inventory_items')
+          .select('product_id')
+          .eq('id', inventoryItemId)
+          .single();
+
+        if (existingItem) {
+          productId = existingItem.product_id;
+
+          // Update product
+          await supabase.from('products').update({
+            name: item.name,
+            category: item.category || null,
+            unit: item.unit || 'unit',
+            supplier: item.supplier || null,
+            updated_at: new Date().toISOString(),
+          }).eq('id', productId);
+
+          // Update inventory item
+          const inventoryUpdate: any = { updated_at: new Date().toISOString() };
+          if (item.quantity !== undefined) inventoryUpdate.quantity = item.quantity;
+          if (item.unit_cost !== undefined) inventoryUpdate.unit_cost = item.unit_cost;
+          if (item.expiration_date) inventoryUpdate.expiration_date = item.expiration_date;
+          if (item.location) inventoryUpdate.location = item.location;
+          if (item.notes) inventoryUpdate.notes = item.notes;
+
+          await supabase.from('inventory_items').update(inventoryUpdate).eq('id', inventoryItemId);
+          results.updated++;
+        }
       } else {
-        const { data: newDeal, error } = await supabase.from('deals').insert(dealPayload).select().single();
-        if (error) throw error;
-        dealId = newDeal.id;
+        // Create product first
+        const { data: newProduct, error: productErr } = await supabase
+          .from('products')
+          .insert({
+            restaurant_id,
+            name: item.name,
+            category: item.category || 'other',
+            unit: item.unit || 'unit',
+            supplier: item.supplier || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (productErr) throw productErr;
+        productId = newProduct.id;
+
+        // Create inventory item linked to product
+        const inventoryPayload: any = {
+          restaurant_id,
+          product_id: productId,
+          quantity: item.quantity ?? 1,
+          unit: item.unit || 'unit',
+          status: 'active',
+          received_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (item.unit_cost !== undefined) inventoryPayload.unit_cost = item.unit_cost;
+        if (item.expiration_date) inventoryPayload.expiration_date = item.expiration_date;
+        if (item.location) inventoryPayload.location = item.location;
+        if (item.notes) inventoryPayload.notes = item.notes;
+
+        const { data: newItem, error: itemErr } = await supabase
+          .from('inventory_items')
+          .insert(inventoryPayload)
+          .select()
+          .single();
+
+        if (itemErr) throw itemErr;
+        inventoryItemId = newItem.id;
         results.created++;
       }
 
+      // Track synced row (reusing deal_id column for inventory_item_id)
       await supabase.from('sheet_synced_rows').upsert({
         integration_id: integrationId,
         row_index: rowIndex,
-        deal_id: dealId,
+        deal_id: inventoryItemId,
         row_hash: rowHash,
         last_synced_at: new Date().toISOString(),
         sync_direction: 'sheet_to_dealish',

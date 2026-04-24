@@ -7,8 +7,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
-// --- Utilities ---
-
 async function sha256(text: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -18,7 +16,6 @@ function simpleHash(obj: unknown): string {
   return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).slice(0, 32);
 }
 
-// Validate API key and return restaurant_id
 async function validateApiKey(supabase: any, rawKey: string): Promise<string | null> {
   const hash = await sha256(rawKey);
   const { data, error } = await supabase
@@ -26,24 +23,23 @@ async function validateApiKey(supabase: any, rawKey: string): Promise<string | n
     .select('id, restaurant_id')
     .eq('key_hash', hash)
     .single();
-
   if (error || !data) return null;
   supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', data.id);
   return data.restaurant_id;
 }
 
-// --- Fuzzy Schema Detection (no LLM) ---
+// --- Fuzzy Schema Detection ---
 
 const FIELD_SYNONYMS: Record<string, string[]> = {
-  title: ['title', 'name', 'item', 'product', 'deal', 'dish', 'menu item', 'item name', 'deal name', 'offer', 'description title', 'food item'],
-  description: ['description', 'details', 'notes', 'info', 'about', 'promo', 'text', 'body', 'summary', 'note'],
-  original_price: ['original price', 'regular price', 'full price', 'normal price', 'price', 'retail price', 'original', 'reg price', 'base price', 'msrp'],
-  deal_price: ['deal price', 'sale price', 'discounted price', 'offer price', 'promo price', 'discount price', 'new price', 'special price', 'deal', 'sale', 'cost'],
-  discount_percent: ['discount', 'discount %', 'discount percent', '% off', 'percent off', 'savings %', 'off %', 'reduction'],
-  is_active: ['active', 'available', 'enabled', 'live', 'on', 'status', 'visible', 'show', 'published', 'active?', 'available?'],
-  valid_from: ['valid from', 'start date', 'start', 'from', 'begins', 'start time', 'valid start', 'effective date', 'begins on'],
-  valid_until: ['valid until', 'expiry', 'expires', 'end date', 'end', 'until', 'valid to', 'expiration', 'expiry date', 'ends', 'ends on', 'deadline'],
-  category: ['category', 'type', 'kind', 'group', 'section', 'cuisine', 'food type', 'item type', 'tag', 'tags'],
+  name: ['name', 'item', 'product', 'title', 'item name', 'product name', 'food item', 'dish', 'ingredient', 'description'],
+  category: ['category', 'type', 'kind', 'group', 'section', 'food type', 'item type', 'tag', 'tags', 'cuisine'],
+  unit: ['unit', 'uom', 'unit of measure', 'measure', 'size', 'pack size', 'packaging'],
+  supplier: ['supplier', 'vendor', 'source', 'brand', 'distributor', 'from'],
+  quantity: ['quantity', 'qty', 'amount', 'count', 'stock', 'on hand', 'in stock', 'units', 'total', 'available', 'inventory'],
+  unit_cost: ['cost', 'price', 'unit cost', 'unit price', 'purchase price', 'buy price', 'cost per unit', 'each', 'per unit'],
+  expiration_date: ['expiry', 'expiration', 'expires', 'expiration date', 'expiry date', 'best before', 'use by', 'best by', 'sell by', 'exp', 'exp date'],
+  location: ['location', 'storage', 'store', 'where', 'place', 'area', 'section', 'zone', 'bin', 'shelf'],
+  notes: ['notes', 'note', 'comments', 'comment', 'remarks', 'memo', 'info', 'details'],
 };
 
 function normalizeHeader(h: string): string {
@@ -56,78 +52,59 @@ function detectSchema(headers: string[]): Record<string, string | null> {
 
   for (const [field, synonyms] of Object.entries(FIELD_SYNONYMS)) {
     let matched: string | null = null;
-
-    // Exact match first
     for (const { original, normalized } of normalizedHeaders) {
-      if (synonyms.includes(normalized)) {
-        matched = original;
-        break;
-      }
+      if (synonyms.includes(normalized)) { matched = original; break; }
     }
-
-    // Partial match if no exact
     if (!matched) {
       for (const { original, normalized } of normalizedHeaders) {
         if (synonyms.some(s => normalized.includes(s) || s.includes(normalized))) {
-          matched = original;
-          break;
+          matched = original; break;
         }
       }
     }
-
     mapping[field] = matched;
-  }
-
-  // If deal_price not found but original_price is, use original_price as deal_price too
-  if (!mapping.deal_price && mapping.original_price) {
-    mapping.deal_price = mapping.original_price;
-    mapping.original_price = null;
   }
 
   return mapping;
 }
 
-// --- Row Normalization ---
-
 function normalizeRow(
-  rawRow: Record<string, unknown>,
+  rowObj: Record<string, unknown>,
   mapping: Record<string, string | null>
 ): Record<string, unknown> | null {
   const mapped: Record<string, unknown> = {};
-
   for (const [field, col] of Object.entries(mapping)) {
-    if (col && rawRow[col] !== undefined && rawRow[col] !== '') {
-      mapped[field] = rawRow[col];
+    if (col && rowObj[col] !== undefined && rowObj[col] !== '') {
+      mapped[field] = rowObj[col];
     }
   }
 
-  if (!mapped.title) return null;
+  if (!mapped.name) return null;
 
-  const deal: Record<string, unknown> = { title: String(mapped.title) };
+  const result: Record<string, unknown> = { name: String(mapped.name).trim() };
 
-  if (mapped.description) deal.description = String(mapped.description);
+  if (mapped.category) result.category = String(mapped.category).trim().toLowerCase();
+  if (mapped.unit) result.unit = String(mapped.unit).trim().toLowerCase();
+  if (mapped.supplier) result.supplier = String(mapped.supplier).trim();
+  if (mapped.notes) result.notes = String(mapped.notes).trim();
 
   const toNum = (v: unknown) => {
     const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
     return isNaN(n) ? undefined : n;
   };
 
-  if (mapped.original_price) deal.original_price = toNum(mapped.original_price);
-  if (mapped.deal_price) deal.deal_price = toNum(mapped.deal_price);
-  if (mapped.discount_percent) deal.discount_percent = toNum(mapped.discount_percent);
-  if (mapped.category) deal.category = String(mapped.category);
-
-  const activeRaw = String(mapped.is_active ?? 'true').toLowerCase().trim();
-  deal.is_active = ['true', 'yes', 'y', '1', 'active', 'on', 'x', '✓', '✅'].includes(activeRaw);
+  if (mapped.quantity !== undefined) result.quantity = toNum(mapped.quantity) ?? 1;
+  if (mapped.unit_cost !== undefined) result.unit_cost = toNum(mapped.unit_cost);
 
   const toISO = (v: unknown) => {
     try { const d = new Date(String(v)); return isNaN(d.getTime()) ? undefined : d.toISOString(); }
     catch { return undefined; }
   };
-  if (mapped.valid_from) deal.valid_from = toISO(mapped.valid_from);
-  if (mapped.valid_until) deal.valid_until = toISO(mapped.valid_until);
 
-  return deal;
+  if (mapped.expiration_date) result.expiration_date = toISO(mapped.expiration_date);
+  if (mapped.location) result.location = String(mapped.location).trim().toLowerCase();
+
+  return result;
 }
 
 // --- Main Handler ---
@@ -152,7 +129,7 @@ serve(async (req) => {
       const restaurantId = await validateApiKey(supabase, apiKey);
       if (!restaurantId) return new Response(JSON.stringify({ error: 'Invalid API key' }), { status: 403, headers: CORS });
 
-      const { sheet_id, sheet_tab = 'Sheet1', headers, sample_rows, webhook_url } = await req.json();
+      const { sheet_id, sheet_tab = 'Sheet1', headers, webhook_url } = await req.json();
       if (!sheet_id || !headers) {
         return new Response(JSON.stringify({ error: 'Missing sheet_id or headers' }), { status: 400, headers: CORS });
       }
@@ -204,7 +181,7 @@ serve(async (req) => {
       }
 
       const mapping = integration.detected_mapping || {};
-      const results: { row_index: number; action: string; deal_id?: string; error?: string }[] = [];
+      const results: { row_index: number; action: string; inventory_item_id?: string; error?: string }[] = [];
 
       for (const { row_index, data: rowData } of rows) {
         try {
@@ -222,52 +199,78 @@ serve(async (req) => {
             continue;
           }
 
-          const deal = normalizeRow(rowData, mapping);
-          if (!deal) {
-            results.push({ row_index, action: 'skipped_no_title' });
+          const item = normalizeRow(rowData, mapping);
+          if (!item) {
+            results.push({ row_index, action: 'skipped_no_name' });
             continue;
           }
 
-          const dealPayload: any = {
-            restaurant_id: restaurantId,
-            title: deal.title,
-            description: deal.description || null,
-            is_active: deal.is_active ?? true,
-            source: 'sheets',
-          };
-
-          if (deal.deal_price) dealPayload.deal_price = deal.deal_price;
-          if (deal.original_price) dealPayload.original_price = deal.original_price;
-          if (deal.discount_percent) dealPayload.discount_percent = deal.discount_percent;
-          if (deal.valid_from) dealPayload.valid_from = deal.valid_from;
-          if (deal.valid_until) dealPayload.valid_until = deal.valid_until;
-          if (deal.category) dealPayload.category = deal.category;
-
-          let dealId: string;
+          let inventoryItemId: string;
           let action: string;
 
           if (existingSync?.deal_id) {
-            const { error } = await supabase.from('deals').update(dealPayload).eq('id', existingSync.deal_id);
-            if (error) throw error;
-            dealId = existingSync.deal_id;
+            inventoryItemId = existingSync.deal_id;
+            const { data: existingItem } = await supabase.from('inventory_items').select('product_id').eq('id', inventoryItemId).single();
+
+            if (existingItem) {
+              await supabase.from('products').update({
+                name: item.name, category: item.category || null,
+                unit: item.unit || 'unit', supplier: item.supplier || null,
+                updated_at: new Date().toISOString(),
+              }).eq('id', existingItem.product_id);
+
+              const inv: any = { updated_at: new Date().toISOString() };
+              if (item.quantity !== undefined) inv.quantity = item.quantity;
+              if (item.unit_cost !== undefined) inv.unit_cost = item.unit_cost;
+              if (item.expiration_date) inv.expiration_date = item.expiration_date;
+              if (item.location) inv.location = item.location;
+              if (item.notes) inv.notes = item.notes;
+              await supabase.from('inventory_items').update(inv).eq('id', inventoryItemId);
+            }
             action = 'updated';
           } else {
-            const { data: newDeal, error } = await supabase.from('deals').insert(dealPayload).select().single();
-            if (error) throw error;
-            dealId = newDeal.id;
+            const { data: newProduct, error: pErr } = await supabase.from('products').insert({
+              restaurant_id: restaurantId,
+              name: item.name,
+              category: item.category || 'other',
+              unit: item.unit || 'unit',
+              supplier: item.supplier || null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }).select().single();
+            if (pErr) throw pErr;
+
+            const invPayload: any = {
+              restaurant_id: restaurantId,
+              product_id: newProduct.id,
+              quantity: item.quantity ?? 1,
+              unit: item.unit || 'unit',
+              status: 'active',
+              received_date: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            if (item.unit_cost !== undefined) invPayload.unit_cost = item.unit_cost;
+            if (item.expiration_date) invPayload.expiration_date = item.expiration_date;
+            if (item.location) invPayload.location = item.location;
+            if (item.notes) invPayload.notes = item.notes;
+
+            const { data: newItem, error: iErr } = await supabase.from('inventory_items').insert(invPayload).select().single();
+            if (iErr) throw iErr;
+            inventoryItemId = newItem.id;
             action = 'created';
           }
 
           await supabase.from('sheet_synced_rows').upsert({
             integration_id,
             row_index,
-            deal_id: dealId,
+            deal_id: inventoryItemId,
             row_hash: rowHash,
             last_synced_at: new Date().toISOString(),
             sync_direction: 'sheet_to_dealish',
           }, { onConflict: 'integration_id,row_index' });
 
-          results.push({ row_index, action, deal_id: dealId });
+          results.push({ row_index, action, inventory_item_id: inventoryItemId });
         } catch (err: any) {
           results.push({ row_index, action: 'error', error: err.message });
         }
@@ -303,8 +306,7 @@ serve(async (req) => {
   } catch (err: any) {
     console.error('sheets-sync error:', err);
     return new Response(JSON.stringify({ error: err.message || 'Internal error' }), {
-      status: 500,
-      headers: { ...CORS, 'content-type': 'application/json' },
+      status: 500, headers: { ...CORS, 'content-type': 'application/json' },
     });
   }
 });
