@@ -5,9 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Clipboard } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import { useRouter } from 'expo-router';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,19 +19,6 @@ import {
 } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
-
-// Google OAuth config — owners need Sheets read/write scope
-const GOOGLE_DISCOVERY = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
-
-// This client ID must be set up in Google Cloud Console
-// Type: Web application (for Expo Go / EAS builds, use the web client ID)
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_SHEETS_CLIENT_ID || '';
-
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
 async function sha256(text: string): Promise<string> {
   return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, text);
@@ -73,46 +59,18 @@ export default function IntegrationsScreen() {
   const [hasGoogleToken, setHasGoogleToken] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Sheet URL input (used after OAuth)
   const [sheetUrl, setSheetUrl] = useState('');
   const [sheetTab, setSheetTab] = useState('Sheet1');
   const [savingSheet, setSavingSheet] = useState(false);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
 
-  // API key generation (for power users / Apps Script)
   const [newKeyLabel, setNewKeyLabel] = useState('');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [generatingKey, setGeneratingKey] = useState(false);
 
-  const redirectUri = 'https://hpsoqjpzebkkxdqapegl.supabase.co/auth/v1/callback';
-
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId: GOOGLE_CLIENT_ID,
-      scopes: [SHEETS_SCOPE],
-      redirectUri,
-      responseType: 'code',
-      extraParams: {
-        access_type: 'offline',
-        prompt: 'consent', // always request refresh token
-      },
-    },
-    GOOGLE_DISCOVERY
-  );
-
   useEffect(() => {
     loadData();
   }, [profile]);
-
-  // Handle OAuth callback
-  useEffect(() => {
-    if (response?.type === 'success' && response.params.code) {
-      handleOAuthCode(response.params.code);
-    } else if (response?.type === 'error') {
-      Alert.alert('Google Sign-In Failed', response.error?.message || 'Unknown error');
-      setConnectingGoogle(false);
-    }
-  }, [response]);
 
   async function loadData() {
     if (!profile?.id) return;
@@ -146,46 +104,96 @@ export default function IntegrationsScreen() {
     }
   }
 
-  async function handleOAuthCode(code: string) {
+  async function handleConnectGoogle() {
     if (!restaurantId || !session?.access_token) return;
     setConnectingGoogle(true);
 
     try {
-      const sheetId = extractSheetId(sheetUrl) || null;
-
-      const resp = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/google-oauth`,
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${session.access_token}`,
+      // Use Supabase's built-in OAuth — handles redirect back to app via deep link
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'dealish://auth/callback',
+          scopes: 'https://www.googleapis.com/auth/spreadsheets',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
           },
-          body: JSON.stringify({
-            code,
-            redirect_uri: redirectUri,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.url) throw new Error('No OAuth URL returned');
+
+      // Open browser
+      const result = await WebBrowser.openAuthSessionAsync(data.url, 'dealish://auth/callback');
+
+      if (result.type === 'success') {
+        // Extract tokens from the callback URL and store them
+        const url = result.url;
+        const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1] || '');
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        const expiresIn = params.get('expires_in');
+
+        if (accessToken && refreshToken) {
+          const expiry = new Date(Date.now() + parseInt(expiresIn || '3600') * 1000).toISOString();
+
+          const { error: upsertErr } = await supabase.from('google_oauth_tokens').upsert({
+            user_id: profile.id,
             restaurant_id: restaurantId,
-            sheet_id: sheetId,
-            sheet_tab: sheetTab || 'Sheet1',
-          }),
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            token_expiry: expiry,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,restaurant_id' });
+
+          if (upsertErr) throw upsertErr;
+
+          await loadData();
+          Alert.alert('✅ Connected!', 'Google account connected. Now paste your Sheet URL to start syncing.');
+        } else {
+          // Tokens not in URL — exchange via edge function
+          const code = params.get('code');
+          if (code) {
+            await exchangeCodeViaEdgeFunction(code);
+          } else {
+            throw new Error('No tokens or code in callback URL');
+          }
         }
-      );
-
-      const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || 'OAuth exchange failed');
-
-      await loadData();
-      Alert.alert(
-        '✅ Connected!',
-        sheetId
-          ? 'Google Sheets connected. Your deals will sync every 5 minutes automatically.'
-          : 'Google account connected. Now paste your Sheet URL to start syncing.'
-      );
+      } else if (result.type === 'cancel') {
+        // User cancelled, do nothing
+      }
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
       setConnectingGoogle(false);
     }
+  }
+
+  async function exchangeCodeViaEdgeFunction(code: string) {
+    const resp = await fetch(
+      `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/google-oauth`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${session!.access_token}`,
+        },
+        body: JSON.stringify({
+          code,
+          redirect_uri: 'dealish://auth/callback',
+          restaurant_id: restaurantId,
+        }),
+      }
+    );
+
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || 'OAuth exchange failed');
+
+    await loadData();
+    Alert.alert('✅ Connected!', 'Google account connected. Now paste your Sheet URL to start syncing.');
   }
 
   function extractSheetId(url: string): string | null {
@@ -226,8 +234,7 @@ export default function IntegrationsScreen() {
       {
         text: 'Disconnect', style: 'destructive',
         onPress: async () => {
-          await supabase.from('google_oauth_tokens').delete()
-            .eq('restaurant_id', restaurantId);
+          await supabase.from('google_oauth_tokens').delete().eq('restaurant_id', restaurantId);
           await loadData();
         },
       },
@@ -292,7 +299,7 @@ export default function IntegrationsScreen() {
       <Text style={s.title}>Integrations</Text>
       <Text style={s.subtitle}>Sync your Google Sheets inventory to Dealish automatically</Text>
 
-      {/* ── Google Sheets Connection (primary flow) ── */}
+      {/* ── Google Sheets Connection ── */}
       <View style={s.section}>
         <View style={s.sectionHeader}>
           <Ionicons name="logo-google" size={20} color="#4285F4" />
@@ -307,15 +314,12 @@ export default function IntegrationsScreen() {
         {!hasGoogleToken ? (
           <>
             <Text style={s.sectionDesc}>
-              Connect your Google account and paste your Sheet URL. We'll detect your columns automatically and sync your deals every 5 minutes — no technical setup needed.
+              Connect your Google account and paste your Sheet URL. We'll detect your columns automatically and sync your deals every 5 minutes.
             </Text>
             <TouchableOpacity
-              style={[s.googleButton, (!request || connectingGoogle) && s.buttonDisabled]}
-              onPress={() => {
-                setConnectingGoogle(true);
-                promptAsync();
-              }}
-              disabled={!request || connectingGoogle}
+              style={[s.googleButton, connectingGoogle && s.buttonDisabled]}
+              onPress={handleConnectGoogle}
+              disabled={connectingGoogle}
             >
               {connectingGoogle ? (
                 <ActivityIndicator color="#fff" size="small" />
@@ -345,7 +349,6 @@ export default function IntegrationsScreen() {
               </View>
             )}
 
-            {/* Column mapping preview */}
             {integration?.detected_mapping && (
               <View style={s.mappingSection}>
                 <Text style={s.mappingTitle}>Detected columns</Text>
@@ -368,10 +371,9 @@ export default function IntegrationsScreen() {
         )}
       </View>
 
-      {/* ── Sheet URL (shown after Google connected, or always if no token) ── */}
+      {/* ── Sheet Settings ── */}
       <View style={s.section}>
         <Text style={s.sectionTitle}>Sheet Settings</Text>
-
         <TextInput
           style={s.input}
           placeholder="Google Sheet URL or Sheet ID"
@@ -388,7 +390,6 @@ export default function IntegrationsScreen() {
           value={sheetTab}
           onChangeText={setSheetTab}
         />
-
         <TouchableOpacity
           style={[s.button, savingSheet && s.buttonDisabled]}
           onPress={handleSaveSheet}
@@ -400,18 +401,10 @@ export default function IntegrationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── API Keys (power user / Apps Script) ── */}
+      {/* ── API Keys (Advanced) ── */}
       <View style={s.section}>
-        <TouchableOpacity
-          style={s.collapsibleHeader}
-          onPress={() => {/* toggle advanced section */}}
-        >
-          <Text style={s.sectionTitle}>Advanced: Apps Script / API Keys</Text>
-          <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <Text style={s.sectionDesc}>
-          For real-time sync or custom setups, use our Google Apps Script with an API key.
-        </Text>
+        <Text style={s.sectionTitle}>Advanced: API Keys</Text>
+        <Text style={s.sectionDesc}>For real-time sync or custom setups via Google Apps Script.</Text>
 
         {generatedKey && (
           <View style={s.keyReveal}>
@@ -505,13 +498,8 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     connectedBadge: { backgroundColor: '#e8f5e9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
     connectedBadgeText: { fontSize: 11, color: '#4caf50', fontWeight: '600' },
     googleButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      backgroundColor: '#4285F4',
-      borderRadius: 12,
-      paddingVertical: 14,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 8, backgroundColor: '#4285F4', borderRadius: 12, paddingVertical: 14,
     },
     googleButtonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
@@ -524,52 +512,27 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     disconnectButton: { marginTop: 4 },
     disconnectText: { fontSize: 13, color: '#ff4444', textAlign: 'right' },
     input: {
-      borderWidth: 1,
-      borderColor: colors.inputBorder,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      fontSize: 14,
-      color: colors.text,
-      backgroundColor: colors.inputBackground,
-      marginBottom: 8,
+      borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 12,
+      paddingHorizontal: 14, paddingVertical: 10, fontSize: 14,
+      color: colors.text, backgroundColor: colors.inputBackground, marginBottom: 8,
     },
-    button: {
-      backgroundColor: '#FE902A',
-      borderRadius: 12,
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
+    button: { backgroundColor: '#FE902A', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
     buttonDisabled: { opacity: 0.6 },
     buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-    collapsibleHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
     keyReveal: {
-      backgroundColor: '#fff8f0',
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: '#FE902A44',
+      backgroundColor: '#fff8f0', borderRadius: 12, padding: 12, marginBottom: 12,
+      borderWidth: 1, borderColor: '#FE902A44',
     },
     keyRevealLabel: { fontSize: 12, color: '#FE902A', fontWeight: '600', marginBottom: 8 },
     keyRevealBox: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      padding: 10,
-      borderWidth: 1,
-      borderColor: '#FE902A44',
-      gap: 8,
+      flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+      borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#FE902A44', gap: 8,
     },
     keyRevealText: { flex: 1, fontSize: 12, fontFamily: 'monospace', color: '#333' },
     dismissText: { fontSize: 12, color: colors.textSecondary, marginTop: 8, textAlign: 'right' },
     keyRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
     },
     keyInfo: { flex: 1 },
     keyLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
@@ -578,4 +541,3 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     copyIdButton: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, justifyContent: 'center' },
     copyIdText: { fontSize: 12, color: colors.textSecondary },
   });
-// 2026-04-23
