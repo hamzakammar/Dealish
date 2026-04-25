@@ -35,6 +35,7 @@ export type Deal = {
   recurrence_days?: number[]; // Array of day numbers (0=Sunday, 1=Monday, etc.)
   recurrence_start_time?: string; // Time string in format "HH:MM:SS"
   recurrence_end_time?: string; // Time string in format "HH:MM:SS"
+  source?: 'manual' | 'sheets'; // Where the deal originated; 'sheets' rows are skipped by sheets-outbound to prevent sync loops
   created_at: string;
   updated_at: string;
 };

@@ -3,6 +3,7 @@ import AuthProvider from '@/app/providers/auth';
 import { setRecoveryFlow } from '@/app/lib/recoveryState';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
@@ -15,6 +16,18 @@ import AppErrorBoundary from '@/components/ErrorBoundary';
 import { useColorScheme } from '@/components/useColorScheme';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useUserSettings } from '@/hooks/useUserSettings';
+
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    debug: __DEV__,
+    enableAutoSessionTracking: true,
+    // Only send events in production builds; dev errors surface in the console.
+    enabled: !__DEV__,
+    tracesSampleRate: 0.2,
+  });
+}
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -29,7 +42,7 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
@@ -51,6 +64,8 @@ export default function RootLayout() {
   // The loading state is handled inside RootLayoutNav if needed
   return <RootLayoutNav />;
 }
+
+export default SENTRY_DSN ? Sentry.wrap(RootLayout) : RootLayout;
 
 function RootLayoutNav() {
   const systemColorScheme = useColorScheme();

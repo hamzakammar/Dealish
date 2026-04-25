@@ -5,19 +5,22 @@ import { createClient } from '@supabase/supabase-js';
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-// Log warnings instead of throwing to prevent app crashes
-// Environment variables should be set in EAS build configuration
-if (!url) {
-    console.error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_URL');
-    console.error('Please set EXPO_PUBLIC_SUPABASE_URL in your EAS build environment variables');
-}
-if (!anon) {
-    console.error('Missing required environment variable: EXPO_PUBLIC_SUPABASE_ANON_KEY');
-    console.error('Please set EXPO_PUBLIC_SUPABASE_ANON_KEY in your EAS build environment variables');
+// Static-export / server context: Node loads this module to harvest exports and has no env vars wired.
+// Fall back to placeholders so the module loads; actual API calls won't happen in that context.
+const isServer = typeof window === 'undefined' && typeof global === 'object' && !global.navigator;
+
+if (!isServer) {
+    const missing: string[] = [];
+    if (!url) missing.push('EXPO_PUBLIC_SUPABASE_URL');
+    if (!anon) missing.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    if (missing.length) {
+        throw new Error(
+            `Supabase client cannot initialize: missing env var(s) ${missing.join(', ')}. ` +
+            `Set these in your .env.local (dev) or EAS build environment (prod).`
+        );
+    }
 }
 
-// Use fallback values to prevent crashes (app will still fail but won't crash immediately)
-// This allows error boundaries to catch the issue
 const supabaseUrl = url || 'https://placeholder.supabase.co';
 const supabaseAnonKey = anon || 'placeholder-key';
 
@@ -34,9 +37,6 @@ export const getAuthRedirectUrl = () => {
   // ensures the link always works regardless of dev/prod environment.
   return 'dealish://auth/callback';
 };
-
-// Determine if we're in a static export/server environment
-const isServer = typeof window === 'undefined' && typeof global === 'object' && !global.navigator;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {

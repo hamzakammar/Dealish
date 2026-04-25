@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "8DWMM7XN54.com.anonymous.Dealish",
+        "appID": "8DWMM7XN54.ca.hamzaammar.dealish",
         "paths": ["/auth/callback*", "/reset-password*"]
       }
     ]

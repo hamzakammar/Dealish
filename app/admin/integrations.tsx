@@ -138,6 +138,7 @@ export default function IntegrationsScreen() {
         const expiresIn = params.get('expires_in');
 
         if (accessToken && refreshToken) {
+          if (!profile?.id) throw new Error('No authenticated user');
           const expiry = new Date(Date.now() + parseInt(expiresIn || '3600') * 1000).toISOString();
 
           const { error: upsertErr } = await supabase.from('google_oauth_tokens').upsert({
@@ -487,7 +488,7 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     title: { fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 24 },
     section: {
-      backgroundColor: colors.cardBackground,
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,

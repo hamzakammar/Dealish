@@ -1,5 +1,6 @@
 import { Restaurant } from "@/types/restaurant";
 import React from "react";
+import { Image, PixelRatio, Platform, View } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
@@ -17,9 +18,9 @@ const MARKER_ASSETS = {
   dotSelected: require("@/assets/images/marker-dot-selected.png"),
 };
 
-// All markers rendered at same display size regardless of PNG canvas size
-const MARKER_SIZE = 36;
-const SELECTED_SIZE = 44;
+const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
+const MARKER_SIZE = rnd(36);
+const SELECTED_SIZE = rnd(44);
 
 export default function RestaurantMarker({
   restaurant,
@@ -41,14 +42,23 @@ export default function RestaurantMarker({
 
   return (
     <Marker
-      key={`${restaurant.id}-${markerKey}`}
+      key={`${restaurant.id}-${markerKey}-${size}`}
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 0.5 }}
-      image={MARKER_ASSETS[markerKey]}
-      style={{ width: size, height: size }}
       tracksViewChanges={false}
       tappable={true}
-    />
+    >
+      <View
+        style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}
+        {...(Platform.OS === "android" && { collapsable: false, renderToHardwareTextureAndroid: true })}
+      >
+        <Image
+          source={MARKER_ASSETS[markerKey]}
+          style={{ width: size, height: size }}
+          resizeMode="contain"
+        />
+      </View>
+    </Marker>
   );
 }
