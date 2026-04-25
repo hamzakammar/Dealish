@@ -34,21 +34,37 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
   };
 }
 
+async function readVaultSecret(supabase: any, secretId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('read_oauth_secret', { p_id: secretId });
+  if (error || !data) return null;
+  return data as string;
+}
+
 async function getValidAccessToken(
   supabase: any,
-  tokenRow: { id: string; access_token: string; refresh_token: string; token_expiry: string }
+  tokenRow: { id: string; access_token_id: string; refresh_token_id: string; token_expiry: string }
 ): Promise<string | null> {
   const expiry = new Date(tokenRow.token_expiry);
   const nowPlus5 = new Date(Date.now() + 5 * 60 * 1000);
-  if (expiry > nowPlus5) return tokenRow.access_token;
 
-  const refreshed = await refreshAccessToken(tokenRow.refresh_token);
+  if (expiry > nowPlus5) {
+    return await readVaultSecret(supabase, tokenRow.access_token_id);
+  }
+
+  const refreshToken = await readVaultSecret(supabase, tokenRow.refresh_token_id);
+  if (!refreshToken) return null;
+
+  const refreshed = await refreshAccessToken(refreshToken);
   if (!refreshed) return null;
 
+  // Update the access-token secret in place; secret id stays the same.
+  await supabase.rpc('update_oauth_secret', {
+    p_id: tokenRow.access_token_id,
+    p_value: refreshed.access_token,
+  });
   await supabase
     .from('google_oauth_tokens')
     .update({
-      access_token: refreshed.access_token,
       token_expiry: refreshed.expiry.toISOString(),
       updated_at: new Date().toISOString(),
     })

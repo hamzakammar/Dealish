@@ -68,12 +68,52 @@ serve(async (req) => {
 
     const expiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-    // Store tokens
+    // Tokens are stored in Supabase Vault, not plaintext columns. We need to
+    // know whether a row already exists so we can update existing secrets in
+    // place (creating new ones each time would orphan vault rows).
+    const { data: existingRow } = await supabase
+      .from('google_oauth_tokens')
+      .select('id, access_token_id, refresh_token_id')
+      .eq('user_id', user.id)
+      .eq('restaurant_id', restaurant_id)
+      .maybeSingle();
+
+    let accessTokenId: string;
+    let refreshTokenId: string;
+
+    if (existingRow?.access_token_id && existingRow?.refresh_token_id) {
+      const { error: uaErr } = await supabase.rpc('update_oauth_secret', {
+        p_id: existingRow.access_token_id,
+        p_value: tokens.access_token,
+      });
+      if (uaErr) throw new Error(`update_oauth_secret access failed: ${uaErr.message}`);
+      const { error: urErr } = await supabase.rpc('update_oauth_secret', {
+        p_id: existingRow.refresh_token_id,
+        p_value: tokens.refresh_token,
+      });
+      if (urErr) throw new Error(`update_oauth_secret refresh failed: ${urErr.message}`);
+      accessTokenId = existingRow.access_token_id;
+      refreshTokenId = existingRow.refresh_token_id;
+    } else {
+      const { data: aId, error: caErr } = await supabase.rpc('create_oauth_secret', {
+        p_value: tokens.access_token,
+        p_name: `oauth_access_${user.id}_${restaurant_id}`,
+      });
+      if (caErr || !aId) throw new Error(`create_oauth_secret access failed: ${caErr?.message ?? 'no id'}`);
+      const { data: rId, error: crErr } = await supabase.rpc('create_oauth_secret', {
+        p_value: tokens.refresh_token,
+        p_name: `oauth_refresh_${user.id}_${restaurant_id}`,
+      });
+      if (crErr || !rId) throw new Error(`create_oauth_secret refresh failed: ${crErr?.message ?? 'no id'}`);
+      accessTokenId = aId as string;
+      refreshTokenId = rId as string;
+    }
+
     await supabase.from('google_oauth_tokens').upsert({
       user_id: user.id,
       restaurant_id,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
+      access_token_id: accessTokenId,
+      refresh_token_id: refreshTokenId,
       token_expiry: expiry,
       scope: tokens.scope,
       updated_at: new Date().toISOString(),
