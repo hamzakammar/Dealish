@@ -2,11 +2,8 @@ import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
-import { Clipboard } from 'react-native';
-import * as Crypto from 'expo-crypto';
-import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,274 +15,322 @@ import {
   View,
 } from 'react-native';
 
-WebBrowser.maybeCompleteAuthSession();
+type ParsedRow = {
+  rowIndex: number;
+  external_product_id: string | null;
+  name: string;
+  description: string | null;
+  category: string | null;
+  unit: string | null;
+  supplier: string | null;
+  quantity: number | null;
+  unit_cost: number | null;
+  purchase_date: string | null;
+  expiration_date: string | null;
+  location: string | null;
+  notes: string | null;
+  status: 'active' | 'low_stock' | 'expired' | null;
+  error: string | null;
+};
 
-async function sha256(text: string): Promise<string> {
-  return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, text);
+type Field = Exclude<keyof ParsedRow, 'rowIndex' | 'error'>;
+
+// Generous alias map. Keys are lowercased, trimmed.
+const HEADER_ALIASES: Record<string, Field> = {
+  'item id': 'external_product_id', 'sku': 'external_product_id', 'id': 'external_product_id',
+  'name': 'name', 'item': 'name', 'product': 'name',
+  'item name': 'name', 'product name': 'name',
+  'description': 'description', 'desc': 'description', 'details': 'description',
+  'category': 'category', 'cat': 'category', 'type': 'category',
+  'unit': 'unit', 'uom': 'unit', 'unit of measure': 'unit',
+  'supplier': 'supplier', 'vendor': 'supplier',
+  'quantity': 'quantity', 'qty': 'quantity', 'count': 'quantity', 'amount': 'quantity',
+  'stock': 'quantity', 'current stock': 'quantity', 'on hand': 'quantity', 'in stock': 'quantity',
+  'unit cost': 'unit_cost', 'unit_cost': 'unit_cost', 'cost': 'unit_cost', 'price': 'unit_cost',
+  'unit cost ($)': 'unit_cost', 'cost ($)': 'unit_cost',
+  'purchase date': 'purchase_date', 'received': 'purchase_date', 'received date': 'purchase_date',
+  'expiration date': 'expiration_date', 'expiration': 'expiration_date',
+  'expires': 'expiration_date', 'expiry date': 'expiration_date', 'expiry': 'expiration_date',
+  'best by': 'expiration_date', 'use by': 'expiration_date',
+  'location': 'location', 'loc': 'location', 'storage': 'location',
+  'notes': 'notes', 'note': 'notes', 'comments': 'notes',
+  'status': 'status',
+};
+
+function detectDelimiter(line: string): string {
+  const tabs = (line.match(/\t/g) || []).length;
+  const commas = (line.match(/,/g) || []).length;
+  return tabs > commas ? '\t' : ',';
 }
 
-function generateKey(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let key = 'dlsh_';
-  for (let i = 0; i < 40; i++) key += chars[Math.floor(Math.random() * chars.length)];
-  return key;
+function parseCSVLine(line: string, delim: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuote) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') inQuote = false;
+      else cur += c;
+    } else {
+      if (c === '"') inQuote = true;
+      else if (c === delim) { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
 }
 
-interface ApiKey {
-  id: string;
-  label: string;
-  last_used_at: string | null;
-  created_at: string;
+function parseNumber(v: string): number | null {
+  if (!v) return null;
+  const n = parseFloat(v.replace(/[$,\s]/g, ''));
+  return isFinite(n) ? n : null;
 }
 
-interface SheetIntegration {
-  id: string;
-  sheet_id: string;
-  sheet_tab: string;
-  sync_method: string;
-  detected_mapping: Record<string, string | null> | null;
-  mapping_confirmed: boolean;
-  last_synced_at: string | null;
+function parseDate(v: string): string | null {
+  if (!v) return null;
+  const s = v.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    let [, mo, da, yr] = m;
+    if (yr.length === 2) yr = '20' + yr;
+    return `${yr}-${mo.padStart(2, '0')}-${da.padStart(2, '0')}`;
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+function parseStatus(v: string): ParsedRow['status'] {
+  const s = v.toLowerCase();
+  if (!s) return null;
+  if (s.includes('expired') || s.includes('🔴')) return 'expired';
+  if (s.includes('low') || s.includes('🟡') || s.includes('yellow')) return 'low_stock';
+  if (s.includes('ok') || s.includes('✅') || s.includes('green') || s.includes('good')) return 'active';
+  return null;
+}
+
+// Find the row that looks like the actual header (contains a Name-ish + Quantity-ish column).
+// Lets us skip title rows like "🍽️ RESTAURANT INVENTORY MANAGEMENT" and "Last Updated: …".
+function findHeaderRowIndex(lines: string[]): number {
+  for (let i = 0; i < lines.length; i++) {
+    const delim = detectDelimiter(lines[i]);
+    const cells = parseCSVLine(lines[i], delim).map(c => c.toLowerCase());
+    const fields = new Set<Field>();
+    for (const c of cells) {
+      const f = HEADER_ALIASES[c];
+      if (f) fields.add(f);
+    }
+    if (fields.has('name') && fields.has('quantity')) return i;
+  }
+  return -1;
+}
+
+function parseSheetText(text: string): { rows: ParsedRow[]; headerError: string | null } {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length < 2) return { rows: [], headerError: 'Need a header row plus at least one data row.' };
+
+  const headerIdx = findHeaderRowIndex(lines);
+  if (headerIdx === -1) {
+    return {
+      rows: [],
+      headerError:
+        'Could not find a header row containing both a name column (e.g. "Item Name") and a quantity column (e.g. "Current Stock").',
+    };
+  }
+
+  const delim = detectDelimiter(lines[headerIdx]);
+  const rawHeaders = parseCSVLine(lines[headerIdx], delim).map(h => h.toLowerCase());
+  const colMap: Record<number, Field> = {};
+  rawHeaders.forEach((h, i) => {
+    const mapped = HEADER_ALIASES[h];
+    if (mapped) colMap[i] = mapped;
+  });
+
+  const rows: ParsedRow[] = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cells = parseCSVLine(lines[i], delim);
+    // Skip totally empty rows (just commas/tabs).
+    if (cells.every(c => !c)) continue;
+
+    const row: ParsedRow = {
+      rowIndex: i + 1,
+      external_product_id: null,
+      name: '', description: null, category: null, unit: null, supplier: null,
+      quantity: null, unit_cost: null, purchase_date: null, expiration_date: null,
+      location: null, notes: null, status: null, error: null,
+    };
+    cells.forEach((cell, idx) => {
+      const field = colMap[idx];
+      if (!field) return;
+      if (field === 'name') row.name = cell;
+      else if (field === 'quantity') row.quantity = parseNumber(cell);
+      else if (field === 'unit_cost') row.unit_cost = parseNumber(cell);
+      else if (field === 'purchase_date') row.purchase_date = parseDate(cell);
+      else if (field === 'expiration_date') row.expiration_date = parseDate(cell);
+      else if (field === 'status') row.status = parseStatus(cell);
+      else (row as any)[field] = cell || null;
+    });
+    if (!row.name) row.error = 'Missing name';
+    else if (row.quantity == null) row.error = 'Missing or invalid quantity';
+    else if (row.quantity < 0) row.error = 'Quantity must be ≥ 0';
+    rows.push(row);
+  }
+  return { rows, headerError: null };
+}
+
+function parseSheetUrl(input: string): { sheetId: string; gid: string } | null {
+  const url = input.trim();
+  if (!url) return null;
+  const idMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!idMatch) return null;
+  // gid can live in either query (?gid=N) or fragment (#gid=N).
+  const gidMatch = url.match(/[?#&]gid=(\d+)/);
+  return { sheetId: idMatch[1], gid: gidMatch ? gidMatch[1] : '0' };
 }
 
 export default function IntegrationsScreen() {
-  const { profile, session } = useAuthContext();
+  const { profile } = useAuthContext();
   const colors = useThemeColors();
   const router = useRouter();
 
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [integration, setIntegration] = useState<SheetIntegration | null>(null);
-  const [hasGoogleToken, setHasGoogleToken] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [sheetUrl, setSheetUrl] = useState('');
-  const [sheetTab, setSheetTab] = useState('Sheet1');
-  const [savingSheet, setSavingSheet] = useState(false);
-  const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [newKeyLabel, setNewKeyLabel] = useState('');
-  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
-  const [generatingKey, setGeneratingKey] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
-    loadData();
-  }, [profile]);
-
-  async function loadData() {
-    if (!profile?.id) return;
-    setLoading(true);
-    try {
-      const { data: restaurant } = await supabase
+    (async () => {
+      if (!profile?.id) return;
+      setLoading(true);
+      const { data } = await supabase
         .from('restaurants')
         .select('id')
         .eq('owner_id', profile.id)
         .single();
-
-      if (!restaurant) { setLoading(false); return; }
-      setRestaurantId(restaurant.id);
-
-      const [keysResult, integResult, tokenResult] = await Promise.all([
-        supabase.from('api_keys').select('id, label, last_used_at, created_at')
-          .eq('restaurant_id', restaurant.id).order('created_at', { ascending: false }),
-        supabase.from('sheet_integrations').select('*')
-          .eq('restaurant_id', restaurant.id).single(),
-        supabase.from('google_oauth_tokens').select('id')
-          .eq('restaurant_id', restaurant.id).single(),
-      ]);
-
-      setApiKeys(keysResult.data || []);
-      setIntegration(integResult.data || null);
-      setHasGoogleToken(!!tokenResult.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
+      setRestaurantId(data?.id ?? null);
       setLoading(false);
+    })();
+  }, [profile]);
+
+  async function handleFetch() {
+    setFetchError(null);
+    setCsvText('');
+    const parsed = parseSheetUrl(sheetUrl);
+    if (!parsed) {
+      setFetchError("That doesn't look like a Google Sheet URL. Paste the link from your browser's address bar.");
+      return;
     }
-  }
-
-  async function handleConnectGoogle() {
-    if (!restaurantId || !session?.access_token) return;
-    setConnectingGoogle(true);
-
+    setFetching(true);
     try {
-      // Use Supabase's built-in OAuth — handles redirect back to app via deep link
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: 'dealish://auth/callback',
-          scopes: 'https://www.googleapis.com/auth/spreadsheets',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL returned');
-
-      // Open browser
-      const result = await WebBrowser.openAuthSessionAsync(data.url, 'dealish://auth/callback');
-
-      if (result.type === 'success') {
-        // Extract tokens from the callback URL and store them
-        const url = result.url;
-        const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1] || '');
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const expiresIn = params.get('expires_in');
-
-        if (accessToken && refreshToken) {
-          if (!profile?.id) throw new Error('No authenticated user');
-          const expiry = new Date(Date.now() + parseInt(expiresIn || '3600') * 1000).toISOString();
-
-          const { error: upsertErr } = await supabase.from('google_oauth_tokens').upsert({
-            user_id: profile.id,
-            restaurant_id: restaurantId,
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            token_expiry: expiry,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id,restaurant_id' });
-
-          if (upsertErr) throw upsertErr;
-
-          await loadData();
-          Alert.alert('✅ Connected!', 'Google account connected. Now paste your Sheet URL to start syncing.');
-        } else {
-          // Tokens not in URL — exchange via edge function
-          const code = params.get('code');
-          if (code) {
-            await exchangeCodeViaEdgeFunction(code);
-          } else {
-            throw new Error('No tokens or code in callback URL');
-          }
+      const exportUrl = `https://docs.google.com/spreadsheets/d/${parsed.sheetId}/export?format=csv&gid=${parsed.gid}`;
+      const resp = await fetch(exportUrl);
+      if (!resp.ok) {
+        if (resp.status === 401 || resp.status === 403 || resp.status === 404) {
+          throw new Error(
+            "Sheet isn't accessible. In Google Sheets: Share → General access → set to \"Anyone with the link\" (Viewer). Then try again."
+          );
         }
-      } else if (result.type === 'cancel') {
-        // User cancelled, do nothing
+        throw new Error(`Fetch failed: HTTP ${resp.status}`);
       }
+      const text = await resp.text();
+      // Google returns an HTML login page (status 200) when the sheet is private.
+      if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+        throw new Error(
+          "Sheet looks private. In Google Sheets: Share → General access → \"Anyone with the link\" (Viewer)."
+        );
+      }
+      setCsvText(text);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      setFetchError(err.message || String(err));
     } finally {
-      setConnectingGoogle(false);
+      setFetching(false);
     }
   }
 
-  async function exchangeCodeViaEdgeFunction(code: string) {
-    const resp = await fetch(
-      `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/google-oauth`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session!.access_token}`,
-        },
-        body: JSON.stringify({
-          code,
-          redirect_uri: 'dealish://auth/callback',
+  const parsed = useMemo(() => parseSheetText(csvText), [csvText]);
+  const validRows = parsed.rows.filter(r => !r.error);
+  const errorRows = parsed.rows.filter(r => r.error);
+
+  async function handleUpload() {
+    if (!restaurantId) return;
+    if (validRows.length === 0) {
+      Alert.alert('Nothing to upload', 'Add at least one valid row.');
+      return;
+    }
+
+    setUploading(true);
+    setProgress({ done: 0, total: validRows.length });
+
+    let succeeded = 0;
+    const failures: { row: number; reason: string }[] = [];
+
+    for (const r of validRows) {
+      try {
+        const { data: product, error: pErr } = await supabase
+          .from('products')
+          .insert({
+            restaurant_id: restaurantId,
+            name: r.name,
+            description: r.description ?? undefined,
+            category: r.category ?? undefined,
+            unit: r.unit || 'each',
+            supplier: r.supplier ?? undefined,
+            external_product_id: r.external_product_id ?? undefined,
+            external_system: r.external_product_id ? 'sheet_upload' : undefined,
+          })
+          .select('id')
+          .single();
+        if (pErr || !product) throw new Error(pErr?.message || 'Product insert failed');
+
+        const { error: iErr } = await supabase.from('inventory_items').insert({
           restaurant_id: restaurantId,
-        }),
+          product_id: product.id,
+          quantity: r.quantity!,
+          unit: r.unit || 'each',
+          unit_cost: r.unit_cost ?? undefined,
+          purchase_date: r.purchase_date ?? undefined,
+          expiration_date: r.expiration_date ?? undefined,
+          location: r.location ?? undefined,
+          supplier: r.supplier ?? undefined,
+          notes: r.notes ?? undefined,
+          status: r.status ?? 'active',
+        });
+        if (iErr) throw new Error(iErr.message);
+        succeeded++;
+      } catch (err: any) {
+        failures.push({ row: r.rowIndex, reason: err.message || String(err) });
       }
-    );
-
-    const result = await resp.json();
-    if (!resp.ok) throw new Error(result.error || 'OAuth exchange failed');
-
-    await loadData();
-    Alert.alert('✅ Connected!', 'Google account connected. Now paste your Sheet URL to start syncing.');
-  }
-
-  function extractSheetId(url: string): string | null {
-    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : url.trim() || null;
-  }
-
-  async function handleSaveSheet() {
-    if (!restaurantId) return;
-    const sheetId = extractSheetId(sheetUrl);
-    if (!sheetId) {
-      Alert.alert('Error', 'Please enter a valid Google Sheets URL or Sheet ID');
-      return;
+      setProgress(p => p ? { ...p, done: p.done + 1 } : p);
     }
-    setSavingSheet(true);
-    try {
-      const { error } = await supabase.from('sheet_integrations').upsert({
-        restaurant_id: restaurantId,
-        sheet_id: sheetId,
-        sheet_tab: sheetTab.trim() || 'Sheet1',
-        sync_method: hasGoogleToken ? 'oauth_cron' : 'apps_script',
-      }, { onConflict: 'restaurant_id,sheet_id' });
 
-      if (error) throw error;
-      await loadData();
-      Alert.alert('Saved', 'Sheet saved. Sync will run automatically every 5 minutes.');
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    } finally {
-      setSavingSheet(false);
+    setUploading(false);
+    setProgress(null);
+
+    if (failures.length === 0) {
+      Alert.alert(
+        'Uploaded',
+        `${succeeded} item${succeeded === 1 ? '' : 's'} added to inventory.`,
+        [{ text: 'OK', onPress: () => { setCsvText(''); router.back(); } }]
+      );
+    } else {
+      const sample = failures.slice(0, 3).map(f => `Row ${f.row}: ${f.reason}`).join('\n');
+      const more = failures.length > 3 ? `\n…and ${failures.length - 3} more` : '';
+      Alert.alert('Partial upload', `${succeeded} succeeded, ${failures.length} failed.\n\n${sample}${more}`);
     }
-  }
-
-  async function handleDisconnectGoogle() {
-    if (!restaurantId) return;
-    Alert.alert('Disconnect Google', 'Deals will stop syncing from your sheet. Existing deals stay.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Disconnect', style: 'destructive',
-        onPress: async () => {
-          await supabase.from('google_oauth_tokens').delete().eq('restaurant_id', restaurantId);
-          await loadData();
-        },
-      },
-    ]);
-  }
-
-  async function handleGenerateKey() {
-    if (!restaurantId || !newKeyLabel.trim()) {
-      Alert.alert('Error', 'Enter a label for this key');
-      return;
-    }
-    setGeneratingKey(true);
-    try {
-      const rawKey = generateKey();
-      const hash = await sha256(rawKey);
-      const { error } = await supabase.from('api_keys').insert({
-        restaurant_id: restaurantId,
-        key_hash: hash,
-        label: newKeyLabel.trim(),
-      });
-      if (error) throw error;
-      setGeneratedKey(rawKey);
-      setNewKeyLabel('');
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    } finally {
-      setGeneratingKey(false);
-    }
-  }
-
-  async function handleDeleteKey(keyId: string) {
-    Alert.alert('Delete Key', 'Apps Script using this key will stop working.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          await supabase.from('api_keys').delete().eq('id', keyId);
-          await loadData();
-        },
-      },
-    ]);
   }
 
   const s = makeStyles(colors);
 
-  if (loading) {
-    return <View style={s.center}><ActivityIndicator color="#FE902A" /></View>;
-  }
-
+  if (loading) return <View style={s.center}><ActivityIndicator color="#FE902A" /></View>;
   if (!restaurantId) {
     return <View style={s.center}><Text style={s.emptyText}>No restaurant found for your account.</Text></View>;
   }
@@ -297,182 +342,112 @@ export default function IntegrationsScreen() {
         <Text style={s.backText}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={s.title}>Integrations</Text>
-      <Text style={s.subtitle}>Sync your Google Sheets inventory to Dealish automatically</Text>
+      <Text style={s.title}>Bulk Upload Inventory</Text>
+      <Text style={s.subtitle}>Import items directly from a Google Sheet URL.</Text>
 
-      {/* ── Google Sheets Connection ── */}
       <View style={s.section}>
-        <View style={s.sectionHeader}>
-          <Ionicons name="logo-google" size={20} color="#4285F4" />
-          <Text style={s.sectionTitle}>Google Sheets</Text>
-          {hasGoogleToken && (
-            <View style={s.connectedBadge}>
-              <Text style={s.connectedBadgeText}>Connected</Text>
-            </View>
-          )}
-        </View>
-
-        {!hasGoogleToken ? (
-          <>
-            <Text style={s.sectionDesc}>
-              Connect your Google account and paste your Sheet URL. We'll detect your columns automatically and sync your deals every 5 minutes.
-            </Text>
-            <TouchableOpacity
-              style={[s.googleButton, connectingGoogle && s.buttonDisabled]}
-              onPress={handleConnectGoogle}
-              disabled={connectingGoogle}
-            >
-              {connectingGoogle ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="logo-google" size={18} color="#fff" />
-                  <Text style={s.googleButtonText}>Connect Google Account</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={s.sectionDesc}>
-              Google account connected. {integration ? 'Syncing automatically every 5 minutes.' : 'Now add your Sheet URL below.'}
-            </Text>
-
-            {integration && (
-              <View style={s.statusRow}>
-                <Ionicons name="checkmark-circle" size={16} color="#4caf50" />
-                <Text style={s.statusText}>
-                  Sheet: ...{integration.sheet_id.slice(-8)} · Tab: {integration.sheet_tab}
-                  {integration.last_synced_at
-                    ? ` · Last synced ${new Date(integration.last_synced_at).toLocaleTimeString()}`
-                    : ' · Pending first sync'}
-                </Text>
-              </View>
-            )}
-
-            {integration?.detected_mapping && (
-              <View style={s.mappingSection}>
-                <Text style={s.mappingTitle}>Detected columns</Text>
-                {Object.entries(integration.detected_mapping)
-                  .filter(([, col]) => col !== null)
-                  .map(([field, col]) => (
-                    <View key={field} style={s.mappingRow}>
-                      <Text style={s.mappingField}>{field}</Text>
-                      <Ionicons name="arrow-forward" size={12} color={colors.textSecondary} />
-                      <Text style={s.mappingCol}>{col}</Text>
-                    </View>
-                  ))}
-              </View>
-            )}
-
-            <TouchableOpacity style={s.disconnectButton} onPress={handleDisconnectGoogle}>
-              <Text style={s.disconnectText}>Disconnect Google Account</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      {/* ── Sheet Settings ── */}
-      <View style={s.section}>
-        <Text style={s.sectionTitle}>Sheet Settings</Text>
+        <Text style={s.sectionTitle}>1. Paste your Google Sheet URL</Text>
+        <Text style={s.sectionDesc}>
+          In Google Sheets: <Text style={s.bold}>Share → General access → "Anyone with the link" (Viewer)</Text>,
+          then copy the URL from your browser's address bar and paste it below. Title rows like
+          "RESTAURANT INVENTORY MANAGEMENT" or "Last Updated:" are skipped automatically.
+        </Text>
+        <Text style={s.sectionDesc}>
+          <Text style={s.bold}>Recognised columns:</Text> <Text style={s.mono}>Item ID</Text>,{' '}
+          <Text style={s.mono}>Item Name</Text>, <Text style={s.mono}>Category</Text>,{' '}
+          <Text style={s.mono}>Unit</Text>, <Text style={s.mono}>Current Stock</Text>,{' '}
+          <Text style={s.mono}>Unit Cost</Text>, <Text style={s.mono}>Status</Text>,{' '}
+          <Text style={s.mono}>Notes</Text>, <Text style={s.mono}>Expiration Date</Text>,{' '}
+          <Text style={s.mono}>Supplier</Text>, <Text style={s.mono}>Location</Text>.
+          {' '}Other columns (Par Level, On Order, Projected Stock, Total Value) are ignored.
+        </Text>
         <TextInput
-          style={s.input}
-          placeholder="Google Sheet URL or Sheet ID"
+          style={s.urlInput}
+          placeholder="https://docs.google.com/spreadsheets/d/…/edit?gid=…"
           placeholderTextColor={colors.textTertiary}
           value={sheetUrl}
           onChangeText={setSheetUrl}
           autoCapitalize="none"
           autoCorrect={false}
-        />
-        <TextInput
-          style={s.input}
-          placeholder="Tab name (default: Sheet1)"
-          placeholderTextColor={colors.textTertiary}
-          value={sheetTab}
-          onChangeText={setSheetTab}
+          keyboardType="url"
+          returnKeyType="go"
+          onSubmitEditing={handleFetch}
         />
         <TouchableOpacity
-          style={[s.button, savingSheet && s.buttonDisabled]}
-          onPress={handleSaveSheet}
-          disabled={savingSheet}
+          style={[s.fetchButton, (fetching || !sheetUrl.trim()) && s.buttonDisabled]}
+          onPress={handleFetch}
+          disabled={fetching || !sheetUrl.trim()}
         >
-          {savingSheet
+          {fetching
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={s.buttonText}>{integration ? 'Update Sheet' : 'Save Sheet'}</Text>}
+            : <Text style={s.fetchButtonText}>Fetch sheet</Text>}
         </TouchableOpacity>
+        {fetchError && (
+          <View style={s.errorBox}><Text style={s.errorText}>{fetchError}</Text></View>
+        )}
       </View>
 
-      {/* ── API Keys (Advanced) ── */}
       <View style={s.section}>
-        <Text style={s.sectionTitle}>Advanced: API Keys</Text>
-        <Text style={s.sectionDesc}>For real-time sync or custom setups via Google Apps Script.</Text>
-
-        {generatedKey && (
-          <View style={s.keyReveal}>
-            <Text style={s.keyRevealLabel}>Copy this key now — it won't be shown again</Text>
-            <TouchableOpacity
-              style={s.keyRevealBox}
-              onPress={() => {
-                Clipboard.setString(generatedKey);
-                Alert.alert('Copied', 'API key copied to clipboard');
-              }}
-            >
-              <Text style={s.keyRevealText} numberOfLines={1}>{generatedKey}</Text>
-              <Ionicons name="copy-outline" size={16} color="#FE902A" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setGeneratedKey(null)}>
-              <Text style={s.dismissText}>Dismiss</Text>
-            </TouchableOpacity>
-          </View>
+        <Text style={s.sectionTitle}>2. Preview</Text>
+        {parsed.headerError && (
+          <View style={s.errorBox}><Text style={s.errorText}>{parsed.headerError}</Text></View>
         )}
-
-        {apiKeys.map(key => (
-          <View key={key.id} style={s.keyRow}>
-            <View style={s.keyInfo}>
-              <Text style={s.keyLabel}>{key.label}</Text>
-              <Text style={s.keyMeta}>
-                {new Date(key.created_at).toLocaleDateString()}
-                {key.last_used_at ? ` · Used ${new Date(key.last_used_at).toLocaleDateString()}` : ' · Never used'}
+        {!parsed.headerError && parsed.rows.length === 0 && (
+          <Text style={s.sectionDesc}>Fetch a sheet above to see a preview.</Text>
+        )}
+        {parsed.rows.slice(0, 20).map(r => (
+          <View key={r.rowIndex} style={[s.previewRow, r.error && s.previewRowError]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.previewTitle} numberOfLines={1}>
+                {r.name || <Text style={s.previewMuted}>(no name)</Text>}
               </Text>
+              <Text style={s.previewMeta} numberOfLines={1}>
+                {[
+                  r.external_product_id,
+                  r.quantity != null && `${r.quantity}${r.unit ? ' ' + r.unit : ''}`,
+                  r.category,
+                  r.unit_cost != null && `$${r.unit_cost.toFixed(2)}`,
+                  r.status && (r.status === 'low_stock' ? 'low' : r.status),
+                  r.expiration_date && `exp ${r.expiration_date}`,
+                ].filter(Boolean).join(' · ') || <Text style={s.previewMuted}>no extras</Text>}
+              </Text>
+              {r.error && <Text style={s.previewError}>{r.error}</Text>}
             </View>
-            <TouchableOpacity onPress={() => handleDeleteKey(key.id)}>
-              <Ionicons name="trash-outline" size={18} color="#ff4444" />
-            </TouchableOpacity>
+            <Ionicons
+              name={r.error ? 'close-circle' : 'checkmark-circle'}
+              size={18}
+              color={r.error ? '#ff4444' : '#4caf50'}
+            />
           </View>
         ))}
-
-        <View style={s.newKeyRow}>
-          <TextInput
-            style={s.input}
-            placeholder="Key label (e.g. Main Sheet)"
-            placeholderTextColor={colors.textTertiary}
-            value={newKeyLabel}
-            onChangeText={setNewKeyLabel}
-          />
-          <TouchableOpacity
-            style={[s.button, generatingKey && s.buttonDisabled]}
-            onPress={handleGenerateKey}
-            disabled={generatingKey}
-          >
-            {generatingKey
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={s.buttonText}>Generate Key</Text>}
-          </TouchableOpacity>
-        </View>
-
-        {restaurantId && (
-          <TouchableOpacity
-            style={s.copyIdButton}
-            onPress={() => {
-              Clipboard.setString(restaurantId);
-              Alert.alert('Copied', 'Restaurant ID copied');
-            }}
-          >
-            <Ionicons name="copy-outline" size={14} color={colors.textSecondary} />
-            <Text style={s.copyIdText}>Copy Restaurant ID for Apps Script config</Text>
-          </TouchableOpacity>
+        {parsed.rows.length > 20 && (
+          <Text style={s.previewMeta}>…and {parsed.rows.length - 20} more</Text>
+        )}
+        {parsed.rows.length > 0 && (
+          <Text style={s.summary}>
+            {validRows.length} ready · {errorRows.length} skipped
+          </Text>
         )}
       </View>
+
+      <TouchableOpacity
+        style={[s.button, (uploading || validRows.length === 0) && s.buttonDisabled]}
+        onPress={handleUpload}
+        disabled={uploading || validRows.length === 0}
+      >
+        {uploading
+          ? (
+            <View style={s.uploadingRow}>
+              <ActivityIndicator color="#fff" size="small" />
+              {progress && (
+                <Text style={s.buttonText}>Uploading {progress.done}/{progress.total}…</Text>
+              )}
+            </View>
+          )
+          : <Text style={s.buttonText}>
+              Upload {validRows.length} item{validRows.length === 1 ? '' : 's'}
+            </Text>}
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -487,58 +462,40 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     backText: { color: colors.text, fontSize: 16, marginLeft: 4 },
     title: { fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 24 },
-    section: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-    },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, flex: 1 },
-    sectionDesc: { fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 },
-    connectedBadge: { backgroundColor: '#e8f5e9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-    connectedBadgeText: { fontSize: 11, color: '#4caf50', fontWeight: '600' },
-    googleButton: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      gap: 8, backgroundColor: '#4285F4', borderRadius: 12, paddingVertical: 14,
-    },
-    googleButtonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-    statusText: { fontSize: 12, color: colors.textSecondary, flex: 1 },
-    mappingSection: { marginBottom: 12 },
-    mappingTitle: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
-    mappingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
-    mappingField: { fontSize: 12, color: colors.textSecondary, width: 120 },
-    mappingCol: { fontSize: 12, color: colors.text, fontWeight: '500' },
-    disconnectButton: { marginTop: 4 },
-    disconnectText: { fontSize: 13, color: '#ff4444', textAlign: 'right' },
-    input: {
+    section: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 16 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
+    sectionDesc: { fontSize: 13, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 },
+    bold: { fontWeight: '700', color: colors.text },
+    mono: { fontFamily: 'monospace', fontSize: 12, color: colors.text },
+    urlInput: {
       borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 12,
-      paddingHorizontal: 14, paddingVertical: 10, fontSize: 14,
-      color: colors.text, backgroundColor: colors.inputBackground, marginBottom: 8,
+      paddingHorizontal: 12, paddingVertical: 12, fontSize: 14,
+      color: colors.text, backgroundColor: colors.inputBackground,
+      marginBottom: 10,
     },
-    button: { backgroundColor: '#FE902A', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-    buttonDisabled: { opacity: 0.6 },
-    buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-    keyReveal: {
-      backgroundColor: '#fff8f0', borderRadius: 12, padding: 12, marginBottom: 12,
-      borderWidth: 1, borderColor: '#FE902A44',
+    fetchButton: {
+      backgroundColor: '#FE902A', borderRadius: 12, paddingVertical: 12,
+      alignItems: 'center', marginBottom: 4,
     },
-    keyRevealLabel: { fontSize: 12, color: '#FE902A', fontWeight: '600', marginBottom: 8 },
-    keyRevealBox: {
-      flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-      borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#FE902A44', gap: 8,
-    },
-    keyRevealText: { flex: 1, fontSize: 12, fontFamily: 'monospace', color: '#333' },
-    dismissText: { fontSize: 12, color: colors.textSecondary, marginTop: 8, textAlign: 'right' },
-    keyRow: {
-      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+    fetchButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+    errorBox: { backgroundColor: '#ffebee', borderRadius: 8, padding: 10, marginBottom: 10 },
+    errorText: { color: '#c62828', fontSize: 13 },
+    previewRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingVertical: 8,
       borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
     },
-    keyInfo: { flex: 1 },
-    keyLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
-    keyMeta: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-    newKeyRow: { marginTop: 12 },
-    copyIdButton: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, justifyContent: 'center' },
-    copyIdText: { fontSize: 12, color: colors.textSecondary },
+    previewRowError: { opacity: 0.6 },
+    previewTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
+    previewMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    previewMuted: { color: colors.textTertiary, fontStyle: 'italic' },
+    previewError: { fontSize: 11, color: '#ff4444', marginTop: 2 },
+    summary: { fontSize: 13, color: colors.textSecondary, marginTop: 10, textAlign: 'right' },
+    button: {
+      backgroundColor: '#FE902A', borderRadius: 12, paddingVertical: 14,
+      alignItems: 'center', marginTop: 8,
+    },
+    buttonDisabled: { opacity: 0.5 },
+    buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+    uploadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   });

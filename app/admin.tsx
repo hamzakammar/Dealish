@@ -549,8 +549,8 @@ export default function AdminDashboard() {
                 <Ionicons name="git-network-outline" size={20} color="#64748B" />
               </View>
               <View>
-                <Text style={styles.menuItemTitle}>Integrations</Text>
-                <Text style={styles.menuItemSubtitle}>Sync Google Sheets inventory</Text>
+                <Text style={styles.menuItemTitle}>Bulk Upload Inventory</Text>
+                <Text style={styles.menuItemSubtitle}>Import items from a Google Sheet URL in one click</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
