@@ -27,10 +27,7 @@
         "com.apple.developer.applesignin": [
           "Default"
         ]
-      },
-      "associatedDomains": [
-        "applinks:dealish.io"
-      ]
+      }
     },
     "android": {
       "icon": "./assets/images/app-icon.png",
