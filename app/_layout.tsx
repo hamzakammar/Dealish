@@ -93,6 +93,7 @@ function RootLayoutNav() {
           if (type === 'recovery') {
             setRecoveryFlow(); // set BEFORE getSession so index.tsx won't redirect away
             await supabase.auth.getSession();
+            await SplashScreen.hideAsync().catch(() => {});
             router.replace('/reset-password?type=recovery');
             return;
           }
@@ -139,9 +140,16 @@ function RootLayoutNav() {
     // Initialize linking
     initializeLinking();
 
+    // Absolute failsafe: if any startup path never calls hideAsync(), the native
+    // splash can otherwise stay on screen (recovery early-return, etc.).
+    const splashFailsafe = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 2500);
+
     // ALWAYS return cleanup function - this is critical for hook consistency
     // React expects this cleanup function to exist on every render
     return () => {
+      clearTimeout(splashFailsafe);
       if (subscription) {
         try {
           subscription.remove();
@@ -160,6 +168,11 @@ function RootLayoutNav() {
         <ThemeWrapper>
           <NotificationHandler />
           <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="permissions" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="qr-scanner" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />

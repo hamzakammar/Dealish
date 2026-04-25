@@ -1,4 +1,5 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
+import { consumeRecoveryFlow } from '@/app/lib/recoveryState';
 import { useAuthContext } from '@/app/providers/auth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,10 @@ export default function ResetPasswordScreen() {
     const { session, isLoading } = useAuthContext();
     const colors = useThemeColors();
     const router = useRouter();
+
+    useEffect(() => {
+        consumeRecoveryFlow();
+    }, []);
     const [email, setEmail] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');

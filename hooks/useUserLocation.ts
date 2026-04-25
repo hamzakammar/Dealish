@@ -1,8 +1,18 @@
 import { UserLocation as UserLocationType } from "@/types/restaurant";
+import { withTimeout } from "@/utils/async";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 import { Region } from "react-native-maps";
+
+const DEFAULT_REGION: Region = {
+  latitude: 43.6532,
+  longitude: -79.3832,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
+
+const LOCATION_GET_TIMEOUT_MS = 20_000;
 
 // Delay before animating to user location to ensure map is ready
 const MAP_ANIMATION_DELAY_MS = 200;
@@ -36,22 +46,31 @@ export function useUserLocation(mapRef: React.RefObject<any>) {
             info.settingsDescription
           );
           if (mounted) {
-            // Default to Toronto when location permission is denied
-            const torontoRegion: Region = {
-              latitude: 43.6532,
-              longitude: -79.3832,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            };
-            setRegion(torontoRegion);
+            setRegion(DEFAULT_REGION);
             setLoading(false);
           }
           return;
         }
 
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        let pos: Awaited<ReturnType<typeof Location.getCurrentPositionAsync>>;
+        try {
+          pos = await withTimeout(
+            Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }),
+            LOCATION_GET_TIMEOUT_MS
+          );
+        } catch {
+          if (__DEV__) {
+            console.warn('Location getCurrentPosition timed out or failed; using default map region');
+          }
+          if (mounted) {
+            setRegion(DEFAULT_REGION);
+            setUserLocation(null);
+            setLoading(false);
+          }
+          return;
+        }
         if (mounted) {
           const initialLocation = ({
             lat: pos.coords.latitude,

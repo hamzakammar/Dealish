@@ -9,10 +9,14 @@ export default function Index() {
   // ALL hooks MUST be called unconditionally at the top level
   const { session, isLoading, profile } = useAuthContext();
   const router = useRouter();
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
   const [hasSeenWelcome, setHasSeenWelcome] = useState<boolean | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
   const hasNavigatedRef = useRef(false);
+  const hasSeenWelcomeRef = useRef<boolean | null>(null);
   const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hide native splash only right before we navigate — keeps native splash visible
@@ -26,7 +30,7 @@ export default function Index() {
         if (!hasNavigatedRef.current) {
           hasNavigatedRef.current = true;
           await SplashScreen.hideAsync().catch(() => {});
-          router.replace('/map');
+          routerRef.current.replace('/map');
         }
       }, 8000);
     }
@@ -44,16 +48,19 @@ export default function Index() {
       // Wait for AsyncStorage checks to complete
       if (hasSeenWelcome === null || hasCompletedOnboarding === null) return;
 
-      // If we have a session but profile hasn't loaded yet, wait for it
-      // This prevents routing before we know the user's role
-      if (session && profile === null) return;
+      // While auth is still resolving session/profile, isLoading is true and we return above.
+      // Do NOT block on `session && profile === null`: after a failed/missing profile fetch,
+      // profile stays null and isLoading is false — the old check caused an infinite splash.
 
       // Prevent duplicate navigation
       if (hasNavigatedRef.current) return;
 
-      // If this is a password recovery deep link, _layout.tsx owns navigation
-      // Don't redirect to map/auth or we'll race with router.replace('/reset-password')
-      if (isRecoveryFlow()) return;
+      // If this is a password recovery deep link, _layout.tsx owns navigation.
+      // Must still hide the native splash, or it stays up forever (was the main "infinite" splash bug).
+      if (isRecoveryFlow()) {
+        await SplashScreen.hideAsync().catch(() => {});
+        return;
+      }
 
       hasNavigatedRef.current = true;
 
@@ -65,45 +72,42 @@ export default function Index() {
         const isTokenValid = session.expires_at && session.expires_at > Date.now() / 1000;
         
         if (!isTokenValid) {
-          router.replace(hasSeenWelcome ? '/auth' : '/welcome');
-          setIsInitializing(false);
+          routerRef.current.replace(hasSeenWelcome ? '/auth' : '/welcome');
           return;
         }
 
         // Valid session - check role and onboarding status
         try {
           if (profile?.role === 'owner' || profile?.role === 'admin') {
-            router.replace('/admin');
+            routerRef.current.replace('/admin');
           } else {
             // Always use profile.display_name as source of truth for onboarding
             // AsyncStorage flag is a fallback only — profile check is definitive
             const needsOnboarding = !profile?.display_name;
             if (needsOnboarding) {
-              router.replace('/onboarding');
+              routerRef.current.replace('/onboarding');
             } else {
-              router.replace('/map');
+              routerRef.current.replace('/map');
             }
           }
         } catch (error) {
           if (__DEV__) console.error('Navigation error:', error);
-          router.replace('/map');
+          routerRef.current.replace('/map');
         }
-        setIsInitializing(false);
         return;
       }
 
       // No session - check welcome screen status
       try {
-        router.replace(hasSeenWelcome ? '/auth' : '/welcome');
+        routerRef.current.replace(hasSeenWelcome ? '/auth' : '/welcome');
       } catch (error) {
         if (__DEV__) console.error('Navigation error:', error);
-        router.replace('/auth');
+        routerRef.current.replace('/auth');
       }
-      setIsInitializing(false);
     }
 
     initialize();
-  }, [session, isLoading, profile, router, hasSeenWelcome, hasCompletedOnboarding]);
+  }, [session, isLoading, profile, hasSeenWelcome, hasCompletedOnboarding]);
 
   // Load AsyncStorage flags on mount
   useEffect(() => {
@@ -117,6 +121,28 @@ export default function Index() {
       setHasSeenWelcome(false);
       setHasCompletedOnboarding(false);
     });
+  }, []);
+
+  // Keep a ref for the one-shot max-wait so we use the real AsyncStorage value at fire time
+  useEffect(() => {
+    hasSeenWelcomeRef.current = hasSeenWelcome;
+  }, [hasSeenWelcome]);
+
+  // Last-resort: never leave the user on a permanent native splash.
+  // Must run once on mount — a changing `router` reference would otherwise reset the timer forever.
+  const STARTUP_MAX_MS = 15_000;
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (hasNavigatedRef.current) return;
+      hasNavigatedRef.current = true;
+      await SplashScreen.hideAsync().catch(() => {});
+      if (__DEV__) {
+        console.warn('Startup took too long; routing to welcome/auth fallback');
+      }
+      const seen = hasSeenWelcomeRef.current;
+      routerRef.current.replace(seen ? '/auth' : '/welcome');
+    }, STARTUP_MAX_MS);
+    return () => clearTimeout(t);
   }, []);
 
   // Native splash stays visible until hideAsync() fires right before navigation.

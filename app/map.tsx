@@ -39,6 +39,8 @@ export default function MapScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [latitudeDelta, setLatitudeDelta] = useState(0.05);
   const [mapIsTransitioning, setMapIsTransitioning] = useState(false);
+  // Never let the full-screen "loading" gate run forever (location/Supabase can hang in native code)
+  const [mapGateBypass, setMapGateBypass] = useState(false);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -201,6 +203,11 @@ export default function MapScreen() {
 
   const loading = restaurantsLoading || locationLoading;
 
+  useEffect(() => {
+    const t = setTimeout(() => setMapGateBypass(true), 10_000);
+    return () => clearTimeout(t);
+  }, []);
+
   const { session } = useAuthContext();
 
   // Check if location permission was denied and set initial view to list
@@ -333,8 +340,8 @@ export default function MapScreen() {
   };
 
   // Show minimal loading - don't block if we have restaurants or location
-  // This prevents 10-second loading times
-  if (loading && restaurants.length === 0 && !region) {
+  // This prevents 10-second loading times. mapGateBypass is a last-resort for hung awaits.
+  if (loading && restaurants.length === 0 && !region && !mapGateBypass) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator size="large" color="#FE902A" />

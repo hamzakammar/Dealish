@@ -1,7 +1,10 @@
 import { supabase } from "@/app/lib/supabase";
 import { Restaurant } from "@/types/restaurant";
+import { withTimeout } from "@/utils/async";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
+
+const RESTAURANTS_QUERY_MS = 15_000;
 
 export function useRestaurants() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -13,12 +16,16 @@ export function useRestaurants() {
 
     async function fetchRestaurants() {
       try {
-        const { data, error } = await supabase
-          .from("restaurants")
-          .select("id,name,lat,lng,address,phone,hero_image_url,type,display_image,rating,num_ratings,partner")
-          .eq("is_active", true)
-          .limit(500);
-
+        const { data, error } = await withTimeout(
+          (async () => {
+            return supabase
+              .from("restaurants")
+              .select("id,name,lat,lng,address,phone,hero_image_url,type,display_image,rating,num_ratings,partner")
+              .eq("is_active", true)
+              .limit(500);
+          })(),
+          RESTAURANTS_QUERY_MS
+        );
         if (error) throw error;
 
         const parsed: Restaurant[] =

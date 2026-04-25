@@ -4,6 +4,24 @@ import type { Session } from '@supabase/supabase-js'
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { AppState, AppStateStatus } from 'react-native'
 
+/** If Supabase never resolves (network / misconfig), we still must unblock the splash screen. */
+const ASYNC_INIT_MS = 12_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error('async_timeout')), ms)
+    promise
+      .then((v) => {
+        clearTimeout(id)
+        resolve(v)
+      })
+      .catch((e) => {
+        clearTimeout(id)
+        reject(e)
+      })
+  })
+}
+
 type AuthContextType = {
   session: Session | null | undefined;
   isLoading: boolean;
@@ -32,6 +50,8 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   // Use ref to track if component is mounted and the current session being fetched
   const isMountedRef = useRef(true)
   const currentFetchSessionIdRef = useRef<string | null>(null)
+  /** In-flight `fetchProfile` count — never let `isLoadingProfile` get stuck on overlapping or stale fetches. */
+  const profileInflight = useRef(0)
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
 
   // Combined loading state - true if either session or profile is loading
@@ -50,17 +70,38 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     const currentSession = sessionRef.current
     const sessionId = currentSession?.user?.id || null
     currentFetchSessionIdRef.current = sessionId
-    
-    setIsLoadingProfile(true)
+
+    profileInflight.current += 1
+    if (isMountedRef.current) {
+      setIsLoadingProfile(true)
+    }
 
     try {
       if (currentSession && sessionId) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*, settings')
-          .eq('id', sessionId)
-          .single()
-        
+        const res = await withTimeout(
+          (async () => {
+            return supabase
+              .from('profiles')
+              .select('*, settings')
+              .eq('id', sessionId)
+              .single()
+          })(),
+          ASYNC_INIT_MS
+        ).catch(() => {
+          if (__DEV__) {
+            console.warn('Profile query timed out or failed; continuing with no profile')
+          }
+          return null
+        })
+
+        if (res === null) {
+          if (!isMountedRef.current || currentFetchSessionIdRef.current !== sessionId) {
+            return
+          }
+          setProfile(null)
+        } else {
+        const { data, error } = res
+
         // Check if this fetch is still valid (session hasn't changed)
         if (!isMountedRef.current || currentFetchSessionIdRef.current !== sessionId) {
           return
@@ -70,30 +111,33 @@ export default function AuthProvider({ children }: PropsWithChildren) {
           console.error('Error fetching user profile:', error)
           setProfile(null)
         } else {
-          // Sync avatar_url from Google auth metadata if profile doesn't have one
+          // Sync avatar_url from Google auth metadata if profile doesn't have one.
+          // Never await a second Supabase write here: if the network stalls, the await would
+          // block this entire function and the `finally` that clears `isLoadingProfile`.
           const googleAvatarUrl = currentSession.user.user_metadata?.avatar_url || currentSession.user.user_metadata?.picture
           const profileAvatarUrl = data?.avatar_url
-          
-          // If profile has no avatar but Google auth does, sync it
           if (googleAvatarUrl && !profileAvatarUrl) {
-            try {
-              const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ avatar_url: googleAvatarUrl })
-                .eq('id', sessionId)
-              
-              if (updateError) {
-                console.error('Error syncing avatar from Google auth:', updateError)
-              } else {
-                // Update the profile data with the synced avatar
-                data.avatar_url = googleAvatarUrl
-              }
-            } catch (syncErr) {
-              console.error('Error syncing avatar:', syncErr)
-            }
+            void withTimeout(
+              (async () => {
+                return supabase
+                  .from('profiles')
+                  .update({ avatar_url: googleAvatarUrl })
+                  .eq('id', sessionId)
+              })(),
+              8_000
+            )
+              .then((r) => {
+                if (r && 'error' in r && (r as { error?: { message?: string } }).error && __DEV__) {
+                  console.error('Error syncing avatar from Google auth:', (r as { error: { message?: string } }).error)
+                }
+              })
+              .catch(() => {
+                // timeout or network — profile already has optimistic avatar in state
+              })
+            data.avatar_url = googleAvatarUrl
           }
-          
           setProfile(data as Profile)
+        }
         }
       } else {
         setProfile(null)
@@ -107,9 +151,9 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       console.error('Unexpected error while fetching user profile:', err)
       setProfile(null)
     } finally {
-      // Only update loading state if this fetch is still valid
-      if (isMountedRef.current && currentFetchSessionIdRef.current === sessionId) {
-        setIsLoadingProfile(false)
+      profileInflight.current = Math.max(0, profileInflight.current - 1)
+      if (isMountedRef.current) {
+        setIsLoadingProfile(profileInflight.current > 0)
       }
     }
   }, []) // Remove session dependency - use ref instead to break circular dependency
@@ -177,10 +221,23 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       try {
         setIsLoadingSession(true)
 
+        let getSessionResult: Awaited<ReturnType<typeof supabase.auth.getSession>>
+        try {
+          getSessionResult = await withTimeout(supabase.auth.getSession(), ASYNC_INIT_MS)
+        } catch {
+          if (__DEV__) {
+            console.warn('getSession timed out; continuing as logged out so the app can start')
+          }
+          if (!isActive || !isMountedRef.current) return
+          setSession(null)
+          setIsLoadingSession(false)
+          return
+        }
+
         const {
           data: { session },
           error,
-        } = await supabase.auth.getSession()
+        } = getSessionResult
         
         if (!isActive || !isMountedRef.current) return
         
@@ -208,7 +265,8 @@ export default function AuthProvider({ children }: PropsWithChildren) {
               timeoutId = setTimeout(async () => {
                 if (!isActive || !isMountedRef.current) return
                 try {
-                  const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession()
+                  const result = await withTimeout(supabase.auth.getSession(), ASYNC_INIT_MS)
+                  const { data: { session: retrySession }, error: retryError } = result
                   if (!retryError && retrySession) {
                     setSession(retrySession)
                     setIsLoadingSession(false)
@@ -219,7 +277,9 @@ export default function AuthProvider({ children }: PropsWithChildren) {
                     attemptRetry() // Retry again
                   }
                 } catch (retryErr) {
-                  console.error('Retry session fetch failed:', retryErr)
+                  if (__DEV__) {
+                    console.warn('Retry getSession failed or timed out', retryErr)
+                  }
                   attemptRetry() // Retry again
                 }
               }, delay)

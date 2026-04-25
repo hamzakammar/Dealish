@@ -19,8 +19,8 @@ const MARKER_ASSETS = {
 };
 
 const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
-const MARKER_SIZE = rnd(36);
-const SELECTED_SIZE = rnd(44);
+const MARKER_SIZE = rnd(28);
+const SELECTED_SIZE = rnd(36);
 
 export default function RestaurantMarker({
   restaurant,
@@ -34,6 +34,16 @@ export default function RestaurantMarker({
 
   const size = isSelected ? SELECTED_SIZE : MARKER_SIZE;
 
+  // Track view changes briefly so the native side captures the bitmap AFTER
+  // the Image asset has loaded, then disable tracking so panning stays cheap.
+  // Without this, Android renders empty markers.
+  const [tracking, setTracking] = React.useState(true);
+  React.useEffect(() => {
+    setTracking(true);
+    const t = setTimeout(() => setTracking(false), 500);
+    return () => clearTimeout(t);
+  }, [markerKey, size]);
+
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
   }, [restaurant, onPress]);
@@ -42,11 +52,11 @@ export default function RestaurantMarker({
 
   return (
     <Marker
-      key={`${restaurant.id}-${markerKey}-${size}`}
+      key={`${restaurant.id}-${markerKey}`}
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={false}
+      tracksViewChanges={tracking}
       tappable={true}
     >
       <View
