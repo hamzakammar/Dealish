@@ -22,6 +22,24 @@ const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
 const MARKER_SIZE = rnd(28);
 const SELECTED_SIZE = rnd(36);
 
+// Render once at the top of any screen that uses RestaurantMarker. Forces
+// Android to decode the marker PNGs before any <Marker> mounts, which closes
+// the race where tracksViewChanges flips off before the asset is ready and
+// produces clickable-but-invisible markers in production builds.
+export function MarkerAssetsWarmup() {
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }}
+    >
+      <Image source={MARKER_ASSETS.deal} style={{ width: 1, height: 1 }} fadeDuration={0} />
+      <Image source={MARKER_ASSETS.dealSelected} style={{ width: 1, height: 1 }} fadeDuration={0} />
+      <Image source={MARKER_ASSETS.dot} style={{ width: 1, height: 1 }} fadeDuration={0} />
+      <Image source={MARKER_ASSETS.dotSelected} style={{ width: 1, height: 1 }} fadeDuration={0} />
+    </View>
+  );
+}
+
 export default function RestaurantMarker({
   restaurant,
   isSelected,
@@ -34,15 +52,14 @@ export default function RestaurantMarker({
 
   const size = isSelected ? SELECTED_SIZE : MARKER_SIZE;
 
-  // Track view changes briefly so the native side captures the bitmap AFTER
-  // the Image asset has loaded, then disable tracking so panning stays cheap.
-  // Without this, Android renders empty markers.
+  // Track view changes until the Image actually decodes, then one more frame
+  // so the native side snapshots the loaded bitmap. A fixed timeout races the
+  // decode on prod Android (Hermes) and produces invisible markers.
   const [tracking, setTracking] = React.useState(true);
-  React.useEffect(() => {
-    setTracking(true);
-    const t = setTimeout(() => setTracking(false), 500);
-    return () => clearTimeout(t);
-  }, [markerKey, size]);
+  React.useEffect(() => { setTracking(true); }, [markerKey, size]);
+  const handleImageLoad = React.useCallback(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setTracking(false)));
+  }, []);
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
@@ -61,12 +78,14 @@ export default function RestaurantMarker({
     >
       <View
         style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}
-        {...(Platform.OS === "android" && { collapsable: false, renderToHardwareTextureAndroid: true })}
+        {...(Platform.OS === "android" && { collapsable: false })}
       >
         <Image
           source={MARKER_ASSETS[markerKey]}
           style={{ width: size, height: size }}
           resizeMode="contain"
+          onLoad={handleImageLoad}
+          fadeDuration={0}
         />
       </View>
     </Marker>

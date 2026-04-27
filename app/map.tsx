@@ -3,7 +3,7 @@ import AccountPanel from "@/components/AccountPanel";
 import FilterPanel from "@/components/FilterPanel";
 import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
-import RestaurantMarker from "@/components/RestaurantMarker";
+import RestaurantMarker, { MarkerAssetsWarmup } from "@/components/RestaurantMarker";
 import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
@@ -351,6 +351,7 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <MarkerAssetsWarmup />
       <View style={styles.contentWrapper}>
         {viewMode === "map" ? (
           <MapView

@@ -3,8 +3,8 @@ import { useAuthContext } from '@/app/providers/auth';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import { Deal, Restaurant } from '@/types/restaurant';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useState, useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function AdminDashboard() {
@@ -41,6 +41,14 @@ export default function AdminDashboard() {
       fetchSalesStats();
     }
   }, [selectedRestaurantId]);
+
+  // Refetch the restaurant list whenever the screen regains focus, so a newly
+  // created restaurant shows up in the dropdown after navigating back.
+  useFocusEffect(
+    useCallback(() => {
+      if (profile?.id) fetchRestaurants();
+    }, [profile?.id])
+  );
 
   const fetchRestaurants = async () => {
     if (!profile?.id) return;
@@ -85,8 +93,25 @@ export default function AdminDashboard() {
     }
   };
 
+  // Demo overrides — values shown for specific restaurants instead of the
+  // real qr_code_scans aggregate. Match by id when you have it, otherwise
+  // by name. Add or remove entries here.
+  const DEMO_SALES_OVERRIDES: { id?: string; name?: string; total: number; average: number }[] = [
+    { name: 'Dealish food', total: 12000, average: 24.50 },
+  ];
+
   const fetchSalesStats = async () => {
     if (!selectedRestaurantId) return;
+
+    const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
+    const override = DEMO_SALES_OVERRIDES.find(
+      o => (o.id && o.id === selectedRestaurantId) || (o.name && o.name === restaurant?.name)
+    );
+    if (override) {
+      setTotalSales(override.total);
+      setAverageSale(override.average);
+      return;
+    }
 
     try {
       // Get all deals for this restaurant
@@ -320,13 +345,62 @@ export default function AdminDashboard() {
                     )}
                   </View>
                 </View>
-                <Ionicons 
-                  name={isRestaurantDropdownOpen ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color="#64748B" 
+                <Ionicons
+                  name={isRestaurantDropdownOpen ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color="#64748B"
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Inline dropdown list */}
+            {isRestaurantDropdownOpen && (
+              <View style={styles.dropdownInline}>
+                {filteredRestaurantsForDropdown.length === 0 ? (
+                  <View style={styles.dropdownEmpty}>
+                    <Text style={styles.dropdownEmptyText}>No restaurants found</Text>
+                  </View>
+                ) : (
+                  filteredRestaurantsForDropdown.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.dropdownItem,
+                        selectedRestaurantId === item.id && styles.dropdownItemSelected,
+                      ]}
+                      onPress={() => {
+                        setSelectedRestaurantId(item.id);
+                        setIsRestaurantDropdownOpen(false);
+                        setRestaurantSearchQuery("");
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="location"
+                        size={18}
+                        color={selectedRestaurantId === item.id ? '#FE902A' : '#94A3B8'}
+                      />
+                      <View style={styles.dropdownItemContent}>
+                        <Text style={[
+                          styles.dropdownItemName,
+                          selectedRestaurantId === item.id && styles.dropdownItemNameSelected,
+                        ]}>
+                          {item.name}
+                        </Text>
+                        {item.address && (
+                          <Text style={styles.dropdownItemAddress} numberOfLines={1}>
+                            {item.address}
+                          </Text>
+                        )}
+                      </View>
+                      {selectedRestaurantId === item.id && (
+                        <Ionicons name="checkmark" size={20} color="#FE902A" />
+                      )}
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -611,71 +685,6 @@ export default function AdminDashboard() {
 
       {/* Sidebar */}
       <DashboardSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-
-      {/* Dropdown List - rendered OUTSIDE ScrollView to ensure it's on top */}
-      {isRestaurantDropdownOpen && restaurants.length > 0 && (
-        <>
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={() => {
-              setIsRestaurantDropdownOpen(false);
-              setRestaurantSearchQuery("");
-            }}
-          />
-          <View style={styles.dropdownListAbsolute}>
-            {filteredRestaurantsForDropdown.length === 0 ? (
-              <View style={styles.dropdownEmpty}>
-                <Text style={styles.dropdownEmptyText}>No restaurants found</Text>
-              </View>
-            ) : (
-              <ScrollView 
-                style={styles.dropdownScrollView}
-                nestedScrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
-              >
-                {filteredRestaurantsForDropdown.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.dropdownItem,
-                      selectedRestaurantId === item.id && styles.dropdownItemSelected
-                    ]}
-                    onPress={() => {
-                      setSelectedRestaurantId(item.id);
-                      setIsRestaurantDropdownOpen(false);
-                      setRestaurantSearchQuery("");
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons 
-                      name="location" 
-                      size={18} 
-                      color={selectedRestaurantId === item.id ? '#FE902A' : '#94A3B8'} 
-                    />
-                    <View style={styles.dropdownItemContent}>
-                      <Text style={[
-                        styles.dropdownItemName,
-                        selectedRestaurantId === item.id && styles.dropdownItemNameSelected
-                      ]}>
-                        {item.name}
-                      </Text>
-                      {item.address && (
-                        <Text style={styles.dropdownItemAddress} numberOfLines={1}>
-                          {item.address}
-                        </Text>
-                      )}
-                    </View>
-                    {selectedRestaurantId === item.id && (
-                      <Ionicons name="checkmark" size={20} color="#FE902A" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        </>
-      )}
     </View>
   );
 }
@@ -857,22 +866,13 @@ const styles = StyleSheet.create({
     zIndex: 1003,
     overflow: 'hidden',
   },
-  dropdownListAbsolute: {
-    position: 'absolute',
-    top: 200,
-    left: 16,
-    right: 16,
+  dropdownInline: {
+    marginTop: 8,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 20,
-    maxHeight: 300,
-    zIndex: 10000,
+    overflow: 'hidden',
   },
   dropdownScrollView: {
     maxHeight: 300,

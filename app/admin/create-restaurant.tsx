@@ -1,7 +1,7 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { geocodeAddress } from '@/utils/geocode';
-import { pickAndUploadHeroImage, pickAndUploadImage } from '@/utils/uploadImage';
+import { pickAndUploadHeroImage } from '@/utils/uploadImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -41,8 +41,6 @@ export default function CreateRestaurant() {
   const [longitude, setLongitude] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Address autocomplete
@@ -103,16 +101,6 @@ export default function CreateRestaurant() {
       // Silently fail — user can still tap the location button manually
     } finally {
       setIsGeocoding(false);
-    }
-  };
-
-  const handleUploadLogo = async () => {
-    setIsUploadingLogo(true);
-    try {
-      const url = await pickAndUploadImage();
-      if (url) setLogoUrl(url);
-    } finally {
-      setIsUploadingLogo(false);
     }
   };
 
@@ -188,14 +176,24 @@ export default function CreateRestaurant() {
         lat: parseFloat(latitude),
         lng: parseFloat(longitude),
         hero_image_url: imageUrl.trim() || null,
-        logo_url: logoUrl.trim() || null,
       };
 
-      const { error } = await supabase.from('restaurants').insert([payload]);
+      const { data, error } = await supabase
+        .from('restaurants')
+        .insert([payload])
+        .select('id')
+        .single();
 
-      if (error && error.code !== 'PGRST204') {
+      // PGRST116 = "no rows returned" when the SELECT-after-INSERT is blocked
+      // by RLS even though the insert itself succeeded.
+      if (error && error.code !== 'PGRST116') {
         console.error('Supabase error creating restaurant:', JSON.stringify(error));
         Alert.alert('Error', `Failed to create restaurant: ${error.message || error.code || 'Unknown error'}`);
+        return;
+      }
+
+      if (!data && !error) {
+        Alert.alert('Error', 'Restaurant insert returned no row. Check RLS policies on the restaurants table.');
         return;
       }
 
@@ -369,37 +367,6 @@ export default function CreateRestaurant() {
         {/* Images */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Images</Text>
-
-          <Text style={styles.label}>Logo (Square)</Text>
-          <View style={styles.imageInputRow}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={logoUrl}
-              onChangeText={setLogoUrl}
-              placeholder="https://... or upload"
-              placeholderTextColor="#C7C7CC"
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={[styles.uploadButton, isUploadingLogo && styles.saveButtonDisabled]}
-              onPress={handleUploadLogo}
-              disabled={isUploadingLogo}
-            >
-              {isUploadingLogo ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </View>
-          {logoUrl ? (
-            <View style={styles.imagePreviewContainer}>
-              <Image source={{ uri: logoUrl }} style={styles.logoPreview} />
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.label}>Hero Image (Wide)</Text>
           <View style={styles.imageInputRow}>
             <TextInput

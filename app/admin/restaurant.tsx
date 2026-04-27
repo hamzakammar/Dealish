@@ -1,7 +1,7 @@
 import { supabase } from '@/app/lib/supabase';
 import { Restaurant } from '@/types/restaurant';
 import { geocodeAddress } from '@/utils/geocode';
-import { pickAndUploadHeroImage, pickAndUploadImage } from '@/utils/uploadImage';
+import { pickAndUploadHeroImage } from '@/utils/uploadImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -22,27 +22,12 @@ export default function RestaurantSettings() {
   const [rating, setRating] = useState('');
   const [numReviews, setNumReviews] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
   const [displayImage, setDisplayImage] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
   const [isUploadingDisplay, setIsUploadingDisplay] = useState(false);
-
-  const handleUploadLogo = async () => {
-    setIsUploadingLogo(true);
-    try {
-      const url = await pickAndUploadImage();
-      if (url) {
-        setLogoUrl(url);
-        setImageUrl(url);
-      }
-    } finally {
-      setIsUploadingLogo(false);
-    }
-  };
 
   const handleUploadHero = async () => {
     setIsUploadingHero(true);
@@ -77,10 +62,14 @@ export default function RestaurantSettings() {
   const fetchRestaurant = async () => {
     try {
       setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('restaurants')
         .select('*')
         .eq('id', restaurantId)
+        .eq('owner_id', user.id)
         .single();
 
       if (error) throw error;
@@ -94,7 +83,6 @@ export default function RestaurantSettings() {
         setRating(data.rating?.toString() || '');
         setNumReviews(data.num_ratings?.toString() || '');
         setImageUrl(data.hero_image_url || '');
-        setLogoUrl(data.hero_image_url || '');
         setDisplayImage(data.display_image || '');
         setLatitude(data.lat?.toString() || '');
         setLongitude(data.lng?.toString() || '');
@@ -180,10 +168,14 @@ export default function RestaurantSettings() {
         }
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const { error } = await supabase
         .from('restaurants')
         .update(updates)
-        .eq('id', restaurantId);
+        .eq('id', restaurantId)
+        .eq('owner_id', user.id);
 
       if (error) throw error;
 
@@ -372,35 +364,6 @@ export default function RestaurantSettings() {
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Images</Text>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Logo (Square)</Text>
-            <View style={styles.imageInputRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                value={logoUrl}
-                onChangeText={setLogoUrl}
-                placeholder="https://... or upload"
-                placeholderTextColor="#94A3B8"
-              />
-              <TouchableOpacity
-                style={[styles.uploadButton, isUploadingLogo && styles.uploadButtonDisabled]}
-                onPress={handleUploadLogo}
-                disabled={isUploadingLogo}
-              >
-                {isUploadingLogo ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="cloud-upload" size={18} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
-            {logoUrl ? (
-              <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: logoUrl }} style={styles.logoPreview} />
-              </View>
-            ) : null}
-          </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hero Image (Wide)</Text>
             <View style={styles.imageInputRow}>

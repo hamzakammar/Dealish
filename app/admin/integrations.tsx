@@ -2,7 +2,7 @@ import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -195,9 +195,12 @@ export default function IntegrationsScreen() {
   const { profile } = useAuthContext();
   const colors = useThemeColors();
   const router = useRouter();
+  const params = useLocalSearchParams<{ restaurantId?: string }>();
 
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [restaurantId, setRestaurantId] = useState<string | null>(
+    typeof params.restaurantId === 'string' ? params.restaurantId : null
+  );
+  const [loading, setLoading] = useState(!params.restaurantId);
 
   const [sheetUrl, setSheetUrl] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -208,6 +211,7 @@ export default function IntegrationsScreen() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
+    if (restaurantId) return; // already supplied by route param
     (async () => {
       if (!profile?.id) return;
       setLoading(true);
@@ -215,11 +219,13 @@ export default function IntegrationsScreen() {
         .from('restaurants')
         .select('id')
         .eq('owner_id', profile.id)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       setRestaurantId(data?.id ?? null);
       setLoading(false);
     })();
-  }, [profile]);
+  }, [profile, restaurantId]);
 
   async function handleFetch() {
     setFetchError(null);

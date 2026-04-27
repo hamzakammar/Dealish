@@ -1,4 +1,5 @@
 import { supabase } from "@/app/lib/supabase";
+import * as Crypto from "expo-crypto";
 
 export type QRCodeData = {
   deal_id: string;
@@ -21,9 +22,7 @@ export async function generateQRCodeToken(dealId: string): Promise<string | null
       return existingDeal.qr_code_token;
     }
 
-    // Generate a unique token (UUID)
-    // Use our custom UUID generator since crypto.randomUUID may not be available in React Native
-    const token = generateUUID();
+    const token = Crypto.randomUUID();
 
     // Update deal with QR code token
     const { error } = await supabase
@@ -44,17 +43,6 @@ export async function generateQRCodeToken(dealId: string): Promise<string | null
     console.error("Error generating QR code token:", error);
     return null;
   }
-}
-
-/**
- * Generate UUID fallback for environments without crypto.randomUUID
- */
-function generateUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
 
 /**

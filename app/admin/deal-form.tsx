@@ -3,6 +3,7 @@ import { useAuthContext } from '@/app/providers/auth';
 import { Deal } from '@/types/restaurant';
 import { notifyNewDeal } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -188,7 +189,6 @@ export default function DealForm() {
         discount_type: discountType,
         discount_value: discountValue ? parseFloat(discountValue) : undefined,
         original_price: originalPrice ? parseFloat(originalPrice) : undefined,
-        source: 'manual',
       };
 
       if (isRecurring) {
@@ -214,17 +214,16 @@ export default function DealForm() {
         if (error) throw error;
         Alert.alert('Success', 'Deal updated successfully');
       } else {
-        const { data, error } = await supabase
+        const newDealId = Crypto.randomUUID();
+        const { error } = await supabase
           .from('deals')
-          .insert([dealData])
-          .select()
-          .single();
+          .insert([{ ...dealData, id: newDealId }]);
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST204') throw error;
 
-        if (isActive && data) {
+        if (isActive) {
           try {
-            await notifyNewDeal(data.id, restaurantId, title, description);
+            await notifyNewDeal(newDealId, restaurantId, title, description);
           } catch (notifError) {
             console.error('Error sending notifications:', notifError);
           }
@@ -232,13 +231,13 @@ export default function DealForm() {
 
         Alert.alert('Success', 'Deal created successfully');
 
-        if (recommendationId && data) {
+        if (recommendationId) {
           try {
             await supabase
               .from('deal_recommendations')
-              .update({ 
+              .update({
                 status: 'created',
-                deal_id: data.id 
+                deal_id: newDealId,
               })
               .eq('id', recommendationId);
           } catch (error) {

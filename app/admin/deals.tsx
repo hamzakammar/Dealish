@@ -23,6 +23,23 @@ export default function DealsManagement() {
   const fetchDeals = async () => {
     try {
       setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: ownedRestaurant, error: ownerErr } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('id', restaurantId)
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (ownerErr) throw ownerErr;
+      if (!ownedRestaurant) {
+        Alert.alert('Error', 'You do not have access to this restaurant');
+        router.replace('/admin');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('deals')
         .select('*')
@@ -47,7 +64,8 @@ export default function DealsManagement() {
       const { error } = await supabase
         .from('deals')
         .update({ is_active: !currentStatus })
-        .eq('id', dealId);
+        .eq('id', dealId)
+        .eq('restaurant_id', restaurantId);
 
       if (error) throw error;
 
@@ -78,7 +96,8 @@ export default function DealsManagement() {
               const { error } = await supabase
                 .from('deals')
                 .delete()
-                .eq('id', dealId);
+                .eq('id', dealId)
+                .eq('restaurant_id', restaurantId);
 
               if (error) throw error;
 
