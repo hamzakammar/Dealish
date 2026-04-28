@@ -386,19 +386,27 @@ export default function MapScreen() {
               }
             }}
           >
-            {filteredRestaurants.map((r) => {
-              const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
-              const hasActiveDeal = activeDealsMap.get(r.id) ?? false;
-              return (
-                <RestaurantMarker
-                  key={r.id}
-                  restaurant={r}
-                  isSelected={isSelected}
-                  onPress={handleRestaurantSelect}
-                  hasActiveDeal={hasActiveDeal}
-                />
-              );
-            })}
+            {filteredRestaurants
+              .filter(
+                (r) =>
+                  r.lat != null &&
+                  r.lng != null &&
+                  Number.isFinite(r.lat) &&
+                  Number.isFinite(r.lng)
+              )
+              .map((r) => {
+                const isSelected = selectedRestaurant !== null && selectedRestaurant.id === r.id;
+                const hasActiveDeal = activeDealsMap.get(r.id) ?? false;
+                return (
+                  <RestaurantMarker
+                    key={r.id}
+                    restaurant={r}
+                    isSelected={isSelected}
+                    onPress={handleRestaurantSelect}
+                    hasActiveDeal={hasActiveDeal}
+                  />
+                );
+              })}
 
           </MapView>
         ) : (
