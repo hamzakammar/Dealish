@@ -72,7 +72,9 @@ export default function Index() {
         const isTokenValid = session.expires_at && session.expires_at > Date.now() / 1000;
         
         if (!isTokenValid) {
-          routerRef.current.replace(hasSeenWelcome ? '/auth' : '/welcome');
+          // Expired session — drop to public map. Re-auth is offered from
+          // the account panel; we never block browsing on auth.
+          routerRef.current.replace(hasSeenWelcome ? '/map' : '/welcome');
           return;
         }
 
@@ -97,12 +99,14 @@ export default function Index() {
         return;
       }
 
-      // No session - check welcome screen status
+      // No session - allow unauthenticated browsing per App Store
+      // 5.1.1(v). First launch shows welcome carousel; afterwards land on map.
+      // Sign-in is offered through the account panel and gated actions.
       try {
-        routerRef.current.replace(hasSeenWelcome ? '/auth' : '/welcome');
+        routerRef.current.replace(hasSeenWelcome ? '/map' : '/welcome');
       } catch (error) {
         if (__DEV__) console.error('Navigation error:', error);
-        routerRef.current.replace('/auth');
+        routerRef.current.replace('/map');
       }
     }
 
@@ -140,7 +144,7 @@ export default function Index() {
         console.warn('Startup took too long; routing to welcome/auth fallback');
       }
       const seen = hasSeenWelcomeRef.current;
-      routerRef.current.replace(seen ? '/auth' : '/welcome');
+      routerRef.current.replace(seen ? '/map' : '/welcome');
     }, STARTUP_MAX_MS);
     return () => clearTimeout(t);
   }, []);

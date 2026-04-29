@@ -1,4 +1,5 @@
 import { supabase } from "@/app/lib/supabase";
+import { router } from "expo-router";
 import DealCard from "@/components/DealCard";
 import RatingDisplay from "@/components/RatingDisplay";
 import { getPartnerRequestCount } from "@/hooks/usePartnerRequests";
@@ -171,7 +172,14 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     const user = await supabase.auth.getUser();
     const profileId = user.data?.user?.id;
     if (!profileId) {
-      console.warn("Not authenticated");
+      Alert.alert(
+        'Sign in required',
+        'Create a free account to save restaurants to your favourites.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Sign in', onPress: () => router.push('/auth' as any) },
+        ]
+      );
       return;
     }
 

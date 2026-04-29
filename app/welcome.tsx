@@ -101,22 +101,22 @@ export default function WelcomeScreen() {
   const handleSkip = async () => {
     try {
       await AsyncStorage.setItem('hasSeenWelcome', 'true');
-      router.replace('/auth');
+      router.replace('/map');
     } catch (error) {
       console.error('Error saving welcome status:', error);
       // Still navigate even if storage fails
-      router.replace('/auth');
+      router.replace('/map');
     }
   };
 
   const handleGetStarted = async () => {
     try {
       await AsyncStorage.setItem('hasSeenWelcome', 'true');
-      router.replace('/auth');
+      router.replace('/map');
     } catch (error) {
       console.error('Error saving welcome status:', error);
       // Still navigate even if storage fails
-      router.replace('/auth');
+      router.replace('/map');
     }
   };
 

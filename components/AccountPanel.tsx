@@ -200,13 +200,13 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
         // Successfully signed out - redirect to auth screen
         onClose();
         try {
-          router.replace('/auth');
+          router.replace('/map');
         } catch (error) {
           console.error('Navigation error:', error);
           // Fallback - try again after a delay
           setTimeout(() => {
             try {
-              router.replace('/auth');
+              router.replace('/map');
             } catch (retryError) {
               console.error('Retry navigation failed:', retryError);
             }
@@ -263,15 +263,34 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     }
   };
 
-  const menuItems = [
-    { label: "My Account", icon: "user", action: navigateToAccount },
-    { label: "Filters", icon: "filter", action: handleFiltersPress },
-    { label: "Favourites", icon: "heart", action: handleFavouritesPress },
-    { label: "Settings", icon: "setting", action: handleSettingsPress },
-    { label: "About", icon: "information-circle", action: () => router.push('/about' as any) },
-    { label: "Help", icon: "help-circle", action: () => router.push('/help' as any) },
-    { label: "Partner with us", icon: "like", action: () => router.push('/partner' as any) },
-  ];
+  const isGuest = !session?.user;
+
+  const handleSignInPress = () => {
+    onClose();
+    try {
+      router.push('/auth' as any);
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
+  const menuItems = isGuest
+    ? [
+        { label: "Filters", icon: "filter", action: handleFiltersPress },
+        { label: "Settings", icon: "setting", action: handleSettingsPress },
+        { label: "About", icon: "information-circle", action: () => router.push('/about' as any) },
+        { label: "Help", icon: "help-circle", action: () => router.push('/help' as any) },
+        { label: "Partner with us", icon: "like", action: () => router.push('/partner' as any) },
+      ]
+    : [
+        { label: "My Account", icon: "user", action: navigateToAccount },
+        { label: "Filters", icon: "filter", action: handleFiltersPress },
+        { label: "Favourites", icon: "heart", action: handleFavouritesPress },
+        { label: "Settings", icon: "setting", action: handleSettingsPress },
+        { label: "About", icon: "information-circle", action: () => router.push('/about' as any) },
+        { label: "Help", icon: "help-circle", action: () => router.push('/help' as any) },
+        { label: "Partner with us", icon: "like", action: () => router.push('/partner' as any) },
+      ];
 
   return (
     <>
@@ -304,7 +323,17 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
           <>
             {/* User Profile Section */}
             <View style={styles.profileSection}>
-              {loadingProfile ? (
+              {isGuest ? (
+                <>
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <AntDesign name="user" size={32} color="#FE902A" />
+                  </View>
+                  <Text style={[styles.userName, dynamicStyles.userName]}>Guest</Text>
+                  <Text style={[styles.userEmail, dynamicStyles.userEmail]}>
+                    Sign in to save favourites and redeem deals
+                  </Text>
+                </>
+              ) : loadingProfile ? (
                 <ActivityIndicator size="small" color="#FE902A" />
               ) : (
                 <>
@@ -338,21 +367,30 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
               ))}
             </View>
 
-            {/* Sign Out Button */}
-            <TouchableOpacity
-              style={[
-                styles.logoutButton,
-                signingOut && styles.logoutButtonDisabled,
-              ]}
-              onPress={handleSignOut}
-              disabled={signingOut}
-            >
-              {signingOut ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.logoutText}>Logout</Text>
-              )}
-            </TouchableOpacity>
+            {/* Sign Out / Sign In Button */}
+            {isGuest ? (
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={handleSignInPress}
+              >
+                <Text style={styles.logoutText}>Sign in / Create account</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.logoutButton,
+                  signingOut && styles.logoutButtonDisabled,
+                ]}
+                onPress={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.logoutText}>Logout</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </>
         ) : (
           <>
