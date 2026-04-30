@@ -85,7 +85,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Dealish to access your camera to scan QR codes for tracking visits."
+          "cameraPermission": "Dealish uses your camera to scan QR codes at restaurants so you can redeem deals at checkout."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Dealish accesses your photo library so restaurant owners can upload hero photos of their restaurant (storefront, dishes, interior) when creating or editing their listing.",
+          "cameraPermission": "Dealish uses your camera to scan QR codes at restaurants so you can redeem deals at checkout."
         }
       ],
       "./plugins/withEntitlementsModification",
