@@ -16,7 +16,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ca.hamzaammar.dealish",
-      "buildNumber": "32",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Dealish uses your location to show nearby restaurants with active deals on the map and sort them by distance from you.",
