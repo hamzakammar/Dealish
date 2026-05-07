@@ -8,6 +8,7 @@ import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useActiveDealsMap } from "@/hooks/useActiveDealsMap";
+import { useDirections } from "@/hooks/useDirections";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useColorScheme } from "@/components/useColorScheme";
@@ -16,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import MapView, { Camera, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -44,6 +45,7 @@ export default function MapScreen() {
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
+  const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
   const { settings } = useUserSettings();
   const colors = useThemeColors();
   
@@ -217,15 +219,24 @@ export default function MapScreen() {
       setHasLocationPermission(false);
       setViewMode("list");
       setSelectedRestaurant(null); // Deselect restaurant when switching to list view
+      clearRoute();
     }
-  }, [locationLoading, userLocation]);
-  
+  }, [locationLoading, userLocation, clearRoute]);
+
   // Deselect restaurant when switching to list view
   useEffect(() => {
     if (viewMode === "list") {
       setSelectedRestaurant(null);
+      clearRoute();
     }
-  }, [viewMode]);
+  }, [viewMode, clearRoute]);
+
+  /** Clear preview route whenever nothing is selected (covers all dismissal paths). */
+  useEffect(() => {
+    if (selectedRestaurant === null) {
+      clearRoute();
+    }
+  }, [selectedRestaurant, clearRoute]);
 
   const handleCloseRestaurant = async () => {
     // If we zoomed/panned into a restaurant, restore the previous map view on close.
@@ -240,9 +251,10 @@ export default function MapScreen() {
       }
     }
     setSelectedRestaurant(null);
+    clearRoute();
   };
 
-  const handleGetDirections = () => {
+  const handleOpenExternalMaps = () => {
     if (!selectedRestaurant) return;
     const { lat, lng, name } = selectedRestaurant;
     const label = encodeURIComponent(name || "Restaurant");
@@ -256,6 +268,11 @@ export default function MapScreen() {
         Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
       }
     });
+  };
+
+  const handlePreviewRoute = () => {
+    if (!selectedRestaurant || !userLocation) return;
+    getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
   };
 
   // Android back button — close restaurant card if open, otherwise default behavior
@@ -282,6 +299,7 @@ export default function MapScreen() {
     // Signal transition so markers re-arm AFTER card spring animation settles (~650ms)
     setMapIsTransitioning(true);
     setTimeout(() => setMapIsTransitioning(false), 650);
+    clearRoute();
 
     // Capture current view before zooming in, so we can restore it on close.
     if (!regionBeforeSelectRef.current) {
@@ -408,6 +426,13 @@ export default function MapScreen() {
                 );
               })}
 
+            {selectedRestaurant && routeCoordinates.length > 0 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#FE902A"
+                strokeWidth={4}
+              />
+            )}
           </MapView>
         ) : (
           <RestaurantList
@@ -560,8 +585,9 @@ export default function MapScreen() {
             ref={restaurantCardRef}
             restaurant={selectedRestaurant}
             onClose={handleCloseRestaurant}
-            onGetDirections={handleGetDirections}
-            isDirectionsAvailable={true}
+            onPreviewRoute={isDirectionsAvailable ? handlePreviewRoute : undefined}
+            onOpenExternalMaps={handleOpenExternalMaps}
+            canPreviewDirections={isDirectionsAvailable && !!userLocation}
             userLocation={userLocation}
           />
         </>

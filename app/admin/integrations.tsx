@@ -2,11 +2,13 @@ import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ParsedRow = {
   rowIndex: number;
@@ -194,8 +197,28 @@ function parseSheetUrl(input: string): { sheetId: string; gid: string } | null {
 export default function IntegrationsScreen() {
   const { profile } = useAuthContext();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const router = useRouter();
   const params = useLocalSearchParams<{ restaurantId?: string }>();
+
+  const goBackSafely = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      router.replace('/admin');
+    }
+  }, [navigation, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        goBackSafely();
+        return true;
+      });
+      return () => sub.remove();
+    }, [goBackSafely])
+  );
 
   const [restaurantId, setRestaurantId] = useState<string | null>(
     typeof params.restaurantId === 'string' ? params.restaurantId : null
@@ -325,7 +348,7 @@ export default function IntegrationsScreen() {
       Alert.alert(
         'Uploaded',
         `${succeeded} item${succeeded === 1 ? '' : 's'} added to inventory.`,
-        [{ text: 'OK', onPress: () => { setCsvText(''); router.back(); } }]
+        [{ text: 'OK', onPress: () => { setCsvText(''); goBackSafely(); } }]
       );
     } else {
       const sample = failures.slice(0, 3).map(f => `Row ${f.row}: ${f.reason}`).join('\n');
@@ -336,20 +359,66 @@ export default function IntegrationsScreen() {
 
   const s = makeStyles(colors);
 
-  if (loading) return <View style={s.center}><ActivityIndicator color="#FE902A" /></View>;
+  if (loading) {
+    return (
+      <View style={[s.screenRoot, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <View style={s.center}>
+          <ActivityIndicator color="#FE902A" />
+        </View>
+      </View>
+    );
+  }
   if (!restaurantId) {
-    return <View style={s.center}><Text style={s.emptyText}>No restaurant found for your account.</Text></View>;
+    return (
+      <View style={[s.screenRoot, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <View style={s.center}>
+          <Text style={s.emptyText}>No restaurant found for your account.</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={20} color={colors.text} />
-        <Text style={s.backText}>Back</Text>
-      </TouchableOpacity>
+    <View style={[s.screenRoot, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          s.topHeader,
+          {
+            paddingTop: insets.top + 8,
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={s.headerBackButton}
+          onPress={goBackSafely}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View style={s.headerTitleBlock}>
+          <Text style={[s.headerScreenTitle, { color: colors.text }]} numberOfLines={1}>
+            Bulk Upload Inventory
+          </Text>
+          <Text style={[s.headerScreenSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+            Google Sheet import
+          </Text>
+        </View>
+        <View style={s.headerSpacer} />
+      </View>
 
-      <Text style={s.title}>Bulk Upload Inventory</Text>
-      <Text style={s.subtitle}>Import items directly from a Google Sheet URL.</Text>
+      <ScrollView
+        style={s.scrollFlex}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[s.introLine, { color: colors.textSecondary }]}>
+          Import items directly from a Google Sheet URL.
+        </Text>
 
       <View style={s.section}>
         <Text style={s.sectionTitle}>1. Paste your Google Sheet URL</Text>
@@ -454,20 +523,51 @@ export default function IntegrationsScreen() {
               Upload {validRows.length} item{validRows.length === 1 ? '' : 's'}
             </Text>}
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    screenRoot: { flex: 1 },
+    topHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingBottom: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    headerBackButton: {
+      padding: 12,
+      marginRight: 4,
+    },
+    headerTitleBlock: {
+      flex: 1,
+      minWidth: 0,
+      justifyContent: 'center',
+    },
+    headerScreenTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      letterSpacing: -0.25,
+    },
+    headerScreenSubtitle: {
+      fontSize: 12,
+      marginTop: 2,
+    },
+    headerSpacer: {
+      width: 44,
+    },
+    scrollFlex: { flex: 1 },
     content: { padding: 20, paddingBottom: 60 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     emptyText: { color: colors.textSecondary, fontSize: 14 },
-    backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-    backText: { color: colors.text, fontSize: 16, marginLeft: 4 },
-    title: { fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
-    subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 24 },
+    introLine: {
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 20,
+    },
     section: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 16 },
     sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
     sectionDesc: { fontSize: 13, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 },

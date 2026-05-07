@@ -7,6 +7,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+// --- Demo KPIs: set DEMO_KPIS_OVERRIDE to true only for staged demos ---
+const DEMO_KPIS_OVERRIDE = false;
+const DEMO_TOTAL_SALES_AMOUNT = 42_800;
+const DEMO_AVG_SALE_AMOUNT = 31.75;
+// ---------------------------------------------------------------
+
 export default function AdminDashboard() {
   const { profile, isLoading } = useAuthContext();
   const router = useRouter();
@@ -102,6 +108,12 @@ export default function AdminDashboard() {
 
   const fetchSalesStats = async () => {
     if (!selectedRestaurantId) return;
+
+    if (DEMO_KPIS_OVERRIDE) {
+      setTotalSales(DEMO_TOTAL_SALES_AMOUNT);
+      setAverageSale(DEMO_AVG_SALE_AMOUNT);
+      return;
+    }
 
     const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
     const override = DEMO_SALES_OVERRIDES.find(

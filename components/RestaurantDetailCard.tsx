@@ -9,6 +9,7 @@ import { Restaurant, UserLocation } from "@/types/restaurant";
 import { trackVisit } from "@/utils/activity";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { Ionicons } from "@expo/vector-icons";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -82,8 +83,12 @@ export type SheetState = 'peek' | 'half' | 'full';
 type RestaurantDetailCardProps = {
   restaurant: Restaurant;
   onClose: () => void;
-  onGetDirections: () => void;
-  isDirectionsAvailable?: boolean;
+  /** In-app route preview (e.g. ORS polyline on the map). */
+  onPreviewRoute?: () => void;
+  /** Open Apple Maps / Google Maps for turn-by-turn navigation. */
+  onOpenExternalMaps: () => void;
+  /** When true, primary action can draw a preview route (API key + user location available). */
+  canPreviewDirections?: boolean;
   userLocation?: UserLocation | null;
   /** Initial state of the sheet. Defaults to 'half' for backward compatibility */
   initialState?: SheetState;
@@ -118,13 +123,15 @@ async function fetchIsFavourite(restaurantId: string): Promise<boolean> {
 const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetailCardProps>(({
   restaurant,
   onClose,
-  onGetDirections,
-  isDirectionsAvailable = true,
+  onPreviewRoute,
+  onOpenExternalMaps,
+  canPreviewDirections = false,
   userLocation,
   initialState = 'half', // Default to 'half' for backward compatibility
 }, ref) => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const mapsAppName = Platform.OS === "ios" ? "Apple Maps" : "Google Maps";
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
   const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
@@ -713,24 +720,77 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       )}
 
       {/* Footer - always visible */}
-      <View style={[styles.footer, { borderTopColor: colors.border, paddingBottom: Math.max(20, insets.bottom + 8) }]} pointerEvents="auto">
-        {isDirectionsAvailable && (
+      <View
+        style={[
+          styles.footer,
+          {
+            borderTopColor: colors.border,
+            paddingHorizontal: 20,
+            paddingTop: 10,
+            paddingBottom: Math.max(14, insets.bottom + 6),
+          },
+        ]}
+        pointerEvents="auto"
+      >
+        <View style={styles.directionsButtonGroup}>
+          {canPreviewDirections && onPreviewRoute ? (
+            <TouchableOpacity
+              style={[styles.directionsButton, styles.directionsButtonInGroup]}
+              onPress={() => {
+                setSheetState('peek');
+                onPreviewRoute();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Show driving route on the map"
+            >
+              <AntDesign
+                name="arrow-right"
+                size={17}
+                color="#fff"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.directionsButtonText}>Show route</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
-            style={styles.directionsButton}
+            style={
+              canPreviewDirections && onPreviewRoute
+                ? [styles.externalNavigateButton, { borderColor: colors.primary }]
+                : [styles.directionsButton, styles.directionsButtonInGroup]
+            }
             onPress={() => {
               setSheetState('peek');
-              onGetDirections();
+              onOpenExternalMaps();
             }}
+            accessibilityRole="button"
+            accessibilityLabel={`Navigate with turn-by-turn in ${mapsAppName}`}
+            accessibilityHint={`Leaves Dealish and opens ${mapsAppName} with directions to ${restaurant.name}`}
           >
-            <AntDesign
-              name="arrow-right"
-              size={18}
-              color="#fff"
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.directionsButtonText}>Get Directions</Text>
+            {canPreviewDirections && onPreviewRoute ? (
+              <View style={styles.externalNavigateContent}>
+                <Ionicons name="navigate" size={17} color={colors.primary} />
+                <View style={styles.externalNavigateTexts}>
+                  <Text style={[styles.externalNavigateTitle, { color: colors.text }]}>Navigate</Text>
+                  <Text
+                    style={[styles.externalNavigateSubtitle, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {`Turn-by-turn in ${mapsAppName}`}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.singleNavigateContent}>
+                <AntDesign name="car" size={16} color="#fff" style={{ marginRight: 7 }} />
+                <View style={styles.singleNavigateLabels}>
+                  <Text style={styles.directionsButtonText}>Navigate</Text>
+                  <Text style={styles.directionsButtonSubcaption}>Opens {mapsAppName}</Text>
+                </View>
+              </View>
+            )}
           </TouchableOpacity>
-        )}
+        </View>
         <TouchableOpacity
           style={[
             styles.favoriteButton,
@@ -746,7 +806,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         >
           <AntDesign
             name="heart"
-            size={20}
+            size={18}
             color={isFavouriteState ? "#FF0000" : "#fff"}
           />
         </TouchableOpacity>
@@ -1067,18 +1127,75 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   footer: {
-    padding: 20,
-    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+    alignItems: "stretch",
+  },
+  directionsButtonGroup: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "stretch",
+  },
+  directionsButtonInGroup: {
+    flex: 1,
+    minHeight: 40,
+  },
+  externalNavigateButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 8,
+    borderWidth: 2,
+    justifyContent: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: "transparent",
+  },
+  externalNavigateContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    minWidth: 0,
+    paddingHorizontal: 2,
+  },
+  externalNavigateTexts: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+  externalNavigateTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 1,
+    lineHeight: 16,
+  },
+  externalNavigateSubtitle: {
+    fontSize: 10,
+    fontWeight: "500",
+    lineHeight: 12,
+  },
+  singleNavigateContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  singleNavigateLabels: {
+    alignItems: "flex-start",
+  },
+  directionsButtonSubcaption: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 1,
+    lineHeight: 13,
   },
   directionsButton: {
-    flex: 1,
     backgroundColor: "#FE902A",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
@@ -1091,12 +1208,13 @@ const styles = StyleSheet.create({
   },
   directionsButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
+    lineHeight: 18,
   },
   favoriteButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: "#FE902A",
