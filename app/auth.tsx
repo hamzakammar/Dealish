@@ -1,4 +1,5 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
+import { sendConfirmationEmail } from '@/utils/sendConfirmationEmail';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -302,8 +303,14 @@ export default function AuthScreen() {
             // Route through index — it will send to /onboarding if display_name is null
             setTimeout(() => router.replace('/'), 200);
           } else {
-            // Email confirmation required — nothing to do until they confirm
-            Alert.alert('Success', 'Check your email for the confirmation link!');
+            // Email confirmation required.
+            // Fire-and-forget welcome email via edge function — failure must never block UX.
+            sendConfirmationEmail({ email, userId: data.user!.id });
+            Alert.alert(
+              'Check your email',
+              `We've sent a confirmation link to ${email}. Click it to activate your account.`,
+              [{ text: 'OK' }]
+            );
           }
         }
       } else {

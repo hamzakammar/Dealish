@@ -701,7 +701,9 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
                 <ActivityIndicator size="small" color="#FE902A" />
               </View>
             ) : deals.length > 0 ? (
-              deals.map((deal) => <DealCard key={deal.id} deal={deal} />)
+              deals.map((deal) => (
+                <DealCard key={deal.id} deal={deal} isPartner={Boolean(restaurant.partner)} />
+              ))
             ) : (
               <View style={styles.emptyState}>
                 <AntDesign name="inbox" size={48} color={colors.textTertiary} />

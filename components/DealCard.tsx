@@ -1,18 +1,23 @@
 import { Deal } from "@/types/restaurant";
+import { supabase } from "@/app/lib/supabase";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { calculateSavings } from "@/utils/activity";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import DealQRCode from "./DealQRCode";
 
 type DealCardProps = {
   deal: Deal;
+  isPartner?: boolean;
 };
 
-export default function DealCard({ deal }: DealCardProps) {
+export default function DealCard({ deal, isPartner = false }: DealCardProps) {
   const colors = useThemeColors();
   const [showQRCode, setShowQRCode] = useState(false);
+  const [userVote, setUserVote] = useState<'thumbs_up' | 'thumbs_down' | null>(null);
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
   const formatTime = (dateString?: string) => {
     if (!dateString) return null;
     const date = new Date(dateString);
@@ -189,6 +194,39 @@ export default function DealCard({ deal }: DealCardProps) {
   const savings = calculateSavings(deal);
   const discountLabel = getDiscountLabel();
 
+  const handleFlag = async (type: 'thumbs_up' | 'thumbs_down') => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      Alert.alert(
+        'Sign in required',
+        'Create a free account to flag deals.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Sign in', onPress: () => router.push('/auth' as any) },
+        ]
+      );
+      return;
+    }
+
+    const previousVote = userVote;
+    setUserVote(type); // optimistic update
+    setIsSubmittingVote(true);
+
+    try {
+      const { error } = await supabase
+        .from('deal_flags')
+        .upsert(
+          { deal_id: deal.id, user_id: user.id, type },
+          { onConflict: 'deal_id,user_id' }
+        );
+      if (error) throw error;
+    } catch {
+      setUserVote(previousVote); // rollback on error
+    } finally {
+      setIsSubmittingVote(false);
+    }
+  };
+
   return (
     <>
       <View style={[styles.dealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -241,6 +279,47 @@ export default function DealCard({ deal }: DealCardProps) {
               {formatTimeRange()}
             </Text>
           </View>
+        </View>
+      )}
+
+      {/* Deal accuracy buttons — only for non-partner venues */}
+      {!isPartner && (
+        <View style={styles.accuracyRow}>
+          <Text style={[styles.accuracyLabel, { color: colors.textSecondary }]}>
+            Is this deal accurate?
+          </Text>
+          <TouchableOpacity
+            testID={userVote === 'thumbs_up' ? 'thumbs-up-button-active' : 'thumbs-up-button'}
+            style={[
+              styles.accuracyButton,
+              userVote === 'thumbs_up' && styles.accuracyButtonActiveUp,
+            ]}
+            onPress={() => handleFlag('thumbs_up')}
+            disabled={isSubmittingVote}
+            accessibilityLabel="Mark deal as accurate"
+          >
+            <Ionicons
+              name={userVote === 'thumbs_up' ? 'thumbs-up' : 'thumbs-up-outline'}
+              size={16}
+              color={userVote === 'thumbs_up' ? '#22C55E' : colors.textSecondary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID={userVote === 'thumbs_down' ? 'thumbs-down-button-active' : 'thumbs-down-button'}
+            style={[
+              styles.accuracyButton,
+              userVote === 'thumbs_down' && styles.accuracyButtonActiveDown,
+            ]}
+            onPress={() => handleFlag('thumbs_down')}
+            disabled={isSubmittingVote}
+            accessibilityLabel="Mark deal as inaccurate"
+          >
+            <Ionicons
+              name={userVote === 'thumbs_down' ? 'thumbs-down' : 'thumbs-down-outline'}
+              size={16}
+              color={userVote === 'thumbs_down' ? '#EF4444' : colors.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -372,6 +451,30 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: "#666",
+  },
+  accuracyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 8,
+  },
+  accuracyLabel: {
+    fontSize: 12,
+    flex: 1,
+  },
+  accuracyButton: {
+    padding: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  accuracyButtonActiveUp: {
+    borderColor: '#22C55E',
+    backgroundColor: '#F0FDF4',
+  },
+  accuracyButtonActiveDown: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
   qrButton: {
     flexDirection: "row",

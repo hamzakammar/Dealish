@@ -3,10 +3,10 @@ import { supabase } from "@/app/lib/supabase";
 import { Deal, Restaurant, UserLocation } from "@/types/restaurant";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   FlatList,
-  Image,
   Modal,
   StyleSheet,
   Text,
@@ -66,13 +66,19 @@ const RestaurantCard = React.memo(function RestaurantCard({
       <View style={styles.imageContainer}>
         {imageUrl && !imageError ? (
           <Image
+            testID={`restaurant-image-${restaurant.id}`}
             source={{ uri: imageUrl }}
             style={styles.image}
-            resizeMode="cover"
-            onError={() => setImageError(true)}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            priority="normal"
+            onLoadError={() => setImageError(true)}
           />
         ) : (
-          <View style={styles.imagePlaceholder}>
+          <View
+            testID={`image-placeholder-${restaurant.id}`}
+            style={styles.imagePlaceholder}
+          >
             <Ionicons name="restaurant-outline" size={32} color="#ccc" />
           </View>
         )}
@@ -272,12 +278,17 @@ export default function RestaurantList({
       </View>
 
       <FlatList
+        testID="restaurant-flatlist"
         data={sortedRestaurants}
         renderItem={renderRestaurant}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         style={styles.listBackground}
+        removeClippedSubviews={true}
+        initialNumToRender={8}
+        maxToRenderPerBatch={5}
+        windowSize={10}
       />
 
       {/* Sort Modal */}
