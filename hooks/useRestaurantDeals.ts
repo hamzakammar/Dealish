@@ -57,8 +57,8 @@ function filterActiveDeals(deals: Deal[]): Deal[] {
       return false; // Deal has expired
     }
 
-    // Check if it's a recurring deal
-    if (deal.is_recurring) {
+    // Check if it's a recurring deal with complete fields
+    if (deal.is_recurring && deal.recurrence_days && deal.recurrence_start_time && deal.recurrence_end_time) {
       return isRecurringDealActive(deal);
     }
 

@@ -1,6 +1,7 @@
 import { Restaurant } from "@/types/restaurant";
+import { Image } from "expo-image";
 import React from "react";
-import { Image, PixelRatio, Platform, View } from "react-native";
+import { PixelRatio, Platform, View } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
@@ -32,10 +33,10 @@ export function MarkerAssetsWarmup() {
       pointerEvents="none"
       style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }}
     >
-      <Image source={MARKER_ASSETS.deal} style={{ width: 1, height: 1 }} fadeDuration={0} />
-      <Image source={MARKER_ASSETS.dealSelected} style={{ width: 1, height: 1 }} fadeDuration={0} />
-      <Image source={MARKER_ASSETS.dot} style={{ width: 1, height: 1 }} fadeDuration={0} />
-      <Image source={MARKER_ASSETS.dotSelected} style={{ width: 1, height: 1 }} fadeDuration={0} />
+      <Image source={MARKER_ASSETS.deal} style={{ width: 1, height: 1 }} transition={0} />
+      <Image source={MARKER_ASSETS.dealSelected} style={{ width: 1, height: 1 }} transition={0} />
+      <Image source={MARKER_ASSETS.dot} style={{ width: 1, height: 1 }} transition={0} />
+      <Image source={MARKER_ASSETS.dotSelected} style={{ width: 1, height: 1 }} transition={0} />
     </View>
   );
 }
@@ -83,9 +84,10 @@ export default function RestaurantMarker({
         <Image
           source={MARKER_ASSETS[markerKey]}
           style={{ width: size, height: size }}
-          resizeMode="contain"
+          contentFit="contain"
           onLoad={handleImageLoad}
-          fadeDuration={0}
+          transition={0}
+          cachePolicy="memory"
         />
       </View>
     </Marker>
