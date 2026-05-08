@@ -30,7 +30,7 @@ serve(async (req) => {
       });
     }
 
-    const { user_id, title, body, data } = await req.json() as NotificationRequest;
+    const { user_id, title, body, data, type } = await req.json() as NotificationRequest;
 
     if (!user_id || !title || !body) {
       return new Response(
