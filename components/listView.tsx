@@ -167,6 +167,7 @@ export default function RestaurantList({
           .select("*")
           .in("restaurant_id", ids)
           .eq("is_active", true)
+          .neq("is_flagged", true)
           .order("created_at", { ascending: false });
 
         if (error) throw error;

@@ -103,7 +103,8 @@ export function useActiveDealsMap(restaurants: Restaurant[]) {
           .from("deals")
           .select("*")
           .in("restaurant_id", restaurantIds)
-          .eq("is_active", true);
+          .eq("is_active", true)
+          .neq("is_flagged", true);
 
         if (error) throw error;
 

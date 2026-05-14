@@ -98,6 +98,7 @@ export function useRestaurantDeals(restaurantId: string | null) {
           .select("*")
           .eq("restaurant_id", restaurantId)
           .eq("is_active", true)
+          .neq("is_flagged", true)
           .order("created_at", { ascending: false });
 
         if (error) throw error;
