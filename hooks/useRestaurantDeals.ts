@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { Deal } from "@/types/restaurant";
 
+const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
+
 /**
- * Checks if a recurring deal is currently active based on day and time
+ * Returns true if a recurring deal is active now or starts within 1 hour today.
  */
 function isRecurringDealActive(deal: Deal): boolean {
   if (!deal.is_recurring || !deal.recurrence_days || !deal.recurrence_start_time || !deal.recurrence_end_time) {
@@ -11,58 +13,64 @@ function isRecurringDealActive(deal: Deal): boolean {
   }
 
   const now = new Date();
-  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  const currentTime = now.toTimeString().slice(0, 8); // "HH:MM:SS"
-
-  // Check if today is in the recurrence days
-  if (!deal.recurrence_days.includes(currentDay)) {
+  if (!deal.recurrence_days.includes(now.getDay())) {
     return false;
   }
 
-  // Check if current time is within the recurrence time range
-  return currentTime >= deal.recurrence_start_time && currentTime <= deal.recurrence_end_time;
+  const currentTime = now.toTimeString().slice(0, 8); // "HH:MM:SS"
+
+  // Active right now
+  if (currentTime >= deal.recurrence_start_time && currentTime <= deal.recurrence_end_time) {
+    return true;
+  }
+
+  // Starts within 1 hour
+  if (currentTime < deal.recurrence_start_time) {
+    const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
+    const startMinutes = sh * 60 + sm;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    return startMinutes - nowMinutes <= 60;
+  }
+
+  return false;
 }
 
 /**
- * Checks if a one-time deal is currently active
+ * Returns true if a one-time deal is active now or starts within 1 hour.
  */
 function isOneTimeDealActive(deal: Deal): boolean {
   const now = new Date();
 
-  // If deal has an end_at and it's passed, deal is expired
   if (deal.end_at && new Date(deal.end_at) < now) {
     return false;
   }
 
-  // If deal has a start_at and it hasn't started yet, deal is not active
-  if (deal.start_at && new Date(deal.start_at) > now) {
-    return false;
+  if (deal.start_at) {
+    const startAt = new Date(deal.start_at);
+    if (startAt > now) {
+      // Not started yet — show if starting within 1 hour
+      return startAt.getTime() - now.getTime() <= SOON_MS;
+    }
   }
 
-  // Deal is active if we're within the time range (or no time restrictions)
   return true;
 }
 
 /**
- * Filters deals to only show currently active ones
+ * Filters deals to active now or starting within 1 hour.
  */
 function filterActiveDeals(deals: Deal[]): Deal[] {
   return deals.filter((deal) => {
-    // Check overall validity period if set (for recurring deals with date range)
     const now = new Date();
-    if (deal.start_at && new Date(deal.start_at) > now) {
-      return false; // Deal hasn't started yet
-    }
+
     if (deal.end_at && new Date(deal.end_at) < now) {
-      return false; // Deal has expired
+      return false; // Expired
     }
 
-    // Check if it's a recurring deal with complete fields
     if (deal.is_recurring && deal.recurrence_days && deal.recurrence_start_time && deal.recurrence_end_time) {
       return isRecurringDealActive(deal);
     }
 
-    // Otherwise, it's a one-time deal
     return isOneTimeDealActive(deal);
   });
 }
