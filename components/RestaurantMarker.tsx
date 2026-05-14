@@ -55,10 +55,10 @@ export default function RestaurantMarker({
   React.useEffect(() => {
     if (Platform.OS !== "android") return;
     setTracking(true);
-    const t = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setTracking(false))
-    );
-    return () => cancelAnimationFrame(t);
+    // double-rAF alone isn't enough on Hermes in release builds —
+    // the native marker slot may not be ready yet. 300ms covers it.
+    const t = setTimeout(() => setTracking(false), 300);
+    return () => clearTimeout(t);
   }, [isSelected, hasActiveDeal, isPartner]);
 
   const handlePress = React.useCallback(() => {
