@@ -90,24 +90,7 @@ export default function PermissionsScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            try {
-              router.replace('/settings');
-            } catch (error) {
-              console.error('Navigation error:', error);
-              try {
-                router.push('/settings');
-              } catch (fallbackError) {
-                console.error('Fallback navigation failed:', fallbackError);
-                // Last resort - try back()
-                try {
-                  router.back();
-                } catch (finalError) {
-                  console.error('All navigation attempts failed:', finalError);
-                }
-              }
-            }
-          }}
+          onPress={() => router.back()}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>

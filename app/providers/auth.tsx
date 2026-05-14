@@ -43,7 +43,7 @@ export function useAuthContext() {
 export default function AuthProvider({ children }: PropsWithChildren) {
   // ALL hooks MUST be called unconditionally at the top level
   const [session, setSession] = useState<Session | undefined | null>(undefined)
-  const [profile, setProfile] = useState<Profile | null | undefined>(null)
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined)
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true)
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(false)
   

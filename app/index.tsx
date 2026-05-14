@@ -25,7 +25,7 @@ export default function Index() {
 
   // Safety net: if profile fetch hangs (network failure), unblock after 8s
   useEffect(() => {
-    if (session && profile === null) {
+    if (session && (profile === null || profile === undefined)) {
       profileTimeoutRef.current = setTimeout(async () => {
         if (!hasNavigatedRef.current) {
           hasNavigatedRef.current = true;
@@ -68,6 +68,10 @@ export default function Index() {
       await SplashScreen.hideAsync().catch(() => {});
 
       if (session) {
+        // profile === undefined means the fetch hasn't started yet (initial state).
+        // Wait for it — the 8s timeout in this file handles the case where it never resolves.
+        if (profile === undefined) return;
+
         // Validate token freshness
         const isTokenValid = session.expires_at && session.expires_at > Date.now() / 1000;
         
@@ -85,7 +89,10 @@ export default function Index() {
           } else {
             // Always use profile.display_name as source of truth for onboarding
             // AsyncStorage flag is a fallback only — profile check is definitive
-            const needsOnboarding = !profile?.display_name;
+            // Only show onboarding if profile has no name AND they haven't
+            // previously completed it. AsyncStorage flag prevents re-showing
+            // when profile is slow to load on relaunch.
+            const needsOnboarding = !profile?.display_name && !hasCompletedOnboarding;
             if (needsOnboarding) {
               routerRef.current.replace('/onboarding');
             } else {
