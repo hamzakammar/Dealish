@@ -25,19 +25,6 @@ function MarkerView({
   hasActiveDeal: boolean;
   isPartner: boolean;
 }) {
-  if (!hasActiveDeal && !isPartner) {
-    // Plain dot — restaurant with no active deal, not a partner
-    return (
-      <View
-        style={[
-          styles.dot,
-          isSelected && styles.dotSelected,
-        ]}
-        {...(Platform.OS === "android" && { collapsable: false })}
-      />
-    );
-  }
-
   return (
     <View
       style={[
@@ -48,13 +35,7 @@ function MarkerView({
       {...(Platform.OS === "android" && { collapsable: false })}
     >
       {hasActiveDeal && (
-        <Text style={styles.dealLabel}>%</Text>
-      )}
-      {isPartner && !hasActiveDeal && (
-        <Text style={styles.partnerLabel}>★</Text>
-      )}
-      {isPartner && hasActiveDeal && (
-        <Text style={styles.dealLabel}>%</Text>
+        <Text style={styles.dealLabel}>$</Text>
       )}
     </View>
   );
@@ -93,23 +74,6 @@ export default function RestaurantMarker({
 }
 
 const styles = StyleSheet.create({
-  // Plain gray dot — no deal, not a partner
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#AAAAAA",
-    borderWidth: 1.5,
-    borderColor: "#FFFFFF",
-  },
-  dotSelected: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#888888",
-  },
-
-  // Deal / partner bubble
   bubble: {
     minWidth: 28,
     height: 28,
@@ -138,11 +102,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
   },
   dealLabel: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  partnerLabel: {
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "800",
