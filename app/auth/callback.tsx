@@ -2,7 +2,7 @@ import { useAuthContext } from '@/app/providers/auth';
 import { supabase } from '@/app/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, View, StyleSheet } from 'react-native';
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
@@ -16,7 +16,11 @@ export default function AuthCallbackScreen() {
         await new Promise(resolve => setTimeout(resolve, 300));
 
         // Check if this is a password recovery callback
-        const isRecovery = params.type === 'recovery';
+        // On web, Supabase puts type=recovery in the URL hash, not query params
+        const hashType = Platform.OS === 'web' && typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.hash.replace('#', '')).get('type')
+          : null;
+        const isRecovery = params.type === 'recovery' || hashType === 'recovery';
         if (isRecovery) {
           router.replace('/reset-password?type=recovery');
           return;
