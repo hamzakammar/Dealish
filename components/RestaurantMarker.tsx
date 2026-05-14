@@ -49,6 +49,18 @@ export default function RestaurantMarker({
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
 
+  // Android needs tracksViewChanges=true briefly so the native layer
+  // captures the rendered view, then we turn it off for performance.
+  const [tracking, setTracking] = React.useState(Platform.OS === "android");
+  React.useEffect(() => {
+    if (Platform.OS !== "android") return;
+    setTracking(true);
+    const t = requestAnimationFrame(() =>
+      requestAnimationFrame(() => setTracking(false))
+    );
+    return () => cancelAnimationFrame(t);
+  }, [isSelected, hasActiveDeal, isPartner]);
+
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
   }, [restaurant, onPress]);
@@ -61,7 +73,7 @@ export default function RestaurantMarker({
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 1.0 }}
-      tracksViewChanges={false}
+      tracksViewChanges={tracking}
       tappable={true}
     >
       <MarkerView
