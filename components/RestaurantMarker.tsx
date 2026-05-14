@@ -1,7 +1,6 @@
 import { Restaurant } from "@/types/restaurant";
-import { Image } from "expo-image";
 import React from "react";
-import { PixelRatio, Platform, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { Marker } from "react-native-maps";
 
 type RestaurantMarkerProps = {
@@ -12,31 +11,51 @@ type RestaurantMarkerProps = {
   scale?: number;
 };
 
-const MARKER_ASSETS = {
-  deal: require("@/assets/images/marker-deal.png"),
-  dealSelected: require("@/assets/images/marker-deal-selected.png"),
-  dot: require("@/assets/images/marker-dot.png"),
-  dotSelected: require("@/assets/images/marker-dot-selected.png"),
-};
-
-const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
-const MARKER_SIZE = rnd(28);
-const SELECTED_SIZE = rnd(36);
-
-// Render once at the top of any screen that uses RestaurantMarker. Forces
-// Android to decode the marker PNGs before any <Marker> mounts, which closes
-// the race where tracksViewChanges flips off before the asset is ready and
-// produces clickable-but-invisible markers in production builds.
+// No-op warmup — kept for API compatibility, no longer needed without PNG assets
 export function MarkerAssetsWarmup() {
+  return null;
+}
+
+function MarkerView({
+  isSelected,
+  hasActiveDeal,
+  isPartner,
+}: {
+  isSelected: boolean;
+  hasActiveDeal: boolean;
+  isPartner: boolean;
+}) {
+  if (!hasActiveDeal && !isPartner) {
+    // Plain dot — restaurant with no active deal, not a partner
+    return (
+      <View
+        style={[
+          styles.dot,
+          isSelected && styles.dotSelected,
+        ]}
+        {...(Platform.OS === "android" && { collapsable: false })}
+      />
+    );
+  }
+
   return (
     <View
-      pointerEvents="none"
-      style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }}
+      style={[
+        styles.bubble,
+        isPartner && styles.bubblePartner,
+        isSelected && styles.bubbleSelected,
+      ]}
+      {...(Platform.OS === "android" && { collapsable: false })}
     >
-      <Image source={MARKER_ASSETS.deal} style={{ width: 1, height: 1 }} transition={0} />
-      <Image source={MARKER_ASSETS.dealSelected} style={{ width: 1, height: 1 }} transition={0} />
-      <Image source={MARKER_ASSETS.dot} style={{ width: 1, height: 1 }} transition={0} />
-      <Image source={MARKER_ASSETS.dotSelected} style={{ width: 1, height: 1 }} transition={0} />
+      {hasActiveDeal && (
+        <Text style={styles.dealLabel}>%</Text>
+      )}
+      {isPartner && !hasActiveDeal && (
+        <Text style={styles.partnerLabel}>★</Text>
+      )}
+      {isPartner && hasActiveDeal && (
+        <Text style={styles.dealLabel}>%</Text>
+      )}
     </View>
   );
 }
@@ -47,20 +66,7 @@ export default function RestaurantMarker({
   onPress,
   hasActiveDeal,
 }: RestaurantMarkerProps) {
-  const markerKey = hasActiveDeal
-    ? isSelected ? "dealSelected" : "deal"
-    : isSelected ? "dotSelected" : "dot";
-
-  const size = isSelected ? SELECTED_SIZE : MARKER_SIZE;
-
-  // Track view changes until the Image actually decodes, then one more frame
-  // so the native side snapshots the loaded bitmap. A fixed timeout races the
-  // decode on prod Android (Hermes) and produces invisible markers.
-  const [tracking, setTracking] = React.useState(true);
-  React.useEffect(() => { setTracking(true); }, [markerKey, size]);
-  const handleImageLoad = React.useCallback(() => {
-    requestAnimationFrame(() => requestAnimationFrame(() => setTracking(false)));
-  }, []);
+  const isPartner = Boolean(restaurant.partner);
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
@@ -70,26 +76,75 @@ export default function RestaurantMarker({
 
   return (
     <Marker
-      key={`${restaurant.id}-${markerKey}`}
+      key={`${restaurant.id}-${isSelected}-${hasActiveDeal}`}
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
-      anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={tracking}
+      anchor={{ x: 0.5, y: 1.0 }}
+      tracksViewChanges={false}
       tappable={true}
     >
-      <View
-        style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}
-        {...(Platform.OS === "android" && { collapsable: false })}
-      >
-        <Image
-          source={MARKER_ASSETS[markerKey]}
-          style={{ width: size, height: size }}
-          contentFit="contain"
-          onLoad={handleImageLoad}
-          transition={0}
-          cachePolicy="memory"
-        />
-      </View>
+      <MarkerView
+        isSelected={isSelected}
+        hasActiveDeal={hasActiveDeal}
+        isPartner={isPartner}
+      />
     </Marker>
   );
 }
+
+const styles = StyleSheet.create({
+  // Plain gray dot — no deal, not a partner
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#AAAAAA",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  dotSelected: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#888888",
+  },
+
+  // Deal / partner bubble
+  bubble: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FE902A",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  bubblePartner: {
+    backgroundColor: "#FE902A",
+    borderColor: "#FFD700", // gold border for partners
+    borderWidth: 2.5,
+  },
+  bubbleSelected: {
+    minWidth: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 3,
+  },
+  dealLabel: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  partnerLabel: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+});
