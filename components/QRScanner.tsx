@@ -4,8 +4,10 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -15,7 +17,65 @@ type QRScannerProps = {
   onClose?: () => void;
 };
 
+function QRScannerWeb({ onScan, onClose }: QRScannerProps) {
+  const [manualCode, setManualCode] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    const code = manualCode.trim();
+    if (!code) return;
+    setLoading(true);
+    try {
+      await onScan(code);
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      Alert.alert('Error', 'Failed to process QR code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={webStyles.container}>
+      <Ionicons name="qr-code-outline" size={64} color="#FE902A" />
+      <Text style={webStyles.title}>Enter QR Code</Text>
+      <Text style={webStyles.subtitle}>
+        Camera scanning is not available in the browser. Enter the QR code value manually.
+      </Text>
+      <TextInput
+        style={webStyles.input}
+        placeholder="Paste or type QR code value"
+        placeholderTextColor="#999"
+        value={manualCode}
+        onChangeText={setManualCode}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <TouchableOpacity
+        style={[webStyles.button, loading && webStyles.buttonDisabled]}
+        onPress={handleSubmit}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={webStyles.buttonText}>Submit</Text>
+        )}
+      </TouchableOpacity>
+      {onClose && (
+        <TouchableOpacity style={webStyles.secondaryButton} onPress={onClose}>
+          <Text style={webStyles.secondaryButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 export default function QRScanner({ onScan, onClose }: QRScannerProps) {
+  if (Platform.OS === 'web') {
+    return <QRScannerWeb onScan={onScan} onClose={onClose} />;
+  }
+
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -114,6 +174,69 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
     </View>
   );
 }
+
+const webStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    maxWidth: 360,
+  },
+  input: {
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#FE902A',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#FE902A',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {

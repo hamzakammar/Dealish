@@ -1,10 +1,60 @@
 import { supabase } from '@/app/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 const BUCKET_NAME = 'restaurant-images';
 
-async function pickAndUpload(options: {
+// Web: use an HTML file input to pick an image, then upload to Supabase
+async function pickAndUploadWeb(options: { filePrefix?: string }): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) { resolve(null); return; }
+
+      try {
+        const prefix = options.filePrefix ? `${options.filePrefix}-` : '';
+        const ext = file.name.split('.').pop() || 'jpg';
+        const fileName = `${prefix}${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+        const arrayBuffer = await file.arrayBuffer();
+
+        const { data, error } = await supabase.storage
+          .from(BUCKET_NAME)
+          .upload(fileName, arrayBuffer, {
+            contentType: file.type || 'image/jpeg',
+            upsert: false,
+          });
+
+        if (error) {
+          Alert.alert('Upload Failed', error.message || 'Failed to upload image');
+          resolve(null);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from(BUCKET_NAME)
+          .getPublicUrl(data.path);
+
+        resolve(publicUrlData.publicUrl);
+      } catch (err) {
+        Alert.alert('Error', 'Failed to upload image. Please try again.');
+        resolve(null);
+      }
+    };
+
+    // If the user closes the dialog without picking
+    input.oncancel = () => resolve(null);
+
+    input.click();
+  });
+}
+
+// Native: use expo-image-picker
+async function pickAndUploadNative(options: {
   aspect: [number, number];
   filePrefix?: string;
 }): Promise<string | null> {
@@ -43,7 +93,6 @@ async function pickAndUpload(options: {
       });
 
     if (error) {
-      console.error('Upload error:', error);
       if (error.message?.includes('bucket') || error.message?.includes('not found')) {
         Alert.alert(
           'Storage Not Configured',
@@ -61,16 +110,17 @@ async function pickAndUpload(options: {
 
     return publicUrlData.publicUrl;
   } catch (error) {
-    console.error('Image pick/upload error:', error);
     Alert.alert('Error', 'Failed to upload image. Please try again.');
     return null;
   }
 }
 
 export function pickAndUploadImage(): Promise<string | null> {
-  return pickAndUpload({ aspect: [1, 1] });
+  if (Platform.OS === 'web') return pickAndUploadWeb({});
+  return pickAndUploadNative({ aspect: [1, 1] });
 }
 
 export function pickAndUploadHeroImage(): Promise<string | null> {
-  return pickAndUpload({ aspect: [16, 9], filePrefix: 'hero' });
+  if (Platform.OS === 'web') return pickAndUploadWeb({ filePrefix: 'hero' });
+  return pickAndUploadNative({ aspect: [16, 9], filePrefix: 'hero' });
 }
