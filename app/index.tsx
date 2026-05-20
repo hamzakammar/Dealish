@@ -87,12 +87,17 @@ export default function Index() {
           if (profile?.role === 'owner' || profile?.role === 'admin') {
             routerRef.current.replace('/admin');
           } else {
-            // Always use profile.display_name as source of truth for onboarding
-            // AsyncStorage flag is a fallback only — profile check is definitive
-            // Only show onboarding if profile has no name AND they haven't
-            // previously completed it. AsyncStorage flag prevents re-showing
-            // when profile is slow to load on relaunch.
-            const needsOnboarding = !profile?.display_name && !hasCompletedOnboarding;
+            // profile is defined (not undefined/null) here.
+            // If profile has a display_name → onboarding was done, go to map.
+            // If profile has no display_name AND no AsyncStorage flag → needs onboarding.
+            // If profile fetch failed (null) → default to map, never block on failed fetch.
+            const profileHasName = Boolean(profile?.display_name?.trim());
+            // Backfill AsyncStorage flag for existing users who have a name in DB
+            // but never had the flag written (signed up before this code existed).
+            if (profileHasName && !hasCompletedOnboarding) {
+              AsyncStorage.setItem('hasCompletedOnboarding', 'true').catch(() => {});
+            }
+            const needsOnboarding = !profileHasName && !hasCompletedOnboarding && profile !== null;
             if (needsOnboarding) {
               routerRef.current.replace('/onboarding');
             } else {
