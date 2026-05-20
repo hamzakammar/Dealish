@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dealish",
     "slug": "Dealish",
-    "version": "1.03",
+    "version": "1.04",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "dealish",
@@ -39,7 +39,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Dealish",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
