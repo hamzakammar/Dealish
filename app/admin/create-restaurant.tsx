@@ -24,6 +24,8 @@ const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 type PlaceSuggestion = {
   place_id: string;
   description: string;
+  lat?: string;
+  lng?: string;
 };
 
 export default function CreateRestaurant() {
@@ -56,20 +58,24 @@ export default function CreateRestaurant() {
 
   const fetchSuggestions = (text: string) => {
     if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current);
-    if (!text || text.length < 3 || !GOOGLE_MAPS_API_KEY) {
+    if (!text || text.length < 3) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
     autocompleteTimer.current = setTimeout(async () => {
       try {
-        const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=address&key=${GOOGLE_MAPS_API_KEY}`;
-        const res = await fetch(url);
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&addressdetails=1&limit=5&countrycodes=ca`;
+        const res = await fetch(url, {
+          headers: { 'Accept-Language': 'en', 'User-Agent': 'DealishApp/1.0' },
+        });
         const data = await res.json();
-        if (data.status === 'OK' && data.predictions?.length > 0) {
-          setSuggestions(data.predictions.map((p: { place_id: string; description: string }) => ({
-            place_id: p.place_id,
-            description: p.description,
+        if (data?.length > 0) {
+          setSuggestions(data.map((p: { place_id: number; display_name: string; lat: string; lon: string }) => ({
+            place_id: String(p.place_id),
+            description: p.display_name,
+            lat: p.lat,
+            lng: p.lon,
           })));
           setShowSuggestions(true);
         } else {
@@ -80,7 +86,7 @@ export default function CreateRestaurant() {
         setSuggestions([]);
         setShowSuggestions(false);
       }
-    }, 300);
+    }, 400);
   };
 
   const selectSuggestion = async (suggestion: PlaceSuggestion) => {
@@ -89,18 +95,24 @@ export default function CreateRestaurant() {
     setShowSuggestions(false);
     Keyboard.dismiss();
 
-    // Auto-geocode the selected address
-    setIsGeocoding(true);
-    try {
-      const result = await geocodeAddress(suggestion.description);
-      if (result) {
-        setLatitude(result.lat.toString());
-        setLongitude(result.lng.toString());
+    // Use coords from Nominatim result directly — no extra geocode call needed
+    if (suggestion.lat && suggestion.lng) {
+      setLatitude(suggestion.lat);
+      setLongitude(suggestion.lng);
+    } else {
+      // Fallback geocode if coords missing
+      setIsGeocoding(true);
+      try {
+        const result = await geocodeAddress(suggestion.description);
+        if (result) {
+          setLatitude(result.lat.toString());
+          setLongitude(result.lng.toString());
+        }
+      } catch {
+        // User can still tap 📍 manually
+      } finally {
+        setIsGeocoding(false);
       }
-    } catch {
-      // Silently fail — user can still tap the location button manually
-    } finally {
-      setIsGeocoding(false);
     }
   };
 
@@ -171,11 +183,13 @@ export default function CreateRestaurant() {
         owner_id: profile.id,
         name: name.trim(),
         address: address.trim() || null,
+        city: 'Toronto, Canada',
         phone: phone.trim() || null,
         type: type.trim() || null,
         lat: parseFloat(latitude),
         lng: parseFloat(longitude),
         hero_image_url: imageUrl.trim() || null,
+        is_active: true,
       };
 
       const { data, error } = await supabase

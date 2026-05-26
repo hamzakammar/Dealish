@@ -4,6 +4,7 @@ import * as Crypto from "expo-crypto";
 export type QRCodeData = {
   deal_id: string;
   token: string;
+  user_id?: string;
 };
 
 /**
@@ -48,8 +49,9 @@ export async function generateQRCodeToken(dealId: string): Promise<string | null
 /**
  * Create QR code data string from deal ID and token
  */
-export function createQRCodeData(dealId: string, token: string): string {
-  return `dealish://scan?deal_id=${dealId}&token=${token}`;
+export function createQRCodeData(dealId: string, token: string, userId?: string): string {
+  const base = `dealish://scan?deal_id=${dealId}&token=${token}`;
+  return userId ? `${base}&user_id=${userId}` : base;
 }
 
 /**
@@ -64,7 +66,8 @@ export function parseQRCodeData(qrData: string): QRCodeData | null {
       const token = url.searchParams.get("token");
 
       if (dealId && token) {
-        return { deal_id: dealId, token };
+        const userId = url.searchParams.get("user_id") ?? undefined;
+        return { deal_id: dealId, token, user_id: userId };
       }
     }
 

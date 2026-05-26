@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { generateQRCodeToken, createQRCodeData } from "@/utils/qrCode";
+import { useAuthContext } from "@/app/providers/auth";
 
 export function useDealQRCode(dealId: string | null) {
+  const { session } = useAuthContext();
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -42,7 +44,7 @@ export function useDealQRCode(dealId: string | null) {
         }
 
         if (mounted) {
-          const qrData = createQRCodeData(currentDealId, token);
+          const qrData = createQRCodeData(currentDealId, token, session?.user?.id);
           setQrCodeData(qrData);
         }
       } catch (e: unknown) {
