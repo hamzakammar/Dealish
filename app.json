@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dealish",
     "slug": "Dealish",
-    "version": "1.1",
+    "version": "1.5",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "dealish",
