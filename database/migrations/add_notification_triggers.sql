@@ -1,3 +1,20 @@
+-- =============================================================================
+-- DEBT-004: OPTIONAL / NOT APPLIED BY DEFAULT.
+-- This migration is NOT present in the live database (it was authored but never
+-- applied). It is kept as an opt-in option for DB-side push notifications.
+--
+-- Before applying, note:
+--   * Requires the pg_net extension and the GUCs app.supabase_url and
+--     app.service_role_key to be set (ALTER DATABASE ... SET ...).
+--   * The app ALREADY sends some of these notifications from client code:
+--       - deal redemption  -> app/qr-scanner.tsx (after redeem_deal_scan)
+--       - new partner       -> utils/notifications.ts
+--     If you enable the matching trigger here you will get DUPLICATE pushes.
+--     Pick one source per notification type.
+--   * Column fixes vs the original draft: uses `partner` (not the non-existent
+--     `is_partner`) and casts favourites with ::uuid[] (the column is uuid[]).
+-- =============================================================================
+
 -- Function to send push notification when a new deal is created
 CREATE OR REPLACE FUNCTION notify_new_deal()
 RETURNS TRIGGER AS $$
@@ -15,7 +32,7 @@ BEGIN
     SELECT id, push_token
     FROM profiles
     WHERE push_token IS NOT NULL
-      AND favourites @> ARRAY[NEW.restaurant_id]::text[]
+      AND favourites @> ARRAY[NEW.restaurant_id]::uuid[]
       AND (settings->>'notifications' IS NULL OR (settings->'notifications'->>'favorites')::boolean IS NOT FALSE)
   LOOP
     -- Call Edge Function to send notification
@@ -115,8 +132,8 @@ RETURNS TRIGGER AS $$
 DECLARE
   user_record RECORD;
 BEGIN
-  -- Only notify if restaurant is a partner (is_partner = true)
-  IF NEW.is_partner = true THEN
+  -- Only notify if restaurant is a partner (partner = true)
+  IF NEW.partner = true THEN
     -- Find all users with push tokens who have notifications enabled
     FOR user_record IN
       SELECT id, push_token
@@ -155,7 +172,7 @@ DROP TRIGGER IF EXISTS trigger_notify_new_partner ON restaurants;
 CREATE TRIGGER trigger_notify_new_partner
   AFTER INSERT ON restaurants
   FOR EACH ROW
-  WHEN (NEW.is_partner = true)
+  WHEN (NEW.partner = true)
   EXECUTE FUNCTION notify_new_partner();
 
 -- Also trigger on UPDATE if is_partner changes from false to true
@@ -164,8 +181,8 @@ RETURNS TRIGGER AS $$
 DECLARE
   user_record RECORD;
 BEGIN
-  -- Only notify if is_partner changed from false to true
-  IF OLD.is_partner = false AND NEW.is_partner = true THEN
+  -- Only notify if partner changed from false to true
+  IF OLD.partner = false AND NEW.partner = true THEN
     -- Find all users with push tokens who have notifications enabled
     FOR user_record IN
       SELECT id, push_token
@@ -204,5 +221,5 @@ DROP TRIGGER IF EXISTS trigger_notify_partner_status_change ON restaurants;
 CREATE TRIGGER trigger_notify_partner_status_change
   AFTER UPDATE ON restaurants
   FOR EACH ROW
-  WHEN (OLD.is_partner IS DISTINCT FROM NEW.is_partner)
+  WHEN (OLD.partner IS DISTINCT FROM NEW.partner)
   EXECUTE FUNCTION notify_partner_status_change();

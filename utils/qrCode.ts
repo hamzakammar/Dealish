@@ -7,6 +7,46 @@ export type QRCodeData = {
   user_id?: string;
 };
 
+export type RedeemResult = {
+  ok: boolean;
+  message: string;
+  saved_amount?: number;
+  deal_title?: string;
+  out_restaurant_id?: string;
+  restaurant_name?: string;
+};
+
+/**
+ * Redeem a deal scan via the server-side SECURITY DEFINER RPC `redeem_deal_scan`.
+ *
+ * The scanner runs on the owner/admin device, so it cannot insert qr_code_scans or
+ * update the customer's profile directly (RLS blocks cross-user writes). The RPC
+ * validates the token + deal/restaurant active state + merchant ownership, records
+ * the scan, and attributes visit/savings to the CUSTOMER (p_user_id).
+ */
+export async function redeemDealScan(
+  dealId: string,
+  token: string,
+  userId: string
+): Promise<RedeemResult> {
+  try {
+    const { data, error } = await supabase.rpc("redeem_deal_scan", {
+      p_deal_id: dealId,
+      p_token: token,
+      p_user_id: userId,
+    });
+    if (error) return { ok: false, message: error.message };
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return { ok: false, message: "No response from server" };
+    return row as RedeemResult;
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Failed to redeem deal",
+    };
+  }
+}
+
 /**
  * Generate a unique QR code token for a deal
  */

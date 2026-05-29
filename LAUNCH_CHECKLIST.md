@@ -35,13 +35,17 @@
 - [ ] Verify `EXPO_PUBLIC_SUPABASE_URL` is set in EAS build config
 - [ ] Verify `EXPO_PUBLIC_SUPABASE_ANON_KEY` is set in EAS build config
 - [ ] Verify `EXPO_PUBLIC_ORS_API_KEY` is set (if using directions)
-- [ ] Verify `EXPO_PUBLIC_AUTH_REDIRECT_URL` is set
+- [ ] Verify `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is set
+- [ ] Verify `EXPO_PUBLIC_SENTRY_DSN` is set (optional; Sentry off if unset)
+- Note: the auth redirect is hardcoded to `dealish://auth/callback` in code
+  (`app/lib/supabase.ts`); there is no `EXPO_PUBLIC_AUTH_REDIRECT_URL` env var.
 
 ### App Configuration
-- [ ] Update `app.json` bundle identifiers if needed:
-  - iOS: `com.anonymous.Dealish` → Your actual bundle ID
-  - Android: `com.anonymous.Dealish` → Your actual package name
-- [ ] Verify app version in `app.json` (currently `1.0.1`)
+- Bundle identifiers are `com.anonymous.Dealish` (iOS + Android).
+- [ ] **Reconcile `apple-app-site-association` (DEBT-008):** it declares
+  `8DWMM7XN54.ca.hamzaammar.dealish`, which does not match the `com.anonymous.Dealish`
+  bundle id. Update the AASA file (or the bundle id) before relying on universal links.
+- [ ] Verify app version in `app.json` (currently `1.5`; `package.json` is `1.5.0`)
 - [ ] Verify app name and slug
 
 ### Testing

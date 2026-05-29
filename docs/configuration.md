@@ -37,13 +37,15 @@ Edge-function secrets are set in the Supabase project, never in source.
 | `expo.extra.eas.projectId` | `c8d4d9ee-1ec9-4e2c-a60f-fa51168853fe` |
 | `expo.runtimeVersion` | `{ policy: "appVersion" }` |
 
-**Identifier mismatches (DEBT-008):**
-- `package.json` version is `1.0.3` while `app.json` is `1.5`.
-- `LAUNCH_READY.md` claims bundle IDs were changed to `ca.hamzaammar.dealish`, but
-  `app.json` still has `com.anonymous.Dealish`.
-- `apple-app-site-association` declares appID `8DWMM7XN54.ca.hamzaammar.dealish` —
-  inconsistent with the `com.anonymous.Dealish` bundle ID. This affects universal
-  links, Apple Sign-In, and App Store submission. Reconcile before release.
+**Identifiers (DEBT-008 — partially addressed 2026-05-29):**
+- `package.json` version aligned to `1.5.0` (was `1.0.3`).
+- Bundle id / Android package **kept as `com.anonymous.Dealish`** (per maintainer
+  decision — this is the identity the app actually ships under).
+- **Remaining mismatch:** `apple-app-site-association` declares appID
+  `8DWMM7XN54.ca.hamzaammar.dealish`, which does NOT match the
+  `com.anonymous.Dealish` bundle id. Universal links / Apple Sign-In require these
+  to match — update the AASA file (and `LAUNCH_READY.md`) to the `com.anonymous`
+  team+bundle id, or change the bundle id, before relying on universal links.
 
 ## EAS (`eas.json`)
 

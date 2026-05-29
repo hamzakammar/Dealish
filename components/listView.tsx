@@ -72,7 +72,7 @@ const RestaurantCard = React.memo(function RestaurantCard({
             contentFit="cover"
             cachePolicy="memory-disk"
             priority="normal"
-            onLoadError={() => setImageError(true)}
+            onError={() => setImageError(true)}
           />
         ) : (
           <View

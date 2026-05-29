@@ -1,8 +1,7 @@
-import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import QRScanner from "@/components/QRScanner";
-import { calculateSavings, trackRedemption } from "@/utils/activity";
-import { parseQRCodeData, recordQRCodeScan, validateQRCode } from "@/utils/qrCode";
+import { sendPushNotification } from "@/utils/notifications";
+import { parseQRCodeData, redeemDealScan } from "@/utils/qrCode";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -27,62 +26,43 @@ export default function QRScannerScreen() {
         return;
       }
 
-      // Validate QR code
-      const isValid = await validateQRCode(qrData.deal_id, qrData.token);
-
-      if (!isValid) {
-        Alert.alert(
-          "Invalid QR Code",
-          "This QR code is invalid or the deal is no longer active."
-        );
-        setProcessing(false);
-        return;
-      }
-
-      // Get deal and restaurant information (including discount fields for savings)
-      const { data: deal, error: dealError } = await supabase
-        .from("deals")
-        .select("restaurant_id, title, discount_type, discount_value, original_price")
-        .eq("id", qrData.deal_id)
-        .single();
-
-      if (dealError || !deal) {
-        Alert.alert("Error", "Failed to fetch deal information.");
-        setProcessing(false);
-        return;
-      }
-
-      // Use user_id from QR code so tracking is attributed to the customer,
-      // not the restaurant admin who is holding the scanner.
+      // Attribute the redemption to the customer (from the QR payload), not the
+      // owner/admin holding the scanner. Falls back to the scanner only if absent.
       const targetUserId = qrData.user_id || session.user.id;
 
-      // Record QR code scan (for analytics)
-      await recordQRCodeScan(
-        qrData.deal_id,
-        deal.restaurant_id,
-        targetUserId
-      );
+      // Redeem server-side: validates token + active state + ownership, records the
+      // scan, and credits the customer's visit/savings. Cross-user writes can't be
+      // done from the merchant device under RLS, so this goes through a definer RPC.
+      const result = await redeemDealScan(qrData.deal_id, qrData.token, targetUserId);
 
-      // Track visit attributed to the customer
-      const savings = calculateSavings({
-        discount_type: deal.discount_type,
-        discount_value: deal.discount_value,
-        original_price: deal.original_price,
-      });
+      if (!result.ok) {
+        Alert.alert("Cannot Redeem", result.message || "This deal could not be redeemed.");
+        setProcessing(false);
+        return;
+      }
 
-      // Track redemption — push notification goes to the customer's device
-      // via recordQRCodeScan. No Alert prompts here since this is the restaurant's device.
-      await trackRedemption(
-        deal.restaurant_id,
-        deal.title,
-        savings > 0 ? savings : undefined,
-        qrData.deal_id
-      );
+      // Notify the customer's device (best-effort; never blocks the flow).
+      try {
+        await sendPushNotification(targetUserId, {
+          type: "deal_redeemed",
+          title: "Deal Redeemed!",
+          body: result.restaurant_name
+            ? `You redeemed: ${result.deal_title} at ${result.restaurant_name}`
+            : `You redeemed: ${result.deal_title ?? "your deal"}`,
+          data: {
+            deal_id: qrData.deal_id,
+            restaurant_id: result.out_restaurant_id,
+            screen: "/account",
+          },
+        });
+      } catch (notifError) {
+        console.error("Error sending redemption notification:", notifError);
+      }
 
       // Brief success confirmation on the scanner (restaurant's device)
       Alert.alert(
         "Verified!",
-        `Deal "${deal.title}" has been redeemed.`,
+        `Deal "${result.deal_title ?? ""}" has been redeemed.`,
         [{
           text: "OK",
           onPress: () => {

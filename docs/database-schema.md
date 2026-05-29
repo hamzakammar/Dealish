@@ -40,7 +40,7 @@ One row per user. `id` matches the Supabase Auth user id. `role` drives routing
 | favourites | array | restaurant ids; mutated via `append_favourite` / `remove_favourite` RPCs |
 | num_visits | bigint | NOT NULL |
 | amount_saved | numeric | NOT NULL |
-| recents | array | recent activity entries (`utils/activity.ts`) |
+| recents | jsonb | recent activity objects (`utils/activity.ts`); **was `uuid[]` — see DEBT-016, migration `change_recents_to_jsonb.sql`** |
 | location | text | |
 | avatar_url | text | stored in `avatars` bucket |
 | settings | jsonb | notifications/privacy/appearance (`hooks/useUserSettings.ts`) |
@@ -481,7 +481,8 @@ Most other FKs are `ON DELETE CASCADE`; `sheet_synced_rows.deal_id` is `ON DELET
 | `append_favourite(p_profile_id uuid, p_restaurant_id uuid)` | sql, SECURITY DEFINER | Appends restaurant id to `profiles.favourites`. Called from `RestaurantDetailCard.tsx`. |
 | `remove_favourite(p_profile_id uuid, p_restaurant_id uuid)` | sql, SECURITY DEFINER | `array_remove` from `profiles.favourites`. |
 | `is_deal_active_now(d deals)` | sql STABLE | `is_active AND start_at<=now() AND end_at>=now()`. Used by RLS `deals_public_read_active_now`. |
-| `is_merchant()` | sql STABLE | `EXISTS profile WHERE id=auth.uid() AND role='merchant'`. **Always FALSE** (role can't be `merchant`). |
+| `is_merchant()` | sql STABLE | Originally `role='merchant'` (always FALSE). **Fixed** to `role IN ('owner','admin')` — `fix_is_merchant_role.sql` (DEBT-001). |
+| `redeem_deal_scan(p_deal_id, p_token, p_user_id)` | plpgsql, SECURITY DEFINER | **Added** (`add_redeem_deal_scan_rpc.sql`, DEBT-003). Merchant-device redemption: validates token/active/ownership, inserts `qr_code_scans`, credits the **customer's** visit/savings/recents. Called by `app/qr-scanner.tsx`. |
 | `mint_redemption(p_deal_id uuid)` | plpgsql, SECURITY DEFINER | Issues a `redemptions` row: random token + 4-digit PIN (both sha256-hashed), 20-min expiry, **1/day per user/deal** rate limit. Requires auth, deal active, restaurant active. **Not called by app.** |
 | `verify_redemption(p_token_or_pin text)` | plpgsql, SECURITY DEFINER | Merchant marks a redemption `used`. **Requires `is_merchant()` → always fails.** **Not called by app.** |
 | `check_deal_accuracy()` | plpgsql trigger | On `deal_flags` change, sets `deals.is_flagged = (down>=5 AND down>up)`. |
@@ -606,5 +607,18 @@ app: it never references `merchant`, `mint_redemption`, `verify_redemption`, or
    (finding 4).
 
 8. **Base tables remain hosted-only.** `profiles`, `restaurants`, `deals`,
-   `redemptions`, `menu_items`, `menu_item_ingredients` have no `CREATE TABLE`
-   migration in this repo. This file is the only in-repo record of their shape.
+   `redemptions` had no `CREATE TABLE` migration. **Resolved (DEBT-012):**
+   `database/schema_base.sql` now reconstructs the base tables + hosted-only
+   functions/triggers/RLS (`menu_items`/`menu_item_ingredients` already have
+   migrations). Validate against a scratch project before production use.
+
+9. **`recents` is now `jsonb` (DEBT-016).** The live column was `uuid[]` but the
+   app stores activity objects, so the write path was silently failing.
+   `change_recents_to_jsonb.sql` converts it; apply before `add_redeem_deal_scan_rpc.sql`.
+
+### Remediation note (2026-05-29)
+
+Many findings above have repo fixes that must be **applied to Supabase**:
+`change_recents_to_jsonb.sql`, `fix_is_merchant_role.sql`, `add_redeem_deal_scan_rpc.sql`,
+`drop_redundant_deals_select_policy.sql`, `drop_restaurants_owner_id_default.sql`,
+`setup_restaurant_images_storage.sql`. See `docs/debt.md` for the status table.

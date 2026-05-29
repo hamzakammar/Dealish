@@ -33,10 +33,35 @@ Severity guide:
 
 <!-- Add new entries below this line, newest first. -->
 
-> Entries DEBT-001..015 were logged on 2026-05-29 from a full repo + live-schema
+> Entries DEBT-001..016 were logged on 2026-05-29 from a full repo + live-schema
 > audit. Severities reflect impact at time of logging. Findings 1–3 were verified
 > by grepping the app (it never references `merchant`, `mint_redemption`,
 > `verify_redemption`, or `redemptions`).
+>
+> ### Resolution status (2026-05-29 remediation pass)
+>
+> | ID | Status | Where |
+> |---|---|---|
+> | DEBT-001 | Fixed in repo — **apply migration** | `database/migrations/fix_is_merchant_role.sql` |
+> | DEBT-002 | Fixed in repo — **apply migration** | `database/migrations/drop_redundant_deals_select_policy.sql` |
+> | DEBT-003 | Fixed in repo — **apply migration** | `add_redeem_deal_scan_rpc.sql` + `utils/qrCode.ts`, `app/qr-scanner.tsx` |
+> | DEBT-004 | Corrected + documented | `database/migrations/add_notification_triggers.sql` (optional, not applied) |
+> | DEBT-005 | Fixed in repo — **apply migration** | `database/migrations/drop_restaurants_owner_id_default.sql` |
+> | DEBT-006 | **Resolved** | `components/listView.tsx` (`onError`) |
+> | DEBT-007 | **Resolved** | `__mocks__/app/lib/supabase.ts`, `StyledText-test.js` |
+> | DEBT-008 | Partially fixed — **AASA still mismatched** | `package.json` 1.5.0; bundle id kept `com.anonymous.Dealish`; reconcile `apple-app-site-association` |
+> | DEBT-009 | Fixed in repo — **apply migration + dashboard policies** | `database/migrations/setup_restaurant_images_storage.sql` |
+> | DEBT-010 | Open — product decision | (no safe code fix) |
+> | DEBT-011 | **Resolved** | docs + `LAUNCH_CHECKLIST.md` |
+> | DEBT-012 | Fixed in repo | `database/schema_base.sql` |
+> | DEBT-013 | Mostly resolved | `npm audit fix` (0 high; 19 moderate need SDK bump) |
+> | DEBT-014 | **Resolved** | `.github/workflows/ci.yml` |
+> | DEBT-015 | **Resolved** | `package.json` (`typecheck`) |
+> | DEBT-016 | Fixed in repo — **apply migration** | `database/migrations/change_recents_to_jsonb.sql` |
+>
+> **"Apply migration"** = the SQL exists in the repo but must be run against the
+> live Supabase project (it is not auto-applied). Apply `change_recents_to_jsonb.sql`
+> before `add_redeem_deal_scan_rpc.sql`.
 
 ### [DEBT-001] `is_merchant()` is always false — server-side redemption system is dead
 - **Severity:** high
@@ -148,6 +173,10 @@ Severity guide:
 - **Impact:** Breaks universal links, Apple Sign-In, and App Store assumptions;
   confusing release state.
 - **Fix:** Pick the real bundle ID/version and reconcile all four sources.
+  **Status (2026-05-29):** version aligned to `1.5.0`; bundle id kept as
+  `com.anonymous.Dealish` (maintainer decision). Still to do: update
+  `apple-app-site-association` (declares `ca.hamzaammar.dealish`) and the stale
+  `LAUNCH_READY.md` note to match `com.anonymous.Dealish`.
 
 ### [DEBT-009] `restaurant-images` storage bucket not represented in repo
 - **Severity:** medium
@@ -231,10 +260,47 @@ Severity guide:
 - **Impact:** Minor friction; easy to skip.
 - **Fix:** Add `"typecheck": "tsc --noEmit"` to `package.json` scripts.
 
+### [DEBT-016] `profiles.recents` is `uuid[]` but the app stores activity objects
+- **Severity:** high
+- **Area:** `profiles.recents`, `utils/activity.ts`, `app/account.tsx`
+- **Logged:** 2026-05-29
+- **Author:** schema audit
+- **Description:** The live column is `uuid[]`, but `trackVisit`/`trackRedemption`
+  and `app/account.tsx` read/write activity OBJECTS
+  (`{ restaurant_id, activity_type, deal_id, amount_saved, created_at }`). Writing
+  objects into a `uuid[]` column fails, so visit/savings/recent-activity tracking
+  is silently broken app-wide (errors are caught and swallowed).
+- **Impact:** Recent-activity feed and visit/savings counters never populate from
+  the `recents` path.
+- **Fix:** Change `recents` to `jsonb` to match usage.
+  **Status:** migration written (`database/migrations/change_recents_to_jsonb.sql`);
+  apply it (before `add_redeem_deal_scan_rpc.sql`).
+
 ---
 
 ## Resolved Debt
 
 <!-- Move entries here when fixed, and note the resolution. -->
 
-*None yet.*
+### [DEBT-006] TypeScript build fails (`expo-image` prop in listView)
+- **Resolved 2026-05-29:** changed `onLoadError` → `onError` in
+  `components/listView.tsx`. `npx tsc --noEmit` now passes.
+
+### [DEBT-007] Test suite exits non-zero despite passing assertions
+- **Resolved 2026-05-29:** rewrote `components/__tests__/StyledText-test.js` to use
+  `@testing-library/react-native` instead of raw `react-test-renderer` (the source
+  of the teardown `window.dispatchEvent` crash), and extended
+  `__mocks__/app/lib/supabase.ts` with `.neq()` + the rest of the PostgREST chain
+  and a thenable resolver. `npm test` now exits 0 (5 suites, 28 tests).
+
+### [DEBT-011] Stale/contradictory docs and config references
+- **Resolved 2026-05-29:** corrected `docs/architecture.md` migration path,
+  reconciled `LAUNCH_CHECKLIST.md`/`docs/configuration.md` with the actual
+  `dealish://auth/callback` redirect and the chosen bundle id.
+
+### [DEBT-014] No CI configured
+- **Resolved 2026-05-29:** added `.github/workflows/ci.yml` running `npm ci`,
+  `npm run typecheck`, and `npm test` on push/PR to `main`.
+
+### [DEBT-015] No `typecheck` npm script
+- **Resolved 2026-05-29:** added `"typecheck": "tsc --noEmit"` to `package.json`.
