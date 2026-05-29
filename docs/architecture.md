@@ -45,7 +45,10 @@ Dealish is a mobile-first deal-sharing app. The client is a React Native app bui
 
 ### Database
 - PostgreSQL via Supabase.
-- Migrations live in `supabase/migrations/`.
+- **Schema reference:** `docs/database-schema.md` is the authoritative live schema.
+- Migrations live in `database/migrations/`. **Note:** these do not create the base
+  tables (`profiles`, `restaurants`, `deals`, `redemptions`, `menu_items`, ...) —
+  those exist only in the hosted project. See `docs/database-schema.md`.
 - Row Level Security (RLS) is enabled on all user-facing tables.
 - Typed query helpers live in `database/`.
 
@@ -74,12 +77,18 @@ Dealish is a mobile-first deal-sharing app. The client is a React Native app bui
 
 ## Key Data Models
 
-> Update this section as schemas evolve. Reference migration files in `supabase/migrations/` for the canonical schema.
+> **Canonical schema:** see `docs/database-schema.md` for the full table/column/FK
+> listing. Summary below.
 
-- **User** — authenticated user profile, linked to Supabase Auth UID.
-- **Deal** — a deal post with title, description, price, image, category, and location.
-- **Vote / Reaction** — upvote/downvote or emoji reaction on a deal.
-- **Comment** — threaded comment on a deal.
+- **profiles** — user profile (role, favourites array, recents, settings, push token), keyed to Supabase Auth UID.
+- **restaurants** — owner-scoped venue (location, rating, `partner` flag, images).
+- **deals** — deal on a restaurant (schedule, recurrence, discount, QR token, flag).
+- **redemptions / qr_code_scans** — two redemption-tracking paths (hashed token+PIN vs scan log).
+- **deal_flags** — user accuracy thumbs up/down on deals.
+- **partner_requests** — user requests for a venue to become a partner.
+- **Inventory** — products, inventory_items, inventory_alerts, inventory_sync_logs, external_system_credentials.
+- **Menu** — menu_items, menu_item_ingredients, deal_recommendations.
+- **Sheets/OAuth** — api_keys, sheet_integrations, sheet_synced_rows, google_oauth_tokens (partially dormant).
 
 ---
 

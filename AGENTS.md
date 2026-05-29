@@ -24,6 +24,8 @@ Dealish is a React Native (Expo) mobile app built with TypeScript and a Supabase
 | `types/` | Global TypeScript types and interfaces |
 | `utils/` | Pure utility functions |
 | `docs/` | Architecture, debt log, ADRs, and plans — **start here for context** |
+| `docs/README.md` | **Docs index** — map of every doc and a reading order |
+| `docs/database-schema.md` | **Authoritative live Supabase schema** (tables/RLS/triggers/RPCs) + critical findings |
 | `AGENTS.md` | This file |
 | `LAUNCH_CHECKLIST.md` | Pre-launch task checklist |
 | `LAUNCH_READY.md` | Launch readiness assessment |
@@ -44,9 +46,10 @@ Dealish is a React Native (Expo) mobile app built with TypeScript and a Supabase
 ## 4. Before You Change Anything
 
 1. Read `docs/architecture.md` — understand the current system shape.
-2. Read `docs/debt.md` — know what is already broken or deferred.
-3. Check `docs/decisions/` — look for an ADR that covers the area you're working in.
-4. Check `docs/plans/` — see if there is an active plan for this feature.
+2. Read `docs/database-schema.md` — the live Supabase schema. The repo's `database/migrations/` do **not** create the base tables (`profiles`, `restaurants`, `deals`, etc.); this doc is the only in-repo record of their shape. Keep it in sync with any schema change.
+3. Read `docs/debt.md` — know what is already broken or deferred.
+4. Check `docs/decisions/` — look for an ADR that covers the area you're working in.
+5. Check `docs/plans/` — see if there is an active plan for this feature.
 
 ---
 
@@ -81,6 +84,7 @@ See `package.json` for all available scripts.
 - **What is broken or deferred:** `docs/debt.md`
 - **What we are building next:** `docs/plans/`
 - **System shape and data flow:** `docs/architecture.md`
+- **Database tables and columns:** `docs/database-schema.md`
 
 ---
 
