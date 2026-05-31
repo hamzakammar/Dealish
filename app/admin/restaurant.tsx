@@ -1,6 +1,7 @@
 import { supabase } from '@/app/lib/supabase';
 import { Restaurant } from '@/types/restaurant';
 import { geocodeAddress } from '@/utils/geocode';
+import { placesGeocode } from '@/utils/places';
 import { pickAndUploadHeroImage } from '@/utils/uploadImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -111,6 +112,15 @@ export default function RestaurantSettings() {
 
     setIsGeocoding(true);
     try {
+      // Google Places first (also refreshes rating/review count), Nominatim fallback.
+      const placesResult = await placesGeocode(address);
+      if (placesResult?.lat != null && placesResult?.lng != null) {
+        setLatitude(placesResult.lat.toString());
+        setLongitude(placesResult.lng.toString());
+        if (placesResult.rating != null) setRating(placesResult.rating);
+        if (placesResult.userRatingCount != null) setNumReviews(placesResult.userRatingCount);
+        return;
+      }
       const result = await geocodeAddress(address);
       if (result) {
         setLatitude(result.lat.toString());
@@ -143,6 +153,10 @@ export default function RestaurantSettings() {
         type: type.trim() || null,
         hero_image_url: imageUrl.trim() || null,
         display_image: displayImage.trim() || null,
+        // rating/num_ratings are Google-sourced (refreshed via the location lookup),
+        // never typed by the restaurant.
+        ...(rating != null ? { rating } : {}),
+        ...(numReviews != null ? { num_ratings: numReviews } : {}),
       };
 
       if (latitude.trim() && longitude.trim()) {

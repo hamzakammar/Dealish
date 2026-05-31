@@ -1,6 +1,7 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
 import { geocodeAddress } from '@/utils/geocode';
+import { placeDetails, placesAutocomplete, placesGeocode, type PlaceSuggestion } from '@/utils/places';
 import { pickAndUploadHeroImage } from '@/utils/uploadImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -19,15 +20,6 @@ import {
   View,
 } from 'react-native';
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
-type PlaceSuggestion = {
-  place_id: string;
-  description: string;
-  lat?: string;
-  lng?: string;
-};
-
 export default function CreateRestaurant() {
   const { profile } = useAuthContext();
   const router = useRouter();
@@ -44,6 +36,10 @@ export default function CreateRestaurant() {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Rating/review count are sourced from Google (not user-entered).
+  const [googleRating, setGoogleRating] = useState<number | null>(null);
+  const [googleRatingCount, setGoogleRatingCount] = useState<number | null>(null);
 
   // Address autocomplete
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -64,25 +60,11 @@ export default function CreateRestaurant() {
       return;
     }
     autocompleteTimer.current = setTimeout(async () => {
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&addressdetails=1&limit=5&countrycodes=ca`;
-        const res = await fetch(url, {
-          headers: { 'Accept-Language': 'en', 'User-Agent': 'DealishApp/1.0' },
-        });
-        const data = await res.json();
-        if (data?.length > 0) {
-          setSuggestions(data.map((p: { place_id: number; display_name: string; lat: string; lon: string }) => ({
-            place_id: String(p.place_id),
-            description: p.display_name,
-            lat: p.lat,
-            lng: p.lon,
-          })));
-          setShowSuggestions(true);
-        } else {
-          setSuggestions([]);
-          setShowSuggestions(false);
-        }
-      } catch {
+      const results = await placesAutocomplete(text);
+      if (results.length > 0) {
+        setSuggestions(results);
+        setShowSuggestions(true);
+      } else {
         setSuggestions([]);
         setShowSuggestions(false);
       }
@@ -95,24 +77,28 @@ export default function CreateRestaurant() {
     setShowSuggestions(false);
     Keyboard.dismiss();
 
-    // Use coords from Nominatim result directly — no extra geocode call needed
-    if (suggestion.lat && suggestion.lng) {
-      setLatitude(suggestion.lat);
-      setLongitude(suggestion.lng);
-    } else {
-      // Fallback geocode if coords missing
-      setIsGeocoding(true);
-      try {
-        const result = await geocodeAddress(suggestion.description);
-        if (result) {
-          setLatitude(result.lat.toString());
-          setLongitude(result.lng.toString());
+    // Resolve the place to coordinates (+ Google rating) server-side.
+    setIsGeocoding(true);
+    try {
+      const details = await placeDetails(suggestion.placeId);
+      if (details?.lat != null && details?.lng != null) {
+        setLatitude(details.lat.toString());
+        setLongitude(details.lng.toString());
+        if (details.address) setAddress(details.address);
+        setGoogleRating(details.rating);
+        setGoogleRatingCount(details.userRatingCount);
+      } else {
+        // Fallback: free-text geocode (Places, then Nominatim).
+        const geo = (await placesGeocode(suggestion.description)) || (await geocodeAddress(suggestion.description));
+        if (geo && geo.lat != null && geo.lng != null) {
+          setLatitude(geo.lat.toString());
+          setLongitude(geo.lng.toString());
         }
-      } catch {
-        // User can still tap 📍 manually
-      } finally {
-        setIsGeocoding(false);
       }
+    } catch {
+      // User can still tap 📍 or enter coordinates manually.
+    } finally {
+      setIsGeocoding(false);
     }
   };
 
@@ -133,6 +119,15 @@ export default function CreateRestaurant() {
     }
     setIsGeocoding(true);
     try {
+      // Google Places first (server-side), then Nominatim as a fallback.
+      const placesResult = await placesGeocode(address);
+      if (placesResult?.lat != null && placesResult?.lng != null) {
+        setLatitude(placesResult.lat.toString());
+        setLongitude(placesResult.lng.toString());
+        setGoogleRating(placesResult.rating);
+        setGoogleRatingCount(placesResult.userRatingCount);
+        return;
+      }
       const result = await geocodeAddress(address);
       if (result) {
         setLatitude(result.lat.toString());
@@ -190,6 +185,9 @@ export default function CreateRestaurant() {
         lng: parseFloat(longitude),
         hero_image_url: imageUrl.trim() || null,
         is_active: true,
+        // Ratings come from Google when available; never user-entered.
+        ...(googleRating != null ? { rating: googleRating } : {}),
+        ...(googleRatingCount != null ? { num_ratings: googleRatingCount } : {}),
       };
 
       const { data, error } = await supabase
@@ -282,7 +280,7 @@ export default function CreateRestaurant() {
                 <View style={styles.suggestionsContainer}>
                   <FlatList
                     data={suggestions}
-                    keyExtractor={(item) => item.place_id}
+                    keyExtractor={(item) => item.placeId}
                     keyboardShouldPersistTaps="always"
                     renderItem={({ item }) => (
                       <TouchableOpacity
