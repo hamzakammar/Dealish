@@ -30,3 +30,4 @@ Connect a Google account and paste a Sheet URL. Deals sync automatically every 5
 npm install
 npx expo start
 ```
+
