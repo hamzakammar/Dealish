@@ -299,30 +299,61 @@ export default function IntegrationsScreen() {
     setUploading(true);
     setProgress({ done: 0, total: validRows.length });
 
-    let succeeded = 0;
+    let created = 0;
+    let updated = 0;
     const failures: { row: number; reason: string }[] = [];
 
     for (const r of validRows) {
       try {
-        const { data: product, error: pErr } = await supabase
-          .from('products')
-          .insert({
-            restaurant_id: restaurantId,
-            name: r.name,
-            description: r.description ?? undefined,
-            category: r.category ?? undefined,
-            unit: r.unit || 'each',
-            supplier: r.supplier ?? undefined,
-            external_product_id: r.external_product_id ?? undefined,
-            external_system: r.external_product_id ? 'sheet_upload' : undefined,
-          })
-          .select('id')
-          .single();
-        if (pErr || !product) throw new Error(pErr?.message || 'Product insert failed');
+        // Idempotent import: re-uploading the same sheet UPDATES rows instead of
+        // duplicating them (products has no SKU/name uniqueness constraint).
+        // Match by SKU (external_product_id) when present, else by name in this restaurant.
+        let existingProductId: string | null = null;
+        if (r.external_product_id) {
+          const { data: found } = await supabase
+            .from('products')
+            .select('id')
+            .eq('restaurant_id', restaurantId)
+            .eq('external_product_id', r.external_product_id)
+            .limit(1)
+            .maybeSingle();
+          existingProductId = found?.id ?? null;
+        } else {
+          const { data: found } = await supabase
+            .from('products')
+            .select('id')
+            .eq('restaurant_id', restaurantId)
+            .ilike('name', r.name)
+            .limit(1)
+            .maybeSingle();
+          existingProductId = found?.id ?? null;
+        }
 
-        const { error: iErr } = await supabase.from('inventory_items').insert({
-          restaurant_id: restaurantId,
-          product_id: product.id,
+        const productFields = {
+          name: r.name,
+          description: r.description ?? undefined,
+          category: r.category ?? undefined,
+          unit: r.unit || 'each',
+          supplier: r.supplier ?? undefined,
+          external_product_id: r.external_product_id ?? undefined,
+          external_system: r.external_product_id ? 'sheet_upload' : undefined,
+        };
+
+        let productId = existingProductId;
+        if (productId) {
+          const { error: upErr } = await supabase.from('products').update(productFields).eq('id', productId);
+          if (upErr) throw new Error(upErr.message);
+        } else {
+          const { data: product, error: pErr } = await supabase
+            .from('products')
+            .insert({ restaurant_id: restaurantId, ...productFields })
+            .select('id')
+            .single();
+          if (pErr || !product) throw new Error(pErr?.message || 'Product insert failed');
+          productId = product.id;
+        }
+
+        const inventoryFields = {
           quantity: r.quantity!,
           unit: r.unit || 'each',
           unit_cost: r.unit_cost ?? undefined,
@@ -332,9 +363,29 @@ export default function IntegrationsScreen() {
           supplier: r.supplier ?? undefined,
           notes: r.notes ?? undefined,
           status: r.status ?? 'active',
-        });
-        if (iErr) throw new Error(iErr.message);
-        succeeded++;
+        };
+
+        // One inventory row per product for sheet imports: update the latest existing row, else insert.
+        const { data: existingItem } = await supabase
+          .from('inventory_items')
+          .select('id')
+          .eq('restaurant_id', restaurantId)
+          .eq('product_id', productId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingItem?.id) {
+          const { error: iuErr } = await supabase.from('inventory_items').update(inventoryFields).eq('id', existingItem.id);
+          if (iuErr) throw new Error(iuErr.message);
+        } else {
+          const { error: iErr } = await supabase
+            .from('inventory_items')
+            .insert({ restaurant_id: restaurantId, product_id: productId, ...inventoryFields });
+          if (iErr) throw new Error(iErr.message);
+        }
+
+        if (existingProductId) updated++; else created++;
       } catch (err: any) {
         failures.push({ row: r.rowIndex, reason: err.message || String(err) });
       }
@@ -344,16 +395,17 @@ export default function IntegrationsScreen() {
     setUploading(false);
     setProgress(null);
 
+    const okSummary = `${created} added, ${updated} updated`;
     if (failures.length === 0) {
       Alert.alert(
         'Uploaded',
-        `${succeeded} item${succeeded === 1 ? '' : 's'} added to inventory.`,
+        `${okSummary}.`,
         [{ text: 'OK', onPress: () => { setCsvText(''); goBackSafely(); } }]
       );
     } else {
       const sample = failures.slice(0, 3).map(f => `Row ${f.row}: ${f.reason}`).join('\n');
       const more = failures.length > 3 ? `\n…and ${failures.length - 3} more` : '';
-      Alert.alert('Partial upload', `${succeeded} succeeded, ${failures.length} failed.\n\n${sample}${more}`);
+      Alert.alert('Partial upload', `${okSummary}, ${failures.length} failed.\n\n${sample}${more}`);
     }
   }
 
