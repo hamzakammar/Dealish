@@ -14,6 +14,7 @@ deployed with the Supabase CLI (`supabase functions deploy <name>`).
 |---|---|---|---|
 | `send-confirmation-email` | verify | Send welcome/confirmation email via Resend | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
 | `send-push-notification` | verify | Look up a user's `push_token` and send an Expo push | `SUPABASE_SERVICE_ROLE_KEY` |
+| `places` | verify | Google Places proxy (New API v1): `autocomplete` / `details` / `geocode` → `{lat,lng,address,name,rating,userRatingCount}` | `GOOGLE_MAPS_API_KEY` (Places API enabled) |
 | `sheets-sync` | api-key | Apps Script endpoint: detect schema / sync / confirm mapping | `SUPABASE_SERVICE_ROLE_KEY` |
 | `sheets-poll` | service | Cron/OAuth poll of Google Sheets → upsert deals | `SUPABASE_SERVICE_ROLE_KEY`, Google creds |
 | `sheets-outbound` | service | DB webhook → push changes out to Apps Script | `SUPABASE_SERVICE_ROLE_KEY` |
@@ -28,6 +29,11 @@ Common env (all functions): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
   - `send-push-notification` — invoked from `utils/notifications.ts`.
   - `send-confirmation-email` — invoked from `utils/sendConfirmationEmail.ts`
     (has a unit test in `__tests__/sendConfirmationEmail.test.ts`).
+  - `places` — invoked from `utils/places.ts` (used by `app/admin/create-restaurant.tsx`
+    and `app/admin/restaurant.tsx` for address autocomplete, coordinates, and
+    Google rating/review counts). Deploy: `supabase secrets set GOOGLE_MAPS_API_KEY=…`
+    then `supabase functions deploy places`. Replaces the previous client-side
+    Nominatim autocomplete (kept only as a geocode fallback).
 - **Dormant (no in-app caller found):**
   - `sheets-sync`, `sheets-poll`, `sheets-outbound`, `google-oauth`,
     `google-oauth-redirect`. These belong to the older bidirectional Sheets sync.

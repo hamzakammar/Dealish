@@ -17,6 +17,12 @@ Edge-function secrets are set in the Supabase project, never in source.
 | `EXPO_PUBLIC_SENTRY_DSN` | optional | `app/_layout.tsx` | Sentry off if unset |
 | `EXPO_PUBLIC_AUTH_REDIRECT_URL` | see note | referenced in `LAUNCH_CHECKLIST.md` | Code hardcodes `dealish://auth/callback`; this var may be stale (DEBT-011) |
 
+**Geocoding/Places (server-side):** address autocomplete, coordinates, and Google
+ratings now go through the `places` edge function, which needs the secret
+`GOOGLE_MAPS_API_KEY` (Places API enabled) set via `supabase secrets set`. The
+client `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is for the map display only and is no
+longer used for geocoding.
+
 ### Edge functions (Supabase secrets)
 
 | Var | Used by |
