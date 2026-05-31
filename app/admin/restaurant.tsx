@@ -19,8 +19,10 @@ export default function RestaurantSettings() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [type, setType] = useState('');
-  const [rating, setRating] = useState('');
-  const [numReviews, setNumReviews] = useState('');
+  // Rating / review count are NOT editable by restaurants — they are sourced from
+  // Google (see scripts/refresh-restaurant-photos-places.js). Kept read-only for display.
+  const [rating, setRating] = useState<number | null>(null);
+  const [numReviews, setNumReviews] = useState<number | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [displayImage, setDisplayImage] = useState('');
   const [latitude, setLatitude] = useState('');
@@ -80,8 +82,8 @@ export default function RestaurantSettings() {
         setAddress(data.address || '');
         setPhone(data.phone || '');
         setType(data.type || '');
-        setRating(data.rating?.toString() || '');
-        setNumReviews(data.num_ratings?.toString() || '');
+        setRating(typeof data.rating === 'number' ? data.rating : null);
+        setNumReviews(typeof data.num_ratings === 'number' ? data.num_ratings : null);
         setImageUrl(data.hero_image_url || '');
         setDisplayImage(data.display_image || '');
         setLatitude(data.lat?.toString() || '');
@@ -129,32 +131,16 @@ export default function RestaurantSettings() {
       return;
     }
 
-    if (rating.trim()) {
-      const ratingNum = parseFloat(rating);
-      if (isNaN(ratingNum) || ratingNum < 0 || ratingNum > 5) {
-        Alert.alert('Error', 'Rating must be a number between 0 and 5');
-        return;
-      }
-    }
-
-    if (numReviews.trim()) {
-      const reviewsNum = parseInt(numReviews, 10);
-      if (isNaN(reviewsNum) || reviewsNum < 0) {
-        Alert.alert('Error', 'Number of reviews must be a positive integer');
-        return;
-      }
-    }
-
     try {
       setIsSaving(true);
 
+      // rating / num_ratings are intentionally NOT written here — they come from
+      // Google reviews, not restaurant self-reporting (prevents fabricated ratings).
       const updates: Record<string, unknown> = {
         name: name.trim(),
         address: address.trim() || null,
         phone: phone.trim() || null,
         type: type.trim() || null,
-        rating: rating.trim() ? parseFloat(rating) : null,
-        num_ratings: numReviews.trim() ? parseInt(numReviews, 10) : null,
         hero_image_url: imageUrl.trim() || null,
         display_image: displayImage.trim() || null,
       };
@@ -297,31 +283,23 @@ export default function RestaurantSettings() {
 
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Rating & Reviews</Text>
-          
           <View style={styles.ratingRow}>
             <View style={styles.ratingInputContainer}>
               <Text style={styles.label}>Rating</Text>
-              <TextInput
-                style={styles.input}
-                value={rating}
-                onChangeText={setRating}
-                placeholder="0-5"
-                placeholderTextColor="#94A3B8"
-                keyboardType="decimal-pad"
-              />
+              <Text style={styles.readOnlyValue}>
+                {rating != null ? `${rating.toFixed(1)} ★` : 'Not set'}
+              </Text>
             </View>
             <View style={styles.ratingInputContainer}>
               <Text style={styles.label}>Number of Reviews</Text>
-              <TextInput
-                style={styles.input}
-                value={numReviews}
-                onChangeText={setNumReviews}
-                placeholder="0"
-                placeholderTextColor="#94A3B8"
-                keyboardType="number-pad"
-              />
+              <Text style={styles.readOnlyValue}>
+                {numReviews != null ? `${numReviews}` : 'Not set'}
+              </Text>
             </View>
           </View>
+          <Text style={styles.helpText}>
+            Ratings and reviews are pulled from Google and can’t be edited here.
+          </Text>
         </View>
 
         <View style={styles.formCard}>
@@ -541,6 +519,15 @@ const styles = StyleSheet.create({
   },
   ratingInputContainer: {
     flex: 1,
+  },
+  readOnlyValue: {
+    fontSize: 15,
+    color: '#0F172A',
+    fontWeight: '600',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
   locationRow: {
     flexDirection: 'row',
