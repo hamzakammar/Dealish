@@ -15,6 +15,7 @@ if you change the system's shape, update the relevant doc in the same change.
 | [`features.md`](./features.md) | Feature-by-feature breakdown with the files behind each |
 | [`integrations.md`](./integrations.md) | External services: Supabase, Maps, ORS, push, OAuth, Sheets, Sentry, Resend |
 | [`edge-functions.md`](./edge-functions.md) | The Deno edge functions and how they're invoked |
+| [`deal-scraping-agent.md`](./deal-scraping-agent.md) | Weekly agent that auto-detects non-partner deals into a review queue (design + build plan) |
 | [`configuration.md`](./configuration.md) | Env vars, secrets, build/EAS config, app identifiers |
 | [`testing.md`](./testing.md) | Test setup and current (failing) state |
 | [`debt.md`](./debt.md) | **Authoritative** technical-debt log |

@@ -616,6 +616,16 @@ app: it never references `merchant`, `mint_redemption`, `verify_redemption`, or
    app stores activity objects, so the write path was silently failing.
    `change_recents_to_jsonb.sql` converts it; apply before `add_redeem_deal_scan_rpc.sql`.
 
+### Deal-scraping agent (2026-05-29, `add_deal_scraping_agent.sql`)
+
+New, additive. See `docs/deal-scraping-agent.md`.
+- `restaurants`: `website_url`, `google_place_id`, `deals_last_crawled_at`, `deals_scrape_opt_out`.
+- `deals`: `source ('owner'|'scraped'|'seed')`, `source_url`, `confidence`, `last_verified_at`.
+- New table `scraped_deal_candidates` — the admin review queue the weekly agent
+  writes to (normalized deal + provenance: `source_url`, `evidence_quote`,
+  `confidence`, `content_hash`, `dedupe_hash`; `status pending|published|rejected|stale|superseded`).
+  Admin-only RLS; agent writes via the service role.
+
 ### Remediation note (2026-05-29)
 
 Many findings above have repo fixes that must be **applied to Supabase**:
