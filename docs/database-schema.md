@@ -621,10 +621,16 @@ app: it never references `merchant`, `mint_redemption`, `verify_redemption`, or
 New, additive. See `docs/deal-scraping-agent.md`.
 - `restaurants`: `website_url`, `google_place_id`, `deals_last_crawled_at`, `deals_scrape_opt_out`.
 - `deals`: `source ('owner'|'scraped'|'seed')`, `source_url`, `confidence`, `last_verified_at`.
-- New table `scraped_deal_candidates` — the admin review queue the weekly agent
+- `profiles`: `is_operator` (platform operator who reviews the queue; distinct from
+  the `owner` and `admin`/scanner roles).
+- New table `scraped_deal_candidates` — the operator review queue the weekly agent
   writes to (normalized deal + provenance: `source_url`, `evidence_quote`,
   `confidence`, `content_hash`, `dedupe_hash`; `status pending|published|rejected|stale|superseded`).
-  Admin-only RLS; agent writes via the service role.
+  RLS gated on `is_operator`; agent writes via the service role.
+- Trigger `trg_auto_deactivate_scraped` on `deal_flags` (`add_scraped_deal_flag_deactivation.sql`):
+  a scraped deal with >=3 thumbs_down (and more downs than ups) is auto-deactivated.
+- NOTE: `deals.source` pre-existed (`'manual'`/`'sheets'` for the Sheets sync); the
+  agent adds the value `'scraped'`. No CHECK constraint, to avoid breaking the sync.
 
 ### Remediation note (2026-05-29)
 

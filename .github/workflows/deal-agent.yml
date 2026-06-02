@@ -1,0 +1,54 @@
+name: deal-agent
+
+# Weekly deal-scraping agent. Pulls non-partner restaurants from the live Supabase
+# `restaurants` table, finds their happy-hour/specials, and writes candidates to the
+# `scraped_deal_candidates` review queue (default flow = human-in-the-loop).
+# See docs/deal-scraping-agent.md.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Mondays 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Write to the DB (--apply). Off = dry-run.'
+        type: boolean
+        default: false
+      limit:
+        description: 'Max restaurants to process (blank = all)'
+        type: string
+        default: ''
+
+concurrency:
+  group: deal-agent
+  cancel-in-progress: false
+
+jobs:
+  grab-deals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run deal agent
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          ARGS=""
+          # Scheduled runs always --apply (fill the queue). Manual runs default to dry-run.
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.apply }}" = "true" ]; then
+            ARGS="--apply"
+          fi
+          if [ -n "${{ inputs.limit }}" ]; then
+            ARGS="$ARGS --limit=${{ inputs.limit }}"
+          fi
+          echo "Running: node scripts/agent/grab-deals.js $ARGS"
+          node scripts/agent/grab-deals.js $ARGS

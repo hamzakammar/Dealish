@@ -34,14 +34,18 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
 const APPLY = process.argv.includes('--apply');
 const FORCE = process.argv.includes('--force');
+const DUMP_TEXT = process.argv.includes('--dump-text');   // validate discovery/fetch without an LLM key
+const AUTO_PUBLISH = process.argv.includes('--auto-publish'); // opt-in: publish high-confidence directly
 const limitArg = process.argv.find((a) => a.startsWith('--limit='));
 const idArg = process.argv.find((a) => a.startsWith('--id='));
+const confArg = process.argv.find((a) => a.startsWith('--min-confidence='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : (APPLY ? null : 10);
 const ONLY_ID = idArg ? idArg.split('=')[1] : null;
+const MIN_CONFIDENCE = confArg ? parseFloat(confArg.split('=')[1]) : 0.8;
 
 if (!SUPABASE_KEY) { console.error('SUPABASE_SERVICE_KEY env var required'); process.exit(1); }
 if (!GOOGLE_KEY) { console.error('GOOGLE_MAPS_API_KEY env var required (Places API enabled)'); process.exit(1); }
-if (!GEMINI_KEY && !OPENAI_KEY) { console.error('Set GEMINI_API_KEY or OPENAI_API_KEY'); process.exit(1); }
+if (!GEMINI_KEY && !OPENAI_KEY && !DUMP_TEXT) { console.error('Set GEMINI_API_KEY or OPENAI_API_KEY (or use --dump-text)'); process.exit(1); }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const STALE_DAYS = 7;
@@ -271,6 +275,61 @@ function normalizeCandidate(raw, restaurant, sourceUrl, contentHash) {
   };
 }
 
+// Publish a candidate straight into `deals` (opt-in --auto-publish path; the default
+// flow is the operator review queue). Uses the service role, so RLS is bypassed.
+async function publishCandidate(candidateId, c) {
+  const dealId = crypto.randomUUID();
+  const dealData = {
+    id: dealId,
+    restaurant_id: c.restaurant_id,
+    title: c.title,
+    description: c.description || null,
+    tags: [],
+    is_active: true,
+    is_recurring: !!c.is_recurring,
+    discount_type: c.discount_type || null,
+    discount_value: c.discount_value,
+    source: 'scraped',
+    source_url: c.source_url,
+    confidence: c.confidence,
+    last_verified_at: new Date().toISOString(),
+  };
+  if (c.is_recurring) {
+    dealData.recurrence_days = c.recurrence_days || [];
+    dealData.recurrence_start_time = c.recurrence_start_time;
+    dealData.recurrence_end_time = c.recurrence_end_time;
+  } else {
+    dealData.start_at = c.start_at || null;
+    dealData.end_at = c.end_at || null;
+  }
+  const { error } = await supabase.from('deals').insert([dealData]);
+  if (error && error.code !== 'PGRST204') { log(`    ! publish failed for "${c.title}": ${error.message}`); return; }
+  await supabase.from('scraped_deal_candidates')
+    .update({ status: 'published', published_deal_id: dealId, reviewed_at: new Date().toISOString() })
+    .eq('id', candidateId);
+  log(`    ✓ auto-published "${c.title}" (conf ${(c.confidence ?? 0).toFixed(2)})`);
+}
+
+// Manual upsert that PRESERVES status (never reverts a published/rejected candidate
+// back to pending when the same deal is re-found).
+async function persistCandidate(c) {
+  const { data: rows } = await supabase
+    .from('scraped_deal_candidates')
+    .select('id, status')
+    .eq('restaurant_id', c.restaurant_id).eq('dedupe_hash', c.dedupe_hash).limit(1);
+  if (rows && rows.length) {
+    const ex = rows[0];
+    const { status, ...refresh } = c; // do not touch status on update
+    await supabase.from('scraped_deal_candidates').update(refresh).eq('id', ex.id);
+    if (AUTO_PUBLISH && ex.status === 'pending' && (c.confidence ?? 0) >= MIN_CONFIDENCE) await publishCandidate(ex.id, c);
+    return;
+  }
+  const { data: ins, error } = await supabase.from('scraped_deal_candidates').insert([c]).select('id').limit(1);
+  if (error) { log(`  ! insert failed for "${c.title}": ${error.message}`); return; }
+  const newId = ins && ins[0] && ins[0].id;
+  if (AUTO_PUBLISH && newId && (c.confidence ?? 0) >= MIN_CONFIDENCE) await publishCandidate(newId, c);
+}
+
 // ---------------------------------------------------------------- per restaurant
 async function processRestaurant(restaurant) {
   const website = await ensureWebsite(restaurant);
@@ -296,8 +355,13 @@ async function processRestaurant(restaurant) {
 
   const relevant = keywordPrefilter(combined);
   if (!relevant.trim()) {
-    if (APPLY) await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
-    return { name: restaurant.name, skipped: 'no deal text found', candidates: [] };
+    if (APPLY && !DUMP_TEXT) await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+    return { name: restaurant.name, website, skipped: 'no deal text found', candidates: [] };
+  }
+
+  // --dump-text: validate discovery + fetch + prefilter WITHOUT an LLM key.
+  if (DUMP_TEXT) {
+    return { name: restaurant.name, website, dumpText: relevant, urls: [...urls].slice(0, pages), candidates: [] };
   }
 
   const contentHash = sha256(relevant);
@@ -317,7 +381,7 @@ async function processRestaurant(restaurant) {
           .eq('restaurant_id', restaurant.id).eq('content_hash', contentHash);
         await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
       }
-      return { name: restaurant.name, skipped: 'content unchanged', candidates: [] };
+      return { name: restaurant.name, website, skipped: 'content unchanged', candidates: [] };
     }
   }
 
@@ -327,12 +391,7 @@ async function processRestaurant(restaurant) {
     .filter(Boolean);
 
   if (APPLY) {
-    for (const c of candidates) {
-      const { error } = await supabase
-        .from('scraped_deal_candidates')
-        .upsert({ ...c, first_seen_at: new Date().toISOString() }, { onConflict: 'restaurant_id,dedupe_hash', ignoreDuplicates: false });
-      if (error) log(`  ! upsert failed for "${c.title}": ${error.message}`);
-    }
+    for (const c of candidates) await persistCandidate(c);
     await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
   }
 
@@ -341,7 +400,9 @@ async function processRestaurant(restaurant) {
 
 // ---------------------------------------------------------------- main
 async function main() {
-  log(`Deal agent starting (${APPLY ? 'APPLY' : 'DRY-RUN'}, provider=${GEMINI_KEY ? 'gemini' : 'openai'})`);
+  const runStartedAt = new Date().toISOString();
+  const mode = DUMP_TEXT ? 'DUMP-TEXT' : APPLY ? (AUTO_PUBLISH ? `APPLY+AUTO-PUBLISH(>=${MIN_CONFIDENCE})` : 'APPLY') : 'DRY-RUN';
+  log(`Deal agent starting (${mode}, provider=${GEMINI_KEY ? 'gemini' : OPENAI_KEY ? 'openai' : 'none'})`);
 
   let q = supabase
     .from('restaurants')
@@ -354,12 +415,22 @@ async function main() {
 
   const { data: restaurants, error } = await q;
   if (error) { console.error('Failed to load restaurants:', error.message); process.exit(1); }
-  log(`Targets: ${restaurants.length} non-partner restaurant(s)`);
+  log(`Targets: ${restaurants.length} non-partner restaurant(s) from the live restaurants table`);
 
   let totalCandidates = 0;
+  let staled = 0;
   for (const r of restaurants) {
     try {
       const res = await processRestaurant(r);
+
+      if (DUMP_TEXT) {
+        log(`- ${res.name}: ${res.website || 'NO WEBSITE'}`);
+        if (res.urls) log(`    pages: ${res.urls.join(', ')}`);
+        if (res.dumpText) log(`    --- prefiltered deal text (${res.dumpText.length} chars) ---\n${res.dumpText.slice(0, 1500)}\n    --- end ---`);
+        else log(`    skipped (${res.skipped || 'no text'})`);
+        continue;
+      }
+
       if (res.skipped) {
         log(`- ${res.name}: skipped (${res.skipped})`);
       } else {
@@ -371,12 +442,25 @@ async function main() {
         });
         totalCandidates += res.candidates.length;
       }
+
+      // Staleness: pending candidates for this restaurant not re-seen this run are
+      // retired. Only 'pending' rows are touched -- published/rejected are preserved,
+      // and a single transient fetch failure never deactivates an already-published deal.
+      if (APPLY) {
+        const { data: st } = await supabase
+          .from('scraped_deal_candidates')
+          .update({ status: 'stale' })
+          .eq('restaurant_id', r.id).eq('status', 'pending').lt('last_seen_at', runStartedAt)
+          .select('id');
+        if (st) staled += st.length;
+      }
     } catch (err) {
       log(`! ${r.name}: ${err.message}`);
     }
   }
 
-  log(`Done. ${totalCandidates} candidate(s) ${APPLY ? 'written to scraped_deal_candidates' : '(dry-run, nothing written)'}.`);
+  if (DUMP_TEXT) { log('Done (dump-text, nothing written).'); return; }
+  log(`Done. ${totalCandidates} candidate(s) ${APPLY ? 'persisted' : '(dry-run, nothing written)'}; ${staled} stale pending candidate(s) retired.`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

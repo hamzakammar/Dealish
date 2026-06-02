@@ -4,7 +4,9 @@ A weekly job that auto-detects deals for **non-partner** restaurants from their 
 website and feeds them into a **review queue** for admin approval. Approved deals
 are published into `deals` with `source='scraped'` and an "unverified" badge.
 
-> Status: **Phase 0 (schema)** landed. Phases 1–3 below are the build plan.
+> Status: **all phases built** (0–3). Requires manual provisioning before it runs:
+> apply the migrations, set GitHub Actions secrets, and flip `profiles.is_operator`
+> for the reviewer. See "Operations" below.
 
 ## Why / guardrails
 
@@ -76,19 +78,41 @@ RLS). Not an edge function — the batch is long-running/bursty, which edge func
   (`status: pending|published|rejected|stale|superseded`, `dedupe_hash` unique per
   restaurant). Admin-only RLS; agent writes via service role.
 
-## Build plan
+## Build plan (all landed)
 
-- **Phase 0 — schema.** ✅ `add_deal_scraping_agent.sql`.
-- **Phase 1 — extract, no publish.** `scripts/agent/grab-deals.ts` over ~10
-  restaurants: discover → fetch → pre-filter → extract → write candidates. Dry-run
-  mode. *Eyeball real extractions before automating anything.*
-- **Phase 2 — review + publish.** Admin queue screen (approve/reject/edit);
-  publishing inserts a `deals` row (`source='scraped'`, recurrence, badge); wire
-  `deal_flags` auto-deactivation.
-- **Phase 3 — automate.** Weekly GitHub Actions cron; staleness expiry; optional
-  high-confidence (>0.8) auto-publish (still badged); Instagram cross-reference.
+- **Phase 0 — schema.** `add_deal_scraping_agent.sql` (+ `add_scraped_deal_flag_deactivation.sql`).
+- **Phase 1 — extract.** `scripts/agent/grab-deals.js`: discover → fetch → pre-filter
+  → extract → normalize → candidates. Dry-run by default; `--dump-text` validates
+  discovery/fetch with no LLM key.
+- **Phase 2 — review + publish.** Operator screen `app/admin/deal-review.tsx`
+  (`hooks/useScrapedDealCandidates.ts`): approve publishes a `deals` row
+  (`source='scraped'`); `DealCard` shows the "Auto-detected · unverified" badge;
+  `deal_flags` auto-deactivation trigger retires repeatedly-flagged scraped deals.
+- **Phase 3 — automate.** Weekly GitHub Actions cron (`.github/workflows/deal-agent.yml`);
+  per-restaurant staleness expiry (un-reviewed candidates not re-found → `stale`);
+  opt-in `--auto-publish --min-confidence=` (off by default — v1 is queue-only).
+  Instagram cross-reference is still future work.
+
+## Operations
+
+**Secrets (GitHub Actions repo secrets):** `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+`GOOGLE_MAPS_API_KEY` (Places API enabled), and `GEMINI_API_KEY` (or `OPENAI_API_KEY`).
+
+**Run modes** (`node scripts/agent/grab-deals.js`):
+- (no flags) — dry-run over 10 restaurants; prints deals + evidence, writes nothing.
+- `--dump-text` — no LLM key needed; prints the prefiltered page text per restaurant
+  (validates website discovery + fetch).
+- `--apply` — persist candidates to the queue + stamp `deals_last_crawled_at` + retire
+  stale pending candidates.
+- `--limit=N`, `--id=<uuid>`, `--force` (ignore content-hash skip).
+- `--auto-publish [--min-confidence=0.8]` — opt-in; publishes high-confidence
+  candidates straight to `deals` (still badged). Leave off to keep human-in-the-loop.
+
+The reviewer must have `profiles.is_operator = true`; then "Review Auto-Detected
+ Deals" appears in the owner dashboard → More.
 
 ## Open items
 
 - LLM provider/key (recommend Gemini 2.0 Flash for free-tier cost; GPT-4o-mini alt).
-- Reader/headless fallback choice for JS-only sites (defer until Phase 1 shows it's needed).
+- Reader/headless fallback for JS-only sites (defer until dump-text shows it's needed).
+- PDF menu parsing and Instagram cross-reference (future).

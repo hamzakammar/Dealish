@@ -23,6 +23,11 @@ ratings now go through the `places` edge function, which needs the secret
 client `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is for the map display only and is no
 longer used for geocoding.
 
+**Deal-scraping agent (GitHub Actions repo secrets):** the weekly
+`.github/workflows/deal-agent.yml` job needs `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+`GOOGLE_MAPS_API_KEY` (Places API enabled), and `GEMINI_API_KEY` (or `OPENAI_API_KEY`)
+set under Settings -> Secrets and variables -> Actions. See `docs/deal-scraping-agent.md`.
+
 ### Edge functions (Supabase secrets)
 
 | Var | Used by |
