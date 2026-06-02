@@ -642,6 +642,31 @@ export default function AdminDashboard() {
             <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
           </TouchableOpacity>
 
+          {profile?.is_operator && (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                try {
+                  router.push('/admin/deal-review' as any);
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                  Alert.alert('Error', 'Failed to navigate. Please try again.');
+                }
+              }}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="sparkles-outline" size={20} color="#64748B" />
+                </View>
+                <View>
+                  <Text style={styles.menuItemTitle}>Review Auto-Detected Deals</Text>
+                  <Text style={styles.menuItemSubtitle}>Approve deals the agent found for non-partner restaurants</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[styles.menuItem, styles.menuItemHighlight]}
             onPress={() => {

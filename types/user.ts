@@ -5,6 +5,7 @@ export type Profile = {
     id: string;
     display_name?: string;
     role: 'user' | 'owner' | 'admin';
+    is_operator?: boolean; // Platform operator: may review the scraped-deal queue
     restaurant_ids?: string[]; // For 'owner' role
     avatar_url?: string;
     location?: string;

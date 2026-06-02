@@ -16,24 +16,20 @@ alter table public.restaurants
   add column if not exists deals_scrape_opt_out   boolean not null default false;
 
 -- 2) deals: provenance for auto-detected deals ---------------------------------
+-- NOTE: `deals.source` ALREADY EXISTS (values like 'manual'/'sheets' used by the
+-- Google Sheets sync). We only ADD the value 'scraped' for published candidates --
+-- no CHECK constraint, to avoid rejecting existing rows / breaking the sheets sync.
 alter table public.deals
-  add column if not exists source           text not null default 'owner',
   add column if not exists source_url        text,
   add column if not exists confidence        numeric,
   add column if not exists last_verified_at  timestamptz;
 
--- Constrain source values (guarded: ADD CONSTRAINT has no IF NOT EXISTS).
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'deals_source_check'
-  ) then
-    alter table public.deals
-      add constraint deals_source_check check (source in ('owner','scraped','seed'));
-  end if;
-end$$;
+create index if not exists idx_deals_source_scraped on public.deals(source) where source = 'scraped';
 
-create index if not exists idx_deals_source on public.deals(source) where source <> 'owner';
+-- Platform-operator flag: who may review the scraped-deal queue. Distinct from the
+-- 'owner' (restaurant) and 'admin' (in-store scanner) roles. Founder flips this true.
+alter table public.profiles
+  add column if not exists is_operator boolean not null default false;
 
 -- 3) review queue --------------------------------------------------------------
 create table if not exists public.scraped_deal_candidates (
@@ -83,10 +79,11 @@ create index if not exists idx_scraped_candidates_restaurant on public.scraped_d
 alter table public.scraped_deal_candidates enable row level security;
 
 drop policy if exists scraped_candidates_admin_all on public.scraped_deal_candidates;
-create policy scraped_candidates_admin_all on public.scraped_deal_candidates
+drop policy if exists scraped_candidates_operator_all on public.scraped_deal_candidates;
+create policy scraped_candidates_operator_all on public.scraped_deal_candidates
   for all to authenticated
-  using     (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
-  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+  using     (exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_operator))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_operator));
 
 drop trigger if exists scraped_candidates_set_updated_at on public.scraped_deal_candidates;
 create trigger scraped_candidates_set_updated_at

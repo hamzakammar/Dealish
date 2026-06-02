@@ -244,6 +244,14 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
         )}
       </View>
 
+      {/* Auto-detected (scraped) deals are unverified by the restaurant */}
+      {deal.source === 'scraped' && (
+        <View style={styles.unverifiedRow}>
+          <Ionicons name="sparkles-outline" size={12} color="#92400E" />
+          <Text style={styles.unverifiedText}>Auto-detected · not yet verified by the restaurant</Text>
+        </View>
+      )}
+
       {/* Discount badge */}
       {discountLabel && (
         <View style={styles.discountRow}>
@@ -390,6 +398,22 @@ const styles = StyleSheet.create({
     color: "#1976d2",
     fontSize: 10,
     fontWeight: "600",
+  },
+  unverifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  unverifiedText: {
+    fontSize: 11,
+    color: '#92400E',
+    fontWeight: '600',
   },
   discountRow: {
     flexDirection: "row",

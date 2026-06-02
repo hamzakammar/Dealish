@@ -35,7 +35,10 @@ export type Deal = {
   recurrence_days?: number[]; // Array of day numbers (0=Sunday, 1=Monday, etc.)
   recurrence_start_time?: string; // Time string in format "HH:MM:SS"
   recurrence_end_time?: string; // Time string in format "HH:MM:SS"
-  source?: 'manual' | 'sheets'; // Where the deal originated; 'sheets' rows are skipped by sheets-outbound to prevent sync loops
+  source?: 'manual' | 'sheets' | 'scraped'; // Where the deal originated; 'sheets' rows are skipped by sheets-outbound; 'scraped' = auto-detected by the deal agent (renders an "unverified" badge)
+  source_url?: string; // For scraped deals: the page the deal was read from
+  confidence?: number; // For scraped deals: 0..1 extraction confidence
+  last_verified_at?: string;
   created_at: string;
   updated_at: string;
 };
