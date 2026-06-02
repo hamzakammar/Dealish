@@ -2,6 +2,31 @@
 
 Notable changes to Dealish. Newest first.
 
+## 2026-06-02 — Deal-scraping agent: Phases 2–3 (review queue + automation)
+
+Completed the agent end to end. It still publishes nothing without operator approval.
+
+- **Phase 2 — review + publish.** Operator screen `app/admin/deal-review.tsx`
+  (`hooks/useScrapedDealCandidates.ts`): shows restaurant, confidence, schedule,
+  verbatim evidence, and source link; approve publishes a `deals` row
+  (`source='scraped'`), reject marks the candidate rejected. Gated by
+  `profiles.is_operator` (RLS + UI). `DealCard` renders an
+  "Auto-detected · not yet verified" badge for scraped deals.
+- **Phase 3 — automation.** Weekly GitHub Actions cron
+  (`.github/workflows/deal-agent.yml`, Mondays 09:00 UTC; manual dispatch defaults to
+  dry-run). Agent gains: `--dump-text` (validate discovery/fetch with no LLM key),
+  status-preserving upsert, per-restaurant staleness expiry (un-reviewed candidates
+  not re-found → `stale`; live deals never retired by a transient miss), and opt-in
+  `--auto-publish --min-confidence=` (off by default).
+- **Self-correction** (`add_scraped_deal_flag_deactivation.sql`): a scraped deal with
+  ≥3 thumbs_down (and more downs than ups) auto-deactivates. Owner/partner deals
+  untouched.
+
+**Manual provisioning required before it runs:** apply both migrations; set
+`profiles.is_operator=true` for the reviewer; set GitHub Actions secrets
+(`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GOOGLE_MAPS_API_KEY`, `GEMINI_API_KEY`).
+Validate with a `--dump-text` then a dry-run before `--apply`.
+
 ## 2026-06-01 — Deal-scraping agent: design + Phases 0–1
 
 Started the weekly agent that auto-detects deals for **non-partner** restaurants from
