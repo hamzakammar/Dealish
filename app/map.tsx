@@ -49,8 +49,12 @@ export default function MapScreen() {
   const { settings } = useUserSettings();
   const colors = useThemeColors();
   
+  // "Planning for" time: null = live (now). When set, the map shows deals active
+  // at that future day/time. Ephemeral (not persisted across sessions).
+  const [planTime, setPlanTime] = useState<Date | null>(null);
+
   // Batch fetch active deals for ALL restaurants (needed for filtering)
-  const { activeDealsMap, dealTitlesMap } = useActiveDealsMap(restaurants);
+  const { activeDealsMap, dealTitlesMap } = useActiveDealsMap(restaurants, planTime);
   
   const systemColorScheme = useColorScheme();
   
@@ -639,6 +643,8 @@ export default function MapScreen() {
         onClearFilters={clearFilters}
         restaurants={restaurants}
         activeFilterCount={activeFilterCount}
+        planTime={planTime}
+        onChangePlanTime={setPlanTime}
       />
 
       {/* Search Suggestions Dropdown */}
