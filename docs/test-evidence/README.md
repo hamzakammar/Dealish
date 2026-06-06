@@ -15,18 +15,31 @@ live Supabase project with the publishable key, browsing unauthenticated.
 | 07 | `07-q3-redeem-screen.png` | **#3** Redeem screen renders with the "for owners & staff only — customers don't need a code" banner. |
 | 08 | `08-q3-redeem-rpc-not-signed-in.png` | **#3** Entering a code + Redeem calls the RPC; logged-out path shows "Not signed in" gracefully. |
 
+## Authenticated #3 paths (verified with a confirmed login)
+Using a real confirmed account (role started as `user`), driven through the actual UI:
+
+| # | Screenshot | What it proves |
+|---|------------|----------------|
+| 09 | `09-q3-account-entry-user.png` | Logged-in `user`: account screen shows the "Restaurant owner or staff?" → "Enter admin access code" entry. |
+| 10 | `10-q3-redeem-invalid-code-authed.png` | Authenticated bogus code returns **"Invalid code"** (distinct from the logged-out "Not signed in") — auth'd RPC + validation branch. |
+| 11 | `11-q3-redeem-success-admin-to-scanner.png` | **Success path**: redeeming a valid `admin` invite flipped role `user`→`admin` (verified server-side, `use_count` 0→1) and routed into `/admin`, which correctly redirects an `admin` (scan-staff) to the QR scanner. |
+| 12 | `12-q3-operator-invites-role-selector.png` | Operator "Admin Invites" screen: restaurant picker + Role selector ("Owner (manages restaurant)" vs "Admin (scans QR only)") + Generate button. |
+| 13 | `13-q3-operator-code-created.png` | Generating a code works: "Code N4PJJD (admin) for Aera. Valid 14 days, single use." (throwaway code deleted afterward). |
+| 14 | `14-q3-account-switch-to-admin-view.png` | With role `admin`, the account screen swaps the entry to "Switch to Admin View" — the other branch of the same conditional. |
+
+Role model confirmed in `app/admin.tsx`: `owner` → full dashboard; `admin` → QR scanner (scan-staff). The redeem RPC only reassigns `restaurants.owner_id` for `owner` invites, so the `admin` test transferred no ownership.
+
 ## Also verified (not pictured)
 - API: anon GET of the test restaurant returns `[]` (RLS); `redeem_restaurant_invite` + `redeem_deal_scan` RPCs live.
 - `tsc` clean; 36/36 jest (8 new real-function time-travel tests); `expo export` bundled 2477 modules.
 
-## Not testable on-device tonight (login-gated; needs a confirmed session)
-Email confirmation is required on this project (`mailer_autoconfirm=false`) and
-anonymous sign-in is disabled, so there's no headless way to obtain a session.
-The following are verified by bundle + tsc + the live RPC, but their authenticated
-UI was not exercised:
-- The `/account` "Enter admin access code" entry and "Switch to Admin View" toggle (owner/admin only).
-- The redeem **success** path (valid code → role granted → routed to /admin).
-- The operator "Admin Access Codes" screen.
+## Remaining gap (pre-existing code, not part of #3)
+The **owner** KPI dashboard itself (Total Sales / Quick Actions) was not screenshotted
+because the QA account was given the `admin` role (which routes to the scanner). The
+dashboard is verified by reading `app/admin.tsx`; an `owner` login would show it. The
+operator entries that live on that dashboard ("Admin Access Codes", "Review Auto-Detected
+Deals") were exercised directly via deep link instead.
 
-To finish these: confirm a signup email (or temporarily toggle off "Confirm email"
-in Supabase Auth), then re-run the redeem flow with a seeded invite code.
+Known dev-only warning: `app/admin.tsx` calls `router.replace('/qr-scanner')` during
+render for `admin`, which triggers a "Cannot update a component during render" LogBox
+warning. Harmless in production; should move into a `useEffect`. Pre-existing.
