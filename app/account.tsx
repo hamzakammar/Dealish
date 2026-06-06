@@ -557,6 +557,47 @@ export default function AccountPage() {
                 </View>
             </View>
 
+            {/* Admin view toggle / access-code entry */}
+            {(profile?.role === 'owner' || profile?.role === 'admin') ? (
+                <>
+                    <Text style={dynamicStyles.sectionTitle}>Admin</Text>
+                    <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+                        <TouchableOpacity
+                            onPress={() => { try { router.push('/admin'); } catch { router.replace('/map'); } }}
+                            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: 16, gap: 12 }}
+                        >
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF3E2', alignItems: 'center', justifyContent: 'center' }}>
+                                <AntDesign name="setting" size={20} color="#FE902A" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>Switch to Admin View</Text>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary }}>Manage your restaurant, deals, and scans</Text>
+                            </View>
+                            <AntDesign name="right" size={18} color={colors.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                </>
+            ) : (
+                <>
+                    <Text style={dynamicStyles.sectionTitle}>Restaurant owner or staff?</Text>
+                    <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+                        <TouchableOpacity
+                            onPress={() => { try { router.push('/admin/redeem-invite'); } catch (e) { console.error(e); } }}
+                            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: 16, gap: 12 }}
+                        >
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF3E2', alignItems: 'center', justifyContent: 'center' }}>
+                                <AntDesign name="key" size={20} color="#FE902A" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>Enter admin access code</Text>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary }}>For restaurant owners & staff only — customers don&apos;t need this</Text>
+                            </View>
+                            <AntDesign name="right" size={18} color={colors.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                </>
+            )}
+
             {/* Recent Activity */}
             <Text style={dynamicStyles.sectionTitle}>Recent Activity</Text>
             <View style={{ paddingHorizontal: 16 }}>
