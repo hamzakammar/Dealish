@@ -11,10 +11,16 @@ if [ -s "$HOME/.nvm/nvm.sh" ]; then
   nvm use 22 >/dev/null 2>&1 || nvm install 22
 fi
 
-# Refuse to build with an unconfigured .env (avoids a long build that can't talk to Supabase).
-if [ ! -f .env ] || grep -q "<PASTE" .env; then
-  echo "ERROR: .env is missing or still has <PASTE...> placeholders."
-  echo "Edit /Users/hamza.ammar/Dealish/.env first (Supabase anon key + Maps key)."
+# Resolve the Supabase key from .env then .env.local (.env.local wins, like Expo).
+envval(){ local var="$1" v="" f line; for f in .env .env.local; do [ -f "$f" ] || continue; line="$(grep -E "^${var}=" "$f" | tail -1)"; [ -n "$line" ] && v="${line#*=}"; done; printf '%s' "$v"; }
+ANON="$(envval EXPO_PUBLIC_SUPABASE_ANON_KEY)"
+if [ -z "$ANON" ] || printf '%s' "$ANON" | grep -q "<PASTE"; then
+  echo "ERROR: Supabase key missing/placeholder in .env(.local). Paste the Publishable/anon key first."
+  exit 1
+fi
+if printf '%s' "$ANON" | grep -q "^sb_secret_"; then
+  echo "ERROR: that's the SECRET key (sb_secret_). It would ship to every device and bypass RLS."
+  echo "Use the Publishable key (sb_publishable_...) or legacy anon key (eyJ...) instead, then rotate the secret."
   exit 1
 fi
 

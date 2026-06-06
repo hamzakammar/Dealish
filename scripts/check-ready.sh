@@ -11,6 +11,9 @@ fail(){ echo "  [TODO] $1"; todo=$((todo+1)); }
 ADB="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 EMU="${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator"
 
+# Read a var from .env then .env.local (.env.local wins — matches Expo precedence).
+envval(){ local var="$1" v="" f line; for f in .env .env.local; do [ -f "$f" ] || continue; line="$(grep -E "^${var}=" "$f" | tail -1)"; [ -n "$line" ] && v="${line#*=}"; done; printf '%s' "$v"; }
+
 echo "Dealish readiness:"
 
 # Node version (Expo 54 wants 20 or 22 LTS)
@@ -21,13 +24,26 @@ else
   fail "Node $(node -v 2>/dev/null) — switch to LTS: nvm install 22 && nvm use 22"
 fi
 
-# .env present + filled (no placeholders)
-if [ -f .env ] && ! grep -q "<PASTE" .env; then
-  pass ".env present and filled"
-elif [ -f .env ]; then
-  fail ".env still has <PASTE...> placeholders — paste your Supabase anon key + Maps key"
+# Supabase key: present, not placeholder, and NOT the secret key.
+ANON="$(envval EXPO_PUBLIC_SUPABASE_ANON_KEY)"
+if [ -z "$ANON" ]; then
+  fail "EXPO_PUBLIC_SUPABASE_ANON_KEY missing (.env / .env.local)"
+elif printf '%s' "$ANON" | grep -q "<PASTE"; then
+  fail "Supabase key still a <PASTE...> placeholder"
+elif printf '%s' "$ANON" | grep -q "^sb_secret_"; then
+  fail "Supabase key is the SECRET key (sb_secret_) — DANGER, use the Publishable/anon key instead"
+elif printf '%s' "$ANON" | grep -qE "^(sb_publishable_|eyJ)"; then
+  pass "Supabase publishable/anon key set"
 else
-  fail ".env missing"
+  fail "Supabase key looks unrecognized — expected sb_publishable_... or eyJ..."
+fi
+
+# Maps key (optional but expected)
+MAPS="$(envval EXPO_PUBLIC_GOOGLE_MAPS_API_KEY)"
+if [ -n "$MAPS" ] && ! printf '%s' "$MAPS" | grep -q "<PASTE"; then
+  pass "Google Maps key set"
+else
+  fail "Google Maps key not set (map tiles will be gray; features still work)"
 fi
 
 # Android SDK
