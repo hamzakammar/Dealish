@@ -27,7 +27,10 @@ export default function AdminDashboard() {
   const [isRestaurantDropdownOpen, setIsRestaurantDropdownOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && (!profile || (profile.role !== 'owner' && profile.role !== 'admin'))) {
+    if (isLoading) return;
+
+    // Not an owner/admin -> bounce to the app root.
+    if (!profile || (profile.role !== 'owner' && profile.role !== 'admin')) {
       try {
         router.replace('/');
       } catch (error) {
@@ -36,7 +39,19 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (profile?.id) {
+    // admin = scan-staff: send them straight to the QR scanner. Done here in an
+    // effect (not during render) to avoid the "Cannot update a component while
+    // rendering a different component" warning.
+    if (profile.role === 'admin') {
+      try {
+        router.replace('/qr-scanner');
+      } catch (error) {
+        console.error('Navigation error:', error);
+      }
+      return;
+    }
+
+    if (profile.id) {
       fetchRestaurants();
     }
   }, [profile, isLoading]);
@@ -257,12 +272,9 @@ export default function AdminDashboard() {
     );
   }
 
+  // admin (scan-staff) is redirected to /qr-scanner by the effect above; render
+  // nothing here so the owner dashboard never flashes for them.
   if (profile?.role === 'admin') {
-    try {
-      router.replace('/qr-scanner');
-    } catch (error) {
-      console.error('Navigation error:', error);
-    }
     return null;
   }
 
