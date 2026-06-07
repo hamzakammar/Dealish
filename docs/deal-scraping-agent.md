@@ -4,9 +4,17 @@ A weekly job that auto-detects deals for **non-partner** restaurants from their 
 website and feeds them into a **review queue** for admin approval. Approved deals
 are published into `deals` with `source='scraped'` and an "unverified" badge.
 
-> Status: **all phases built** (0–3). Requires manual provisioning before it runs:
-> apply the migrations, set GitHub Actions secrets, and flip `profiles.is_operator`
-> for the reviewer. See "Operations" below.
+> Status: **code complete (phases 0–3), but never provisioned or run.** As of the
+> last check the agent schema is **not applied to the live DB** (`scraped_deal_candidates`,
+> `restaurants.deals_scrape_opt_out`, `deals.source` all missing). Before it can run:
+> 1. Apply the schema — one paste: **`database/APPLY_agent.sql`**.
+> 2. Set GitHub Actions repo secrets (see "Operations").
+> 3. Flip `profiles.is_operator = true` for the reviewer.
+> It has also **never been run against a real website or LLM**, and the
+> normalize/dedupe/prefilter logic has **no dedicated automated tests** — so a
+> `--dump-text` then dry-run validation pass is strongly recommended before the
+> first `--apply`. Until the schema is applied, the operator "Review Auto-Detected
+> Deals" dashboard entry will error (its table doesn't exist yet).
 
 ## Why / guardrails
 
@@ -113,6 +121,21 @@ The reviewer must have `profiles.is_operator = true`; then "Review Auto-Detected
 
 ## Open items
 
+**Before first run (blocking):**
+- Apply `database/APPLY_agent.sql` to the live DB. (Fixed: the migration now adds
+  `deals.source` defensively — it previously assumed the column existed and would
+  fail on the index build.)
+- Set GitHub Actions secrets incl. `SUPABASE_SERVICE_KEY` + an LLM key.
+- Flip `profiles.is_operator` for the reviewer.
+
+**Validation (recommended before publishing deals about real businesses):**
+- `--dump-text` smoke test: confirm Places discovery finds the official sites and
+  fetch+readability+prefilter yields usable text for *these* ~170 restaurants.
+- Dry-run with an LLM key on ~10 restaurants: sanity-check extraction quality,
+  evidence quotes, and confidence; tune the prompt/threshold.
+- Add unit coverage for normalize/dedupe/prefilter against fixture HTML.
+
+**Deferred / future:**
 - LLM provider/key (recommend Gemini 2.0 Flash for free-tier cost; GPT-4o-mini alt).
 - Reader/headless fallback for JS-only sites (defer until dump-text shows it's needed).
 - PDF menu parsing and Instagram cross-reference (future).
