@@ -1,6 +1,7 @@
 import { useAuthContext } from "@/app/providers/auth";
 import AccountPanel from "@/components/AccountPanel";
 import FilterPanel from "@/components/FilterPanel";
+import PlanTimeSelector from "@/components/PlanTimeSelector";
 import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker, { MarkerAssetsWarmup } from "@/components/RestaurantMarker";
@@ -40,7 +41,6 @@ export default function MapScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [latitudeDelta, setLatitudeDelta] = useState(0.05);
   const [mapIsTransitioning, setMapIsTransitioning] = useState(false);
-  // Never let the full-screen "loading" gate run forever (location/Supabase can hang in native code)
   const [mapGateBypass, setMapGateBypass] = useState(false);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
@@ -49,16 +49,10 @@ export default function MapScreen() {
   const { settings } = useUserSettings();
   const colors = useThemeColors();
   
-  // "Planning for" time: null = live (now). When set, the map shows deals active
-  // at that future day/time. Ephemeral (not persisted across sessions).
   const [planTime, setPlanTime] = useState<Date | null>(null);
-
-  // Batch fetch active deals for ALL restaurants (needed for filtering)
   const { activeDealsMap, dealTitlesMap } = useActiveDealsMap(restaurants, planTime);
-  
   const systemColorScheme = useColorScheme();
   
-  // Determine if dark mode is active from settings
   const isDarkMode = useMemo(() => {
     if (!settings?.appearance?.theme) return false;
     if (settings.appearance.theme === 'dark') return true;
@@ -68,7 +62,6 @@ export default function MapScreen() {
     return false;
   }, [settings?.appearance?.theme, systemColorScheme]);
   
-  // Dark map style for Google Maps
   const darkMapStyle = useMemo(() => [
     { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
     { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
@@ -96,66 +89,64 @@ export default function MapScreen() {
     {
       featureType: "road",
       elementType: "geometry",
-      stylers: [{ color: "#38414e" }],
+      stylers: [{ color: "#38414e" }]
     },
     {
       featureType: "road",
       elementType: "geometry.stroke",
-      stylers: [{ color: "#212a37" }],
+      stylers: [{ color: "#212a37" }]
     },
     {
       featureType: "road",
       elementType: "labels.text.fill",
-      stylers: [{ color: "#9ca5b3" }],
+      stylers: [{ color: "#9ca5b3" }]
     },
     {
       featureType: "road.highway",
       elementType: "geometry",
-      stylers: [{ color: "#746855" }],
+      stylers: [{ color: "#746855" }]
     },
     {
       featureType: "road.highway",
       elementType: "geometry.stroke",
-      stylers: [{ color: "#1f2835" }],
+      stylers: [{ color: "#1f2835" }]
     },
     {
       featureType: "road.highway",
       elementType: "labels.text.fill",
-      stylers: [{ color: "#f3d19c" }],
+      stylers: [{ color: "#f3d19c" }]
     },
     {
       featureType: "transit",
       elementType: "geometry",
-      stylers: [{ color: "#2f3948" }],
+      stylers: [{ color: "#2f3948" }]
     },
     {
       featureType: "transit.station",
       elementType: "labels.text.fill",
-      stylers: [{ color: "#d59563" }],
+      stylers: [{ color: "#d59563" }]
     },
     {
       featureType: "water",
       elementType: "geometry",
-      stylers: [{ color: "#17263c" }],
+      stylers: [{ color: "#17263c" }]
     },
     {
       featureType: "water",
       elementType: "labels.text.fill",
-      stylers: [{ color: "#515c6d" }],
+      stylers: [{ color: "#515c6d" }]
     },
     {
       featureType: "water",
       elementType: "labels.text.stroke",
-      stylers: [{ color: "#17263c" }],
+      stylers: [{ color: "#17263c" }]
     },
   ], []);
   
-  // Initialize map type from user settings
   const [mapType, setMapType] = useState<MapType>(() => {
     return settings?.appearance?.defaultMapType || "standard";
   });
   
-  // Filter restaurants (pass activeDealsMap for hasDealsOnly filter)
   const {
     filters,
     updateFilters,
@@ -166,7 +157,6 @@ export default function MapScreen() {
     activeFilterCount,
   } = useRestaurantFilters(restaurants, userLocation, activeDealsMap);
 
-  // Apply search filter on top of existing filters
   const filteredRestaurants = React.useMemo(() => {
     if (!searchQuery.trim()) {
       return filteredByFilters;
@@ -180,14 +170,12 @@ export default function MapScreen() {
     );
   }, [filteredByFilters, searchQuery, dealTitlesMap]);
 
-  // Update map type when settings change
   useEffect(() => {
     if (settings?.appearance?.defaultMapType && settings.appearance.defaultMapType !== mapType) {
       setMapType(settings.appearance.defaultMapType);
     }
   }, [settings?.appearance?.defaultMapType, mapType]);
 
-  // Get search suggestions (limited to top 5)
   const searchSuggestions = React.useMemo(() => {
     if (!searchQuery.trim()) {
       return [];
@@ -216,18 +204,15 @@ export default function MapScreen() {
 
   const { session } = useAuthContext();
 
-  // Check if location permission was denied and set initial view to list
   useEffect(() => {
     if (!locationLoading && !userLocation) {
-      // No location available - switch to list view
       setHasLocationPermission(false);
       setViewMode("list");
-      setSelectedRestaurant(null); // Deselect restaurant when switching to list view
+      setSelectedRestaurant(null);
       clearRoute();
     }
   }, [locationLoading, userLocation, clearRoute]);
 
-  // Deselect restaurant when switching to list view
   useEffect(() => {
     if (viewMode === "list") {
       setSelectedRestaurant(null);
@@ -235,7 +220,6 @@ export default function MapScreen() {
     }
   }, [viewMode, clearRoute]);
 
-  /** Clear preview route whenever nothing is selected (covers all dismissal paths). */
   useEffect(() => {
     if (selectedRestaurant === null) {
       clearRoute();
@@ -243,7 +227,6 @@ export default function MapScreen() {
   }, [selectedRestaurant, clearRoute]);
 
   const handleCloseRestaurant = async () => {
-    // If we zoomed/panned into a restaurant, restore the previous map view on close.
     if (viewMode === "map") {
       if (cameraBeforeSelectRef.current) {
         mapRef.current?.animateCamera(cameraBeforeSelectRef.current, { duration: 800 });
@@ -263,13 +246,13 @@ export default function MapScreen() {
     const { lat, lng, name } = selectedRestaurant;
     const label = encodeURIComponent(name || "Restaurant");
     const url = Platform.OS === "ios"
-      ? `maps://?daddr=${lat},${lng}&q=${label}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}&travelmode=driving`;
+      ? \`maps://?daddr=\${lat},\${lng}&q=\${label}\`
+      : \`https://www.google.com/maps/dir/?api=1&destination=\${lat},\${lng}&destination_place_id=\${label}&travelmode=driving\`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) {
         Linking.openURL(url);
       } else {
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+        Linking.openURL(\`https://www.google.com/maps/dir/?api=1&destination=\${lat},\${lng}\`);
       }
     });
   };
@@ -279,7 +262,6 @@ export default function MapScreen() {
     getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
   };
 
-  // Android back button — close restaurant card if open, otherwise default behavior
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -300,50 +282,43 @@ export default function MapScreen() {
     if (selectedRestaurant?.id === restaurant.id) {
       return;
     }
-    // Signal transition so markers re-arm AFTER card spring animation settles (~650ms)
     setMapIsTransitioning(true);
     setTimeout(() => setMapIsTransitioning(false), 650);
     clearRoute();
 
-    // Capture current view before zooming in, so we can restore it on close.
     if (!regionBeforeSelectRef.current) {
       regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
     }
     if (!cameraBeforeSelectRef.current) {
-      // getCamera is async; fire-and-forget to capture rotation/pitch too
       mapRef.current?.getCamera?.().then((cam) => {
         if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
       }).catch(() => {});
     }
     
-    // Set selected restaurant immediately for responsive UI
     setSelectedRestaurant(restaurant);
 
-    // If we're in list view, switch to map view first, then pan after a short delay
     if (viewMode === "list") {
       setViewMode("map");
-      // Wait for map view to be ready before panning
       setTimeout(() => {
         mapRef.current?.animateToRegion(
           {
-            latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
+            latitude: restaurant.lat - 0.002,
             longitude: restaurant.lng,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          800 // Animation duration in milliseconds
+          800
         );
       }, 100);
     } else {
-      // Already in map view, pan immediately
       mapRef.current?.animateToRegion(
         {
-          latitude: restaurant.lat - 0.002, // Slightly offset to account for card overlay
+          latitude: restaurant.lat - 0.002,
           longitude: restaurant.lng,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         },
-        800 // Animation duration in milliseconds
+        800
       );
     }
   }, [selectedRestaurant, viewMode, region]);
@@ -361,8 +336,6 @@ export default function MapScreen() {
     mapRef.current?.animateToRegion(targetRegion, 600);
   };
 
-  // Show minimal loading - don't block if we have restaurants or location
-  // This prevents 10-second loading times. mapGateBypass is a last-resort for hung awaits.
   if (loading && restaurants.length === 0 && !region && !mapGateBypass) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -392,18 +365,15 @@ export default function MapScreen() {
             onRegionChangeComplete={(r) => {
               currentRegionRef.current = r;
               setLatitudeDelta(r.latitudeDelta);
-              // Sync blurred map background with main map
               if (blurredMapRef.current) {
                 blurredMapRef.current.animateToRegion(r, 0);
               }
             }}
             onPress={(e) => {
-              // Close restaurant card when tapping on map (not on markers)
               if (e.nativeEvent.action === 'marker-press') {
-                return; // Don't close if tapping a marker
+                return;
               }
               if (selectedRestaurant) {
-                // Use the animated close method
                 restaurantCardRef.current?.closeWithAnimation();
               }
             }}
@@ -448,10 +418,8 @@ export default function MapScreen() {
         )}
       </View>
 
-      {/* Top Search and Controls Bar */}
       {!isAccountPanelOpen && !isFilterPanelOpen && (
         <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
-          {/* Blurred Map Background - disabled on Android to prevent duplicate map */}
           {viewMode === "map" && region && Platform.OS === 'ios' && (
             <View style={styles.blurredMapBackground}>
               <MapView
@@ -472,117 +440,113 @@ export default function MapScreen() {
               <BlurView intensity={colors.isDark ? 80 : 60} style={StyleSheet.absoluteFillObject} tint={colors.isDark ? "dark" : "light"} />
             </View>
           )}
-          {/* Simple background for Android */}
           {viewMode === "map" && Platform.OS === 'android' && (
             <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
           )}
           <View style={styles.topBarContent}>
             <View style={styles.topBar}>
-            {/* Settings Button */}
-            <TouchableOpacity
-              style={[styles.topActionButton, { backgroundColor: colors.card }]}
-              onPress={() => setIsAccountPanelOpen(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.topActionButton, { backgroundColor: colors.card }]}
+                onPress={() => setIsAccountPanelOpen(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
 
-            {/* Search Bar */}
-            <View style={[styles.topSearchBar, { backgroundColor: colors.card }]}>
-              <Ionicons name="search" size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.topSearchInput, { color: colors.text }]}
-                placeholder="Search"
-                placeholderTextColor={colors.textTertiary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setSearchQuery("")}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-                </TouchableOpacity>
-              )}
+              <View style={[styles.topSearchBar, { backgroundColor: colors.card }]}>
+                <Ionicons name="search" size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.topSearchInput, { color: colors.text }]}
+                  placeholder="Search"
+                  placeholderTextColor={colors.textTertiary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setSearchQuery("")}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.topActionButton, 
+                  { backgroundColor: colors.card },
+                  activeFilterCount > 0 && styles.topActionButtonActive
+                ]}
+                onPress={() => setIsFilterPanelOpen(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="options" size={18} color={activeFilterCount > 0 ? colors.primary : colors.textSecondary} />
+                {activeFilterCount > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.topActionButton, { backgroundColor: colors.card }]}
+                onPress={handleRecenter}
+                activeOpacity={0.7}
+                disabled={!userLocation || viewMode !== "map"}
+              >
+                <Ionicons 
+                  name="location" 
+                  size={18} 
+                  color={userLocation && viewMode === "map" ? colors.textSecondary : colors.textTertiary} 
+                />
+              </TouchableOpacity>
             </View>
 
-            {/* Filter and Location Buttons */}
-            <TouchableOpacity
-              style={[
-                styles.topActionButton, 
-                { backgroundColor: colors.card },
-                activeFilterCount > 0 && styles.topActionButtonActive
-              ]}
-              onPress={() => setIsFilterPanelOpen(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="options" size={18} color={activeFilterCount > 0 ? colors.primary : colors.textSecondary} />
-              {activeFilterCount > 0 && (
-                <View style={styles.filterBadge}>
-                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.topActionButton, { backgroundColor: colors.card }]}
-              onPress={handleRecenter}
-              activeOpacity={0.7}
-              disabled={!userLocation || viewMode !== "map"}
-            >
-              <Ionicons 
-                name="location" 
-                size={18} 
-                color={userLocation && viewMode === "map" ? colors.textSecondary : colors.textTertiary} 
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* List/Map Toggle */}
-          <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#3A3A3C" : "#E9EAEB" }]}>
-            <TouchableOpacity
-              style={[
-                styles.viewToggleSegment,
-                viewMode === "list" && styles.viewToggleSegmentActive
-              ]}
-              onPress={() => {
-                setViewMode("list");
-                setSelectedRestaurant(null); // Deselect restaurant when switching to list view
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.viewToggleText,
-                { color: viewMode === "list" ? "#fff" : colors.textSecondary },
-                viewMode === "list" && styles.viewToggleTextActive
-              ]}>
-                List
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.viewToggleSegment,
-                viewMode === "map" && styles.viewToggleSegmentActive
-              ]}
-              onPress={() => setViewMode("map")}
-              activeOpacity={0.7}
-              disabled={!hasLocationPermission}
-            >
-              <Text style={[
-                styles.viewToggleText,
-                { color: viewMode === "map" ? "#fff" : (!hasLocationPermission ? colors.textTertiary : colors.textSecondary) },
-                viewMode === "map" && styles.viewToggleTextActive,
-                !hasLocationPermission && styles.viewToggleTextDisabled
-              ]}>
-                Map
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#3A3A3C" : "#E9EAEB" }]}>
+              <TouchableOpacity
+                style={[
+                  styles.viewToggleSegment,
+                  viewMode === "list" && styles.viewToggleSegmentActive
+                ]}
+                onPress={() => {
+                  setViewMode("list");
+                  setSelectedRestaurant(null);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.viewToggleText,
+                  { color: viewMode === "list" ? "#fff" : colors.textSecondary },
+                  viewMode === "list" && styles.viewToggleTextActive
+                ]}>
+                  List
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.viewToggleSegment,
+                  viewMode === "map" && styles.viewToggleSegmentActive
+                ]}
+                onPress={() => setViewMode("map")}
+                activeOpacity={0.7}
+                disabled={!hasLocationPermission}
+              >
+                <Text style={[
+                  styles.viewToggleText,
+                  { color: viewMode === "map" ? "#fff" : (!hasLocationPermission ? colors.textTertiary : colors.textSecondary) },
+                  viewMode === "map" && styles.viewToggleTextActive,
+                  !hasLocationPermission && styles.viewToggleTextDisabled
+                ]}>
+                  Map
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            <PlanTimeSelector planTime={planTime} onChangePlanTime={setPlanTime} />
           </View>
         </View>
       )}
 
-      {/* Hide restaurant detail card when filter panel is open */}
       {selectedRestaurant && !isFilterPanelOpen && (
         <>
           <RestaurantDetailCard
@@ -597,14 +561,10 @@ export default function MapScreen() {
         </>
       )}
 
-      {/* {viewMode === "map" && <MapTypeSelector mapType={mapType} onMapTypeChange={setMapType} />} */}
-
-      {/* Overlay when account panel is open */}
       {isAccountPanelOpen && (
         <View style={[styles.accountPanelOverlay, { backgroundColor: colors.background }]} />
       )}
 
-      {/* Account Panel */}
       <AccountPanel
         isOpen={isAccountPanelOpen}
         onClose={() => setIsAccountPanelOpen(false)}
@@ -634,7 +594,6 @@ export default function MapScreen() {
         onOpenFilters={() => setIsFilterPanelOpen(true)}
       />
 
-      {/* Filter Panel */}
       <FilterPanel
         isOpen={isFilterPanelOpen}
         onClose={() => setIsFilterPanelOpen(false)}
@@ -647,7 +606,6 @@ export default function MapScreen() {
         onChangePlanTime={setPlanTime}
       />
 
-      {/* Search Suggestions Dropdown */}
       {!isAccountPanelOpen && !isFilterPanelOpen && searchSuggestions.length > 0 && (
         <View style={[styles.suggestionsContainer, { backgroundColor: colors.card, borderColor: colors.primary }]}>
           <FlatList
@@ -686,16 +644,6 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  menuButton: {
-    position: 'absolute',
-    top: 50,
-    left: 16,
-    backgroundColor: '#FE902A',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    zIndex: 10,
-  },
   topBarContainer: {
     position: 'absolute',
     top: 0,
@@ -812,36 +760,6 @@ const styles = StyleSheet.create({
   viewToggleTextDisabled: {
     color: '#CCC',
   },
-  recenterButton: {
-    position: 'absolute',
-    top: 112,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.23)',
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2, // Lower than restaurant full screen (zIndex: 10)
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  searchContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-    paddingTop: 8,
-    backgroundColor: 'transparent',
-    zIndex: 5, // Above map, below panels
-  },
   suggestionsContainer: {
     position: 'absolute',
     top: 110,
@@ -888,44 +806,9 @@ const styles = StyleSheet.create({
   suggestionAddress: {
     fontSize: 13,
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1.5,
-    borderColor: '#FE902A',
-  },
-  searchIconContainer: {
-    padding: 10,
-    marginLeft: 4,
-    borderRadius: 10,
-    backgroundColor: '#FFF5EB',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    fontWeight: '500',
-  },
-  clearButton: {
-    marginRight: 8,
-    padding: 6,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
-  },
   contentWrapper: {
     flex: 1,
-    paddingTop: 160, // Space for top bar container
+    paddingTop: 240,
   },
   accountPanelOverlay: {
     position: 'absolute',
