@@ -43,3 +43,26 @@ Deals") were exercised directly via deep link instead.
 Known dev-only warning: `app/admin.tsx` calls `router.replace('/qr-scanner')` during
 render for `admin`, which triggers a "Cannot update a component during render" LogBox
 warning. Harmless in production; should move into a `useEffect`. Pre-existing.
+(FIXED 2026-06-05, `3355a17` -- redirect moved into the effect; verified on-device.)
+
+## Android icon check (2026-06-05)
+`15-android-list-icons.png`, `16-android-detail-hero.png`. Asked to verify the
+recurring "cropped restaurant icons" issue on Android. Checked every customer-facing
+image surface on the emulator -- **all render correctly, no cropping reproduced**:
+- Map markers: orange `$` bubbles (no image -- can't crop).
+- List thumbnails (`expo-image`, `contentFit="cover"`): clean storefront/interior photos.
+- Detail-card peek thumbnail (64x64, RN `Image` `cover` in an `overflow:hidden` round
+  container): clean.
+- Detail-card full hero (`cover`): fills width, no distortion.
+
+Data note: `restaurants.logo_url` / `image_url` columns **do not exist** -- only
+`display_image` (185/185, a Google Places photo). So the `logo_url || image_url ||
+display_image` fallback in `RestaurantDetailCard.tsx` + `listView.tsx` is dead code that
+always resolves to the photo; `cover` is correct for photos. Latent trap: if a real
+logo is ever stored, `cover` would crop it (logos want `contain`). No current bug.
+
+## Multi-manager backend (live, post-migration, 2026-06-05)
+After `add_restaurant_members.sql` was applied: `restaurant_members` backfilled (184
+rows), `redeem_restaurant_invite` live with the new signature (bogus code -> `Invalid
+code`), anon still reads active deals (no customer-read regression from the deals-RLS
+rescope). QA account confirmed reset (role=user, is_operator=false).
