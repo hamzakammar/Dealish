@@ -76,17 +76,36 @@ export default function AdminDashboard() {
 
     try {
       setIsLoadingRestaurants(true);
-      const { data, error } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('owner_id', profile.id)
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // Restaurants this user manages = their 'owner' memberships. The migration
+      // backfilled every legacy owner_id as an owner member, so this also covers
+      // existing owners. Fall back to the old owner_id query if the membership
+      // table isn't present yet (e.g. app updated before the migration ran).
+      let list: Restaurant[];
+      const { data: memberData, error: memberError } = await supabase
+        .from('restaurant_members')
+        .select('restaurant:restaurant_id(*)')
+        .eq('user_id', profile.id)
+        .eq('role', 'owner');
 
-      setRestaurants(data || []);
-      if (data && data.length > 0 && !selectedRestaurantId) {
-        setSelectedRestaurantId(data[0].id);
+      if (memberError) {
+        const { data, error } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('owner_id', profile.id)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        list = (data || []) as Restaurant[];
+      } else {
+        list = ((memberData || []) as any[])
+          .map((m) => m.restaurant)
+          .filter(Boolean)
+          .sort((a, b) => (b?.created_at || '').localeCompare(a?.created_at || '')) as Restaurant[];
+      }
+
+      setRestaurants(list);
+      if (list.length > 0 && !selectedRestaurantId) {
+        setSelectedRestaurantId(list[0].id);
       }
     } catch (error) {
       console.error('Error fetching restaurants:', error);
@@ -679,7 +698,7 @@ export default function AdminDashboard() {
             </TouchableOpacity>
           )}
 
-          {profile?.is_operator && (
+          {(profile?.is_operator || profile?.role === 'owner') && (
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -697,7 +716,7 @@ export default function AdminDashboard() {
                 </View>
                 <View>
                   <Text style={styles.menuItemTitle}>Admin Access Codes</Text>
-                  <Text style={styles.menuItemSubtitle}>Create invite codes for new restaurant owners & staff</Text>
+                  <Text style={styles.menuItemSubtitle}>Invite managers & staff to your restaurant</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />

@@ -46,17 +46,29 @@ export default function InvitesScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Operators may issue codes for any restaurant; a manager only for the
+    // restaurants they belong to (RLS enforces this on insert regardless).
+    const restaurantsQuery = profile?.is_operator
+      ? supabase.from('restaurants').select('id, name').order('name')
+      : supabase
+          .from('restaurant_members')
+          .select('restaurant:restaurant_id ( id, name )')
+          .eq('user_id', profile?.id ?? '')
+          .eq('role', 'owner');
     const [{ data: rData }, { data: iData }] = await Promise.all([
-      supabase.from('restaurants').select('id, name').order('name'),
+      restaurantsQuery,
       supabase
         .from('restaurant_invites')
         .select('*, restaurants:restaurant_id ( name )')
         .order('created_at', { ascending: false }),
     ]);
-    setRestaurants((rData as Restaurant[]) || []);
+    const rlist = profile?.is_operator
+      ? ((rData as Restaurant[]) || [])
+      : (((rData as any[]) || []).map((m) => m.restaurant).filter(Boolean) as Restaurant[]);
+    setRestaurants(rlist);
     setInvites((iData as unknown as Invite[]) || []);
     setLoading(false);
-  }, []);
+  }, [profile?.is_operator, profile?.id]);
 
   useEffect(() => {
     load();
@@ -113,7 +125,7 @@ export default function InvitesScreen() {
     ]);
   };
 
-  if (!profile?.is_operator) {
+  if (!profile?.is_operator && profile?.role !== 'owner') {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -125,7 +137,7 @@ export default function InvitesScreen() {
         </View>
         <View style={styles.centered}>
           <Ionicons name="lock-closed-outline" size={48} color="#CBD5E1" />
-          <Text style={styles.emptyTitle}>Operators only</Text>
+          <Text style={styles.emptyTitle}>Managers only</Text>
         </View>
       </View>
     );

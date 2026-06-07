@@ -629,8 +629,36 @@ New, additive. See `docs/deal-scraping-agent.md`.
   RLS gated on `is_operator`; agent writes via the service role.
 - Trigger `trg_auto_deactivate_scraped` on `deal_flags` (`add_scraped_deal_flag_deactivation.sql`):
   a scraped deal with >=3 thumbs_down (and more downs than ups) is auto-deactivated.
-- NOTE: `deals.source` pre-existed (`'manual'`/`'sheets'` for the Sheets sync); the
-  agent adds the value `'scraped'`. No CHECK constraint, to avoid breaking the sync.
+- NOTE: `deals.source` is added defensively by the migration (it may already exist
+  for the Sheets sync's `'manual'`/`'sheets'` values); the agent adds `'scraped'`.
+  No CHECK constraint, to avoid breaking the sync. (Earlier the migration assumed
+  `source` pre-existed and would fail the index build on a clean DB -- now fixed.)
+
+### Multi-manager restaurants (2026-06-05, `add_restaurant_members.sql`)
+
+New, additive. Lets many people manage one restaurant and lets managers invite
+their own team (previously only `is_operator` could mint codes, and an `owner`
+invite transferred `restaurants.owner_id`, locking out the first owner).
+- New table `restaurant_members` (`restaurant_id`, `user_id`, `role 'owner'|'admin'`,
+  `created_by`, unique `(restaurant_id, user_id)`). `owner` = manages (dashboard),
+  `admin` = scan-staff. RLS: you see/manage members of restaurants you manage;
+  operators see all. Backfilled from every non-null `restaurants.owner_id`.
+- Helpers `is_restaurant_manager(uuid)` + `is_platform_operator()` (SECURITY DEFINER,
+  `authenticated`-only) used by RLS.
+- `redeem_restaurant_invite` now **adds a membership** (and recomputes the caller's
+  landing `profiles.role` = highest role held) instead of transferring `owner_id`
+  (it only fills `owner_id` when null). Use-count claim is now atomic (no TOCTOU).
+- `restaurant_invites` RLS opened from operator-only to **operator OR a manager of
+  that restaurant**.
+- **Security fix:** `deals` write/owner-read policies were `OR (profiles.role IN
+  ('owner','admin'))` -- globally letting any owner/admin edit ANY restaurant's
+  deals. Rescoped to `is_restaurant_manager(restaurant_id) OR is_platform_operator()`
+  and `to authenticated`. The public `is_active` read policy is unchanged.
+- **Security fix:** `prevent_role_self_escalation` now also blocks app users from
+  changing their own `is_operator` (it previously guarded only `role`, but
+  `profiles_update_own` allows writing any own column).
+- PREFLIGHT before applying: ensure your founder account has `is_operator = true`,
+  and review `restaurants WHERE owner_id IS NULL` (verified 0 active such rows).
 
 ### Remediation note (2026-05-29)
 
