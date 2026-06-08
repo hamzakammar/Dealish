@@ -246,13 +246,13 @@ export default function MapScreen() {
     const { lat, lng, name } = selectedRestaurant;
     const label = encodeURIComponent(name || "Restaurant");
     const url = Platform.OS === "ios"
-      ? \`maps://?daddr=\${lat},\${lng}&q=\${label}\`
-      : \`https://www.google.com/maps/dir/?api=1&destination=\${lat},\${lng}&destination_place_id=\${label}&travelmode=driving\`;
+      ? `maps://?daddr=${lat},${lng}&q=${label}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}&travelmode=driving`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) {
         Linking.openURL(url);
       } else {
-        Linking.openURL(\`https://www.google.com/maps/dir/?api=1&destination=\${lat},\${lng}\`);
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
       }
     });
   };
