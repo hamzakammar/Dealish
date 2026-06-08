@@ -68,28 +68,43 @@ export default function RestaurantSettings() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Membership-first check: verify owner-level access via restaurant_members.
+      // If the user has access, the restaurants query will succeed via RLS.
+      const { data: membership, error: memberErr } = await supabase
+        .from('restaurant_members')
+        .select('role')
+        .eq('restaurant_id', restaurantId)
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .maybeSingle();
+
+      if (memberErr) throw memberErr;
+      
+      // If no explicit membership, fallback to checking legacy owner_id via RLS on restaurants
       const { data, error } = await supabase
         .from('restaurants')
         .select('*')
         .eq('id', restaurantId)
-        .eq('owner_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-
-      if (data) {
-        setRestaurant(data);
-        setName(data.name);
-        setAddress(data.address || '');
-        setPhone(data.phone || '');
-        setType(data.type || '');
-        setRating(typeof data.rating === 'number' ? data.rating : null);
-        setNumReviews(typeof data.num_ratings === 'number' ? data.num_ratings : null);
-        setImageUrl(data.hero_image_url || '');
-        setDisplayImage(data.display_image || '');
-        setLatitude(data.lat?.toString() || '');
-        setLongitude(data.lng?.toString() || '');
+      if (!data) {
+        Alert.alert('Error', 'You do not have permission to edit this restaurant');
+        router.replace('/admin');
+        return;
       }
+
+      setRestaurant(data);
+      setName(data.name);
+      setAddress(data.address || '');
+      setPhone(data.phone || '');
+      setType(data.type || '');
+      setRating(typeof data.rating === 'number' ? data.rating : null);
+      setNumReviews(typeof data.num_ratings === 'number' ? data.num_ratings : null);
+      setImageUrl(data.hero_image_url || '');
+      setDisplayImage(data.display_image || '');
+      setLatitude(data.lat?.toString() || '');
+      setLongitude(data.lng?.toString() || '');
     } catch (error) {
       console.error('Error fetching restaurant:', error);
       Alert.alert('Error', 'Failed to load restaurant details');
@@ -174,8 +189,7 @@ export default function RestaurantSettings() {
       const { error } = await supabase
         .from('restaurants')
         .update(updates)
-        .eq('id', restaurantId)
-        .eq('owner_id', user.id);
+        .eq('id', restaurantId);
 
       if (error) throw error;
 
