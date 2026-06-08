@@ -77,31 +77,20 @@ export default function AdminDashboard() {
     try {
       setIsLoadingRestaurants(true);
 
-      // Restaurants this user manages = their 'owner' memberships. The migration
-      // backfilled every legacy owner_id as an owner member, so this also covers
-      // existing owners. Fall back to the old owner_id query if the membership
-      // table isn't present yet (e.g. app updated before the migration ran).
-      let list: Restaurant[];
+      // Membership-first approach: pull restaurants where the user is an 'owner' member.
+      // Legacy owner_id check is handled by the RLS policy automatically if we query restaurant_members.
       const { data: memberData, error: memberError } = await supabase
         .from('restaurant_members')
         .select('restaurant:restaurant_id(*)')
         .eq('user_id', profile.id)
         .eq('role', 'owner');
 
-      if (memberError) {
-        const { data, error } = await supabase
-          .from('restaurants')
-          .select('*')
-          .eq('owner_id', profile.id)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        list = (data || []) as Restaurant[];
-      } else {
-        list = ((memberData || []) as any[])
-          .map((m) => m.restaurant)
-          .filter(Boolean)
-          .sort((a, b) => (b?.created_at || '').localeCompare(a?.created_at || '')) as Restaurant[];
-      }
+      if (memberError) throw memberError;
+
+      const list = ((memberData || []) as any[])
+        .map((m) => m.restaurant)
+        .filter(Boolean)
+        .sort((a, b) => (b?.created_at || '').localeCompare(a?.created_at || '')) as Restaurant[];
 
       setRestaurants(list);
       if (list.length > 0 && !selectedRestaurantId) {
