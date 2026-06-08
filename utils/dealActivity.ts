@@ -8,8 +8,11 @@ export const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
  * When false (planning for a chosen time), only counts deals active AT that time.
  */
 export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
-  if (!deal.is_recurring || !deal.recurrence_days || !deal.recurrence_start_time || !deal.recurrence_end_time) {
-    return false;
+  if (!deal.is_recurring) return false;
+  
+  if (!deal.recurrence_days || !deal.recurrence_start_time || !deal.recurrence_end_time) {
+    // Incomplete recurring fields — treat as always-on (fall through to one-time check)
+    return true;
   }
 
   if (!deal.recurrence_days.includes(ref.getDay())) {
@@ -65,6 +68,14 @@ export function filterActiveDeals(deals: Deal[], atTime: Date | null): Deal[] {
   return deals.filter((deal) => {
     if (deal.end_at && new Date(deal.end_at) < ref) {
       return false; // Expired
+    }
+    
+    // If a deal starts in the future, it's inactive (unless in live mode/lookahead)
+    if (deal.start_at) {
+      const startAt = new Date(deal.start_at);
+      if (startAt > ref && (!lookahead || startAt.getTime() - ref.getTime() > SOON_MS)) {
+        return false;
+      }
     }
 
     if (deal.is_recurring && deal.recurrence_days && deal.recurrence_start_time && deal.recurrence_end_time) {
