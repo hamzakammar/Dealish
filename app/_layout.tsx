@@ -1,6 +1,6 @@
 import { supabase } from '@/app/lib/supabase';
 import AuthProvider from '@/app/providers/auth';
-import { setRecoveryFlow } from '@/app/lib/recoveryState';
+import { setRecoveryFlow, initRecoveryState } from '@/app/lib/recoveryState';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
@@ -47,6 +47,11 @@ function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+
+  // Load recovery state from storage on mount
+  useEffect(() => {
+    initRecoveryState().catch(console.error);
+  }, []);
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
