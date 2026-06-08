@@ -1,6 +1,7 @@
 import { Deal } from "@/types/restaurant";
 import { supabase } from "@/app/lib/supabase";
 import { useThemeColors } from "@/hooks/useThemeColors";
+import { calculateSavings } from "@/utils/activity";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -190,23 +191,7 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
     }
   };
 
-  // Thin-client: prefer the server-calculated savings if available in the model.
-  // Fallback to local math only if the backend field is missing.
-  const savings = deal.savings_amount ?? (() => {
-    const { discount_type, discount_value, original_price } = deal;
-    if (!discount_type) return 0;
-    switch (discount_type) {
-      case 'percent':
-        return (discount_value && original_price) ? Math.round((original_price * discount_value / 100) * 100) / 100 : 0;
-      case 'fixed':
-        return discount_value || 0;
-      case 'bogo':
-        return original_price || 0;
-      default:
-        return 0;
-    }
-  })();
-  
+  const savings = deal.savings_amount ?? calculateSavings(deal);
   const discountLabel = getDiscountLabel();
 
   const handleFlag = async (type: 'thumbs_up' | 'thumbs_down') => {
@@ -274,7 +259,7 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
             <Ionicons name="pricetag" size={12} color="#FE902A" />
             <Text style={styles.discountBadgeText}>{discountLabel}</Text>
           </View>
-          {savings > 0 && (
+          {typeof savings === 'number' && savings > 0 && (
             <Text style={styles.savingsText}>Save ${savings.toFixed(2)}</Text>
           )}
         </View>
