@@ -191,7 +191,7 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
     }
   };
 
-  const savings = calculateSavings(deal);
+  const savings = deal.savings_amount ?? calculateSavings(deal);
   const discountLabel = getDiscountLabel();
 
   const handleFlag = async (type: 'thumbs_up' | 'thumbs_down') => {
@@ -259,7 +259,7 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
             <Ionicons name="pricetag" size={12} color="#FE902A" />
             <Text style={styles.discountBadgeText}>{discountLabel}</Text>
           </View>
-          {savings > 0 && (
+          {typeof savings === 'number' && savings > 0 && (
             <Text style={styles.savingsText}>Save ${savings.toFixed(2)}</Text>
           )}
         </View>

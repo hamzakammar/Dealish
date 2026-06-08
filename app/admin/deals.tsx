@@ -26,18 +26,30 @@ export default function DealsManagement() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data: ownedRestaurant, error: ownerErr } = await supabase
-        .from('restaurants')
-        .select('id')
-        .eq('id', restaurantId)
-        .eq('owner_id', user.id)
+      // Membership-first approach: verify manager access via restaurant_members.
+      // If the user has access, the restaurants query (or the subsequent deals query) will succeed via RLS.
+      const { data: membership, error: memberErr } = await supabase
+        .from('restaurant_members')
+        .select('role')
+        .eq('restaurant_id', restaurantId)
+        .eq('user_id', user.id)
         .maybeSingle();
 
-      if (ownerErr) throw ownerErr;
-      if (!ownedRestaurant) {
-        Alert.alert('Error', 'You do not have access to this restaurant');
-        router.replace('/admin');
-        return;
+      if (memberErr) throw memberErr;
+      
+      // If no explicit membership, fallback to checking legacy owner_id via RLS on restaurants
+      if (!membership) {
+        const { data: ownedRestaurant, error: ownerErr } = await supabase
+          .from('restaurants')
+          .select('id')
+          .eq('id', restaurantId)
+          .maybeSingle();
+
+        if (ownerErr || !ownedRestaurant) {
+          Alert.alert('Error', 'You do not have access to this restaurant');
+          router.replace('/admin');
+          return;
+        }
       }
 
       const { data, error } = await supabase
@@ -541,4 +553,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-// cleanup

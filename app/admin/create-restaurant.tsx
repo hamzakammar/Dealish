@@ -208,6 +208,25 @@ export default function CreateRestaurant() {
         Alert.alert('Error', 'Restaurant insert returned no row. Check RLS policies on the restaurants table.');
         return;
       }
+      
+      const restaurantId = data?.id;
+      
+      // Register creator as the primary 'owner' member in the new table.
+      // This is crucial for the new membership-based RLS logic.
+      if (restaurantId) {
+        const { error: memberError } = await supabase
+          .from('restaurant_members')
+          .insert({
+            restaurant_id: restaurantId,
+            user_id: profile.id,
+            role: 'owner'
+          });
+          
+        if (memberError) {
+          console.error('Error creating restaurant membership:', memberError);
+          // Non-blocking: owner_id fallback in RLS will still grant them access initially.
+        }
+      }
 
       Alert.alert('Success', 'Restaurant created successfully');
       setTimeout(() => router.back(), 500);

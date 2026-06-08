@@ -18,7 +18,7 @@ const PLAN_HOURS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
 function hourLabel(h: number): string {
   const ampm = h < 12 ? "AM" : "PM";
   const hr = h % 12 === 0 ? 12 : h % 12;
-  return \`\${hr}\${ampm}\`;
+  return `${hr}${ampm}`;
 }
 
 function dayLabel(d: Date, today: Date): string {

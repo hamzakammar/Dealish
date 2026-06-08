@@ -8,8 +8,11 @@ export const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
  * When false (planning for a chosen time), only counts deals active AT that time.
  */
 export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
-  if (!deal.is_recurring || !deal.recurrence_days || !deal.recurrence_start_time || !deal.recurrence_end_time) {
-    return false;
+  if (!deal.is_recurring) return false;
+  
+  if (!deal.recurrence_days || !deal.recurrence_days.length || !deal.recurrence_start_time || !deal.recurrence_end_time) {
+    // Incomplete recurring fields — treat as always-on (fall through to one-time check)
+    return true;
   }
 
   if (!deal.recurrence_days.includes(ref.getDay())) {
@@ -28,7 +31,7 @@ export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean)
     const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
     const startMinutes = sh * 60 + sm;
     const refMinutes = ref.getHours() * 60 + ref.getMinutes();
-    return startMinutes - refMinutes <= 60;
+    return startMinutes >= refMinutes && startMinutes - refMinutes <= 60;
   }
 
   return false;
@@ -63,11 +66,17 @@ export function filterActiveDeals(deals: Deal[], atTime: Date | null): Deal[] {
   const ref = atTime ?? new Date();
   const lookahead = atTime == null;
   return deals.filter((deal) => {
+    // Most basic check: is the deal active?
+    if (deal.is_active === false) return false;
+
+    // Check expiration regardless of recurring status
     if (deal.end_at && new Date(deal.end_at) < ref) {
       return false; // Expired
     }
 
-    if (deal.is_recurring && deal.recurrence_days && deal.recurrence_start_time && deal.recurrence_end_time) {
+    // A recurring deal is only evaluated by recurring logic if it has any recurring fields.
+    // If it's marked recurring but has NO fields, it falls through to one-time logic (always active).
+    if (deal.is_recurring && (deal.recurrence_days?.length || deal.recurrence_start_time || deal.recurrence_end_time)) {
       return isRecurringDealActive(deal, ref, lookahead);
     }
 
