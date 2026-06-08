@@ -17,8 +17,10 @@ export type RedeemResult = {
 };
 
 /**
- * Redeem a deal scan via the server-side SECURITY DEFINER RPC `redeem_deal_scan`.
- *
+ * Redeem a deal scan via the server-side SECURITY DEFINER RPC `verify_redemption`.
+ * 
+ * Uses SHA-256 hashing for secure token verification.
+ * 
  * The scanner runs on the owner/admin device, so it cannot insert qr_code_scans or
  * update the customer's profile directly (RLS blocks cross-user writes). The RPC
  * validates the token + deal/restaurant active state + merchant ownership, records
@@ -30,11 +32,18 @@ export async function redeemDealScan(
   userId: string
 ): Promise<RedeemResult> {
   try {
-    const { data, error } = await supabase.rpc("redeem_deal_scan", {
+    // Generate SHA-256 hash of the token for secure verification
+    const hashedToken = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      token
+    );
+
+    const { data, error } = await supabase.rpc("verify_redemption", {
       p_deal_id: dealId,
-      p_token: token,
+      p_token_hash: hashedToken,
       p_user_id: userId,
     });
+
     if (error) return { ok: false, message: error.message };
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) return { ok: false, message: "No response from server" };
@@ -48,7 +57,7 @@ export async function redeemDealScan(
 }
 
 /**
- * Generate a unique QR code token for a deal
+ * Generate a unique QR code token for a deal and store its SHA-256 hash
  */
 export async function generateQRCodeToken(dealId: string): Promise<string | null> {
   try {
@@ -64,12 +73,17 @@ export async function generateQRCodeToken(dealId: string): Promise<string | null
     }
 
     const token = Crypto.randomUUID();
+    const hashedToken = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      token
+    );
 
-    // Update deal with QR code token
+    // Update deal with QR code token and its hash
     const { error } = await supabase
       .from("deals")
       .update({
         qr_code_token: token,
+        qr_code_token_hash: hashedToken,
         qr_code_generated_at: new Date().toISOString(),
       })
       .eq("id", dealId);
@@ -125,97 +139,5 @@ export function parseQRCodeData(qrData: string): QRCodeData | null {
   } catch (error) {
     console.error("Error parsing QR code data:", error);
     return null;
-  }
-}
-
-/**
- * Validate QR code token against deal
- */
-export async function validateQRCode(dealId: string, token: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from("deals")
-      .select("id, qr_code_token, is_active, start_at, end_at, is_recurring")
-      .eq("id", dealId)
-      .eq("qr_code_token", token)
-      .single();
-
-    if (error || !data) {
-      return false;
-    }
-
-    // Check if deal is active
-    if (!data.is_active) {
-      return false;
-    }
-
-    // For one-time deals, check if within date range
-    if (!data.is_recurring) {
-      const now = new Date();
-      if (data.start_at && new Date(data.start_at) > now) {
-        return false; // Deal hasn't started
-      }
-      if (data.end_at && new Date(data.end_at) < now) {
-        return false; // Deal has expired
-      }
-    }
-
-    return true;
-  } catch (error) {
-    console.error("Error validating QR code:", error);
-    return false;
-  }
-}
-
-/**
- * Record a QR code scan
- */
-export async function recordQRCodeScan(
-  dealId: string,
-  restaurantId: string,
-  userId: string
-): Promise<void> {
-  try {
-    await supabase.from("qr_code_scans").insert({
-      deal_id: dealId,
-      restaurant_id: restaurantId,
-      user_id: userId,
-      scanned_at: new Date().toISOString(),
-    });
-
-    // Send push notification for deal redemption
-    try {
-      const { sendPushNotification } = await import('./notifications');
-      const { data: deal } = await supabase
-        .from('deals')
-        .select('title, restaurant_id')
-        .eq('id', dealId)
-        .single();
-      
-      const { data: restaurant } = await supabase
-        .from('restaurants')
-        .select('name')
-        .eq('id', restaurantId)
-        .single();
-
-      if (deal && restaurant) {
-        await sendPushNotification(userId, {
-          type: 'deal_redeemed',
-          title: 'Deal Redeemed!',
-          body: `You redeemed: ${deal.title} at ${restaurant.name}`,
-          data: {
-            deal_id: dealId,
-            restaurant_id: restaurantId,
-            screen: '/account',
-          },
-        });
-      }
-    } catch (notifError) {
-      // Don't fail the scan if notification fails
-      console.error('Error sending redemption notification:', notifError);
-    }
-  } catch (error) {
-    console.error("Error recording QR code scan:", error);
-    // Don't throw - this is for analytics, shouldn't block the flow
   }
 }
