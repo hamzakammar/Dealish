@@ -238,14 +238,29 @@ export default function IntegrationsScreen() {
     (async () => {
       if (!profile?.id) return;
       setLoading(true);
-      const { data } = await supabase
-        .from('restaurants')
-        .select('id')
-        .eq('owner_id', profile.id)
+      
+      // Membership-first check: get the first restaurant the user owns via memberships.
+      // RLS handles the legacy owner_id check on the fallback restaurants query.
+      const { data: memberData } = await supabase
+        .from('restaurant_members')
+        .select('restaurant_id')
+        .eq('user_id', profile.id)
+        .eq('role', 'owner')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      setRestaurantId(data?.id ?? null);
+
+      if (memberData) {
+        setRestaurantId(memberData.restaurant_id);
+      } else {
+        const { data } = await supabase
+          .from('restaurants')
+          .select('id')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setRestaurantId(data?.id ?? null);
+      }
       setLoading(false);
     })();
   }, [profile, restaurantId]);
@@ -657,4 +672,3 @@ const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
     buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
     uploadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   });
-// 2026-05-01
