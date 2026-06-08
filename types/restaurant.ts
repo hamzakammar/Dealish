@@ -28,7 +28,7 @@ export type Deal = {
   discount_type?: 'percent' | 'fixed' | 'bogo'; // Type of discount offered
   discount_value?: number; // Percentage (0-100) for percent, dollar amount for fixed
   original_price?: number; // Original price before discount (for fixed savings calculation)
-  savings_amount?: number | string; // Server-calculated savings (Thin Client refactor)
+  savings_amount?: number; // Server-calculated numeric savings
   start_at?: string;
   end_at?: string;
   is_active: boolean;
