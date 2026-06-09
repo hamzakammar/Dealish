@@ -12,33 +12,29 @@ interface NotificationRequest {
     deal_id?: string;
     restaurant_id?: string;
     screen?: string;
-    type?: string;
     [key: string]: any;
   };
 }
 
 serve(async (req) => {
-  try {
-    // Handle CORS
-    if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        },
-      });
-    }
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      },
+    });
+  }
 
+  try {
     const { user_id, title, body, data, type } = await req.json() as NotificationRequest;
 
     if (!user_id || !title || !body) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: user_id, title, body' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -47,30 +43,41 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user's push token
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('push_token, settings')
-      .eq('id', user_id)
-      .single();
+    // Get user's profile for settings and all registered push tokens
+    const [profileResult, tokensResult] = await Promise.all([
+      supabase.from('profiles').select('settings').eq('id', user_id).single(),
+      supabase.from('user_push_tokens').select('push_token').eq('user_id', user_id)
+    ]);
 
-    if (profileError || !profile?.push_token) {
-      console.error('Error fetching push token:', profileError);
+    if (profileResult.error) {
+      throw new Error(`Profile fetch error: ${profileResult.error.message}`);
+    }
+
+    // Determine all active tokens for this user
+    // We check both the new multi-token table and the legacy column on profiles
+    const tokens = new Set<string>();
+    if (tokensResult.data) {
+      tokensResult.data.forEach((t: any) => tokens.add(t.push_token));
+    }
+    
+    // Check legacy column as fallback (from profiles schema)
+    const { data: legacyProfile } = await supabase.from('profiles').select('push_token').eq('id', user_id).single();
+    if (legacyProfile?.push_token) {
+      tokens.add(legacyProfile.push_token);
+    }
+
+    if (tokens.size === 0) {
       return new Response(
-        JSON.stringify({ error: 'User push token not found' }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ message: 'No push tokens found for user' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check user settings
-    const settings = profile.settings || {};
+    // Check user notification settings
+    const settings = profileResult.data.settings || {};
     const notifications = settings.notifications || {};
-    
-    // Determine if notification should be sent based on type
     const notificationType = type || data?.type;
+    
     let shouldSend = true;
     if (notificationType === 'new_deal') {
       shouldSend = notifications.favorites !== false;
@@ -83,14 +90,24 @@ serve(async (req) => {
     if (!shouldSend) {
       return new Response(
         JSON.stringify({ message: 'Notification disabled by user settings' }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Send notification via Expo Push Service
+    // Prepare notifications for all tokens
+    const messages = Array.from(tokens).map(token => ({
+      to: token,
+      title,
+      body,
+      sound: 'default',
+      priority: 'high',
+      data: {
+        ...data,
+        type: notificationType,
+      },
+    }));
+
+    // Send notifications via Expo Push Service (batch request)
     const pushResponse = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
@@ -98,35 +115,22 @@ serve(async (req) => {
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip, deflate',
       },
-      body: JSON.stringify({
-        to: profile.push_token,
-        title,
-        body,
-        sound: 'default',
-        priority: 'high',
-        data: {
-          ...data,
-          type: notificationType,
-        },
-      }),
+      body: JSON.stringify(messages),
     });
 
     if (!pushResponse.ok) {
       const errorText = await pushResponse.text();
-      console.error('Expo Push Service error:', errorText);
-      return new Response(
-        JSON.stringify({ error: 'Failed to send notification', details: errorText }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      throw new Error(`Expo Push Service error: ${errorText}`);
     }
 
     const result = await pushResponse.json();
     
+    // Cleanup invalid tokens (optional enhancement: detect "DeviceNotRegistered")
+    // For Phase 3, we'll just log the result
+    console.log(`Sent ${messages.length} notifications for user ${user_id}`, result);
+    
     return new Response(
-      JSON.stringify({ success: true, result }),
+      JSON.stringify({ success: true, count: messages.length, result }),
       {
         status: 200,
         headers: {
@@ -139,10 +143,7 @@ serve(async (req) => {
     console.error('Error in send-push-notification function:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error', details: error.message }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 });
