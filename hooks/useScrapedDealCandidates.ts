@@ -120,6 +120,25 @@ export function useScrapedDealCandidates() {
     [profile?.id],
   );
 
+  const updateCandidate = useCallback(
+    async (id: string, fields: Partial<ScrapedCandidate>) => {
+      setWorking(id);
+      try {
+        const { error } = await supabase
+          .from('scraped_deal_candidates')
+          .update(fields)
+          .eq('id', id);
+        if (error) throw error;
+        setCandidates((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, ...fields } : c)),
+        );
+      } finally {
+        setWorking(null);
+      }
+    },
+    [],
+  );
+
   return {
     candidates,
     loading,
@@ -128,5 +147,6 @@ export function useScrapedDealCandidates() {
     fetchCandidates,
     approve,
     reject,
+    updateCandidate,
   };
 }
