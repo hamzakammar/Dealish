@@ -210,7 +210,8 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 
 async function savePushToken(userId: string, token: string): Promise<void> {
   try {
-    const { error } = await supabase
+    // Write to legacy column for backwards compat
+    await supabase
       .from('profiles')
       .update({
         push_token: token,
@@ -218,9 +219,16 @@ async function savePushToken(userId: string, token: string): Promise<void> {
       })
       .eq('id', userId);
 
-    if (error) {
-      console.error('Error saving push token:', error);
-    }
+    // Write to multi-device table
+    await supabase
+      .from('user_push_tokens')
+      .upsert({
+        user_id: userId,
+        push_token: token,
+        device_name: Device.modelName || undefined,
+        device_type: Platform.OS,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,push_token' });
   } catch (error) {
     console.error('Error saving push token:', error);
   }
