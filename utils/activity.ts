@@ -4,8 +4,17 @@ import { Deal } from "@/types/restaurant";
 /**
  * Calculate the dollar amount a customer saves when redeeming a deal.
  * Returns the savings amount, or 0 if it can't be calculated.
+ * @deprecated Use manualAmount from database instead of computing savings client-side
  */
-export function calculateSavings(deal: Pick<Deal, 'discount_type' | 'discount_value' | 'original_price'>): number {
+export function calculateSavings(
+  deal: Pick<Deal, 'discount_type' | 'discount_value' | 'original_price'>,
+  manualAmount?: number
+): number {
+  // If manualAmount is provided, return it directly
+  if (manualAmount !== undefined && manualAmount !== null) {
+    return manualAmount;
+  }
+
   const { discount_type, discount_value, original_price } = deal;
 
   if (!discount_type) return 0;
@@ -14,6 +23,7 @@ export function calculateSavings(deal: Pick<Deal, 'discount_type' | 'discount_va
     case 'percent': {
       // e.g., 20% off a $15 item = $3 saved
       if (discount_value && original_price) {
+        // Round to 2 decimals to match database behavior
         return Math.round((original_price * discount_value / 100) * 100) / 100;
       }
       // If no original price, we can't compute exact savings
@@ -24,7 +34,7 @@ export function calculateSavings(deal: Pick<Deal, 'discount_type' | 'discount_va
       return discount_value || 0;
     }
     case 'bogo': {
-      // Buy one get one free = savings equal to the item price
+      // Buy one get one free = savings equal to full original price
       return original_price || 0;
     }
     default:
