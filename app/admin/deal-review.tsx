@@ -2,7 +2,7 @@ import { useAuthContext } from '@/app/providers/auth';
 import { ScrapedCandidate, useScrapedDealCandidates } from '@/hooks/useScrapedDealCandidates';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  FlatList,
 } from 'react-native';
+import { supabase } from '@/app/lib/supabase';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -206,10 +208,106 @@ function EditableCard({
   );
 }
 
+interface ProfileRow {
+  id: string;
+  email: string;
+  role: string;
+  is_operator: boolean;
+}
+
+function UserManagement() {
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, role, is_operator')
+      .order('email');
+    if (!error && data) setProfiles(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
+
+  const toggleOperator = async (profileId: string, current: boolean) => {
+    setUpdating(profileId);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_operator: !current })
+      .eq('id', profileId);
+    
+    if (error) {
+      Alert.alert('Error', 'Failed to update operator status.');
+    } else {
+      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, is_operator: !current } : p));
+    }
+    setUpdating(null);
+  };
+
+  const updateRole = async (profileId: string, role: string) => {
+    setUpdating(profileId);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', profileId);
+    
+    if (error) {
+      Alert.alert('Error', 'Failed to update user role.');
+    } else {
+      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role } : p));
+    }
+    setUpdating(null);
+  };
+
+  return (
+    <View style={styles.userList}>
+      <Text style={styles.sectionHeader}>Manage Platform Access</Text>
+      {loading ? (
+        <ActivityIndicator size="small" color="#FE902A" />
+      ) : (
+        profiles.map(p => (
+          <View key={p.id} style={styles.userRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.userEmail}>{p.email}</Text>
+              <Text style={styles.userRole}>Role: {p.role}</Text>
+            </View>
+            <View style={styles.userActions}>
+              <TouchableOpacity 
+                style={[styles.roleBtn, p.role === 'admin' && styles.roleBtnActive]}
+                onPress={() => updateRole(p.id, p.role === 'admin' ? 'user' : 'admin')}
+                disabled={!!updating}
+              >
+                <Text style={[styles.roleBtnText, p.role === 'admin' && styles.roleBtnTextActive]}>
+                  {p.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.opBtn, p.is_operator && styles.opBtnActive]}
+                onPress={() => toggleOperator(p.id, p.is_operator)}
+                disabled={!!updating}
+              >
+                <Text style={[styles.opBtnText, p.is_operator && styles.opBtnTextActive]}>
+                  {p.is_operator ? 'Revoke Op' : 'Make Operator'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
 export default function DealReviewScreen() {
   const router = useRouter();
   const { profile } = useAuthContext();
-  const { candidates, loading, working, isOperator, fetchCandidates, approve, reject, updateCandidate } =
+  const [tab, setTab] = useState<'deals' | 'users'>('deals');
+  const { candidates, loading, working, fetchCandidates, approve, reject, updateCandidate } =
     useScrapedDealCandidates();
 
   const onApprove = async (c: ScrapedCandidate) => {
@@ -234,14 +332,14 @@ export default function DealReviewScreen() {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Deal Review</Text>
+          <Text style={styles.headerTitle}>Operator Dashboard</Text>
           <View style={styles.backButton} />
         </View>
-        <View style={styles.centered}>
+        <div style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
           <Ionicons name="lock-closed-outline" size={48} color="#CBD5E1" />
           <Text style={styles.emptyTitle}>Operators only</Text>
-          <Text style={styles.emptyText}>This review queue is restricted to platform operators.</Text>
-        </View>
+          <Text style={styles.emptyText}>This dashboard is restricted to platform operators.</Text>
+        </div>
       </View>
     );
   }
@@ -252,41 +350,62 @@ export default function DealReviewScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Deal Review</Text>
+        <Text style={styles.headerTitle}>Operator Dashboard</Text>
         <View style={styles.backButton} />
+      </View>
+
+      <View style={styles.tabs}>
+        <TouchableOpacity 
+          style={[styles.tab, tab === 'deals' && styles.tabActive]}
+          onPress={() => setTab('deals')}
+        >
+          <Text style={[styles.tabText, tab === 'deals' && styles.tabTextActive]}>Review Deals</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, tab === 'users' && styles.tabActive]}
+          onPress={() => setTab('users')}
+        >
+          <Text style={[styles.tabText, tab === 'users' && styles.tabTextActive]}>Manage Access</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchCandidates} />}
+        refreshControl={tab === 'deals' ? <RefreshControl refreshing={loading} onRefresh={fetchCandidates} /> : undefined}
       >
-        <Text style={styles.subtitle}>
-          Auto-detected deals. Edit before approving, or reject.
-        </Text>
+        {tab === 'deals' ? (
+          <>
+            <Text style={styles.subtitle}>
+              Auto-detected deals. Edit before approving, or reject.
+            </Text>
 
-        {loading && candidates.length === 0 && (
-          <ActivityIndicator size="large" color="#FE902A" style={{ marginTop: 40 }} />
+            {loading && candidates.length === 0 && (
+              <ActivityIndicator size="large" color="#FE902A" style={{ marginTop: 40 }} />
+            )}
+
+            {!loading && candidates.length === 0 && (
+              <View style={styles.centered}>
+                <Ionicons name="checkmark-done-outline" size={48} color="#CBD5E1" />
+                <Text style={styles.emptyTitle}>Queue is empty</Text>
+                <Text style={styles.emptyText}>No pending candidates. Run the agent to populate it.</Text>
+              </View>
+            )}
+
+            {candidates.map((c) => (
+              <EditableCard
+                key={c.id}
+                candidate={c}
+                working={working}
+                onApprove={onApprove}
+                onReject={onReject}
+                onSave={updateCandidate}
+              />
+            ))}
+          </>
+        ) : (
+          <UserManagement />
         )}
-
-        {!loading && candidates.length === 0 && (
-          <View style={styles.centered}>
-            <Ionicons name="checkmark-done-outline" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>Queue is empty</Text>
-            <Text style={styles.emptyText}>No pending candidates. Run the agent to populate it.</Text>
-          </View>
-        )}
-
-        {candidates.map((c) => (
-          <EditableCard
-            key={c.id}
-            candidate={c}
-            working={working}
-            onApprove={onApprove}
-            onReject={onReject}
-            onSave={updateCandidate}
-          />
-        ))}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -309,6 +428,11 @@ const styles = StyleSheet.create({
   },
   backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+  tabs: { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  tab: { paddingVertical: 12, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabActive: { borderBottomColor: '#FE902A' },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
+  tabTextActive: { color: '#FE902A' },
   content: { flex: 1 },
   contentContainer: { padding: 16 },
   subtitle: { fontSize: 13, color: '#64748B', marginBottom: 16, lineHeight: 18 },
@@ -346,7 +470,6 @@ const styles = StyleSheet.create({
   rejectText: { color: '#EF4444', fontWeight: '700', fontSize: 14 },
   approveBtn: { backgroundColor: '#FE902A' },
   approveText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  // Edit mode styles
   editSection: { marginTop: 8 },
   fieldLabel: { fontSize: 12, fontWeight: '600', color: '#64748B', marginBottom: 4, marginTop: 10 },
   input: {
@@ -395,4 +518,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FE902A',
   },
   saveText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  userList: { gap: 12 },
+  sectionHeader: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
+  userRow: { backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center' },
+  userEmail: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
+  userRole: { fontSize: 12, color: '#64748B' },
+  userActions: { gap: 6 },
+  roleBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0' },
+  roleBtnActive: { backgroundColor: '#F1F5F9' },
+  roleBtnText: { fontSize: 11, fontWeight: '600', color: '#64748B' },
+  roleBtnTextActive: { color: '#0F172A' },
+  opBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: '#F1F5F9' },
+  opBtnActive: { backgroundColor: '#FE902A' },
+  opBtnText: { fontSize: 11, fontWeight: '600', color: '#64748B' },
+  opBtnTextActive: { color: '#fff' },
 });
