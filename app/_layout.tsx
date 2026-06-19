@@ -8,7 +8,7 @@ import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -47,10 +47,21 @@ function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  const [isReady, setIsReady] = useState(false);
 
-  // Load recovery state from storage on mount
+  // Load recovery state and session on mount
   useEffect(() => {
-    initRecoveryState().catch(console.error);
+    const initialize = async () => {
+      try {
+        await supabase.auth.getSession();
+        await initRecoveryState();
+      } catch (err) {
+        console.error('Initialization error:', err);
+      } finally {
+        setIsReady(true);
+      }
+    };
+    initialize();
   }, []);
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
@@ -65,8 +76,11 @@ function RootLayout() {
     }
   }, [loaded]);
 
-  // Always render RootLayoutNav to maintain hook consistency
-  // The loading state is handled inside RootLayoutNav if needed
+  // Gate render until initialization completes
+  if (!isReady) {
+    return null;
+  }
+
   return <RootLayoutNav />;
 }
 
