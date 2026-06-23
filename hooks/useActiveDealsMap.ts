@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/app/lib/supabase";
-import { Restaurant } from "@/types/restaurant";
-// Pure, unit-tested filtering logic lives in utils so tests exercise the real
-// code (not a drifting copy). See utils/dealActivity.ts + __tests__/dealPlanningTime.test.ts.
+import { Restaurant, Deal } from "@/types/restaurant";
 import { filterActiveDeals } from "@/utils/dealActivity";
 
 /**
@@ -14,7 +12,11 @@ export function useActiveDealsMap(restaurants: Restaurant[], atTime: Date | null
   const [dealTitlesMap, setDealTitlesMap] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
 
+  const mountedRef = useRef(true);
+
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (restaurants.length === 0) {
       setActiveDealsMap(new Map());
       setDealTitlesMap(new Map());
@@ -22,11 +24,9 @@ export function useActiveDealsMap(restaurants: Restaurant[], atTime: Date | null
       return;
     }
 
-    let mounted = true;
-
     async function fetchActiveDeals() {
       try {
-        const restaurantIds = restaurants.map((r) => r.id);
+        const restaurantIds = restaurants.map((r: Restaurant) => r.id);
 
         // Batch fetch all deals for all restaurants
         const { data, error } = await supabase
@@ -38,23 +38,23 @@ export function useActiveDealsMap(restaurants: Restaurant[], atTime: Date | null
 
         if (error) throw error;
 
-        if (!mounted) return;
+        if (!mountedRef.current) return;
 
         // Filter to only active deals (at the selected time, or now)
-        const activeDeals = filterActiveDeals(data || [], atTime);
+        const activeDeals: Deal[] = filterActiveDeals(data || [], atTime);
 
         // Create a map: restaurant_id -> hasActiveDeal
         const dealsMap = new Map<string, boolean>();
         const titlesMap = new Map<string, string[]>();
         
         // Initialize all restaurants to false
-        restaurantIds.forEach((id) => {
+        restaurantIds.forEach((id: string) => {
           dealsMap.set(id, false);
           titlesMap.set(id, []);
         });
 
         // Mark restaurants with active deals as true and collect titles
-        activeDeals.forEach((deal) => {
+        activeDeals.forEach((deal: Deal) => {
           dealsMap.set(deal.restaurant_id, true);
           const existing = titlesMap.get(deal.restaurant_id) || [];
           titlesMap.set(deal.restaurant_id, [...existing, deal.title || '', deal.description || '']);
@@ -65,10 +65,10 @@ export function useActiveDealsMap(restaurants: Restaurant[], atTime: Date | null
         setLoading(false);
       } catch (e: unknown) {
         console.error("Error fetching active deals:", e);
-        if (mounted) {
+        if (mountedRef.current) {
           const emptyMap = new Map<string, boolean>();
           const emptyTitles = new Map<string, string[]>();
-          restaurants.forEach((r) => {
+          restaurants.forEach((r: Restaurant) => {
             emptyMap.set(r.id, false);
             emptyTitles.set(r.id, []);
           });
@@ -82,11 +82,13 @@ export function useActiveDealsMap(restaurants: Restaurant[], atTime: Date | null
     fetchActiveDeals();
 
     const interval = setInterval(() => {
-      if (mounted) fetchActiveDeals();
-    }, 60000);
+      if (mountedRef.current && document.visibilityState === 'visible') {
+        fetchActiveDeals();
+      }
+    }, 300000); // Match PR #21 slow poll
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       clearInterval(interval);
     };
   }, [restaurants, atTime]);
