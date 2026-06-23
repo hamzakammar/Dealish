@@ -1,10 +1,10 @@
 import { Deal } from "@/types/restaurant";
-import { format, parseISO, isValid } from "date-fns";
 
 export const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
 
 /**
  * Robust datetime comparison handling timezones and cross-midnight spans.
+ * Uses native JS Date objects without external dependencies.
  */
 function isTimeInRange(current: Date, startStr: string, endStr: string): boolean {
   const [sh, sm] = startStr.split(':').map(Number);
@@ -35,16 +35,13 @@ export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean)
     return true; 
   }
 
-  // Handle day-of-week check, considering deals that started "yesterday" but end today (post-midnight)
   const currentDay = ref.getDay();
   const prevDay = (currentDay + 6) % 7;
   
   const isActiveToday = deal.recurrence_days.includes(currentDay) && 
                        isTimeInRange(ref, deal.recurrence_start_time, deal.recurrence_end_time);
                        
-  // If not active in today's slot, check if we are in the tail end of yesterday's slot
   if (!isActiveToday && deal.recurrence_days.includes(prevDay)) {
-     // Check if the range crosses midnight
      const [sh] = deal.recurrence_start_time.split(':').map(Number);
      const [eh] = deal.recurrence_end_time.split(':').map(Number);
      if (eh < sh) {
@@ -54,7 +51,6 @@ export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean)
 
   if (isActiveToday) return true;
 
-  // Lookahead logic
   if (lookahead && deal.recurrence_days.includes(currentDay)) {
     const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
     const startDate = new Date(ref);
@@ -68,12 +64,12 @@ export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean)
 }
 
 export function isOneTimeDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
-  const startAt = deal.start_at ? parseISO(deal.start_at) : null;
-  const endAt = deal.end_at ? parseISO(deal.end_at) : null;
+  const startAt = deal.start_at ? new Date(deal.start_at) : null;
+  const endAt = deal.end_at ? new Date(deal.end_at) : null;
 
-  if (endAt && isValid(endAt) && endAt < ref) return false;
+  if (endAt && !isNaN(endAt.getTime()) && endAt < ref) return false;
 
-  if (startAt && isValid(startAt)) {
+  if (startAt && !isNaN(startAt.getTime())) {
     if (startAt > ref) {
       return lookahead && startAt.getTime() - ref.getTime() <= SOON_MS;
     }
