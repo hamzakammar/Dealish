@@ -297,8 +297,11 @@ export default function FilterPanel({
                       key={h}
                       style={[dynamicStyles.typeChip, selected && dynamicStyles.typeChipActive]}
                       onPress={() => {
+                        // If no day selected, default to current day
                         const base = planTime ?? new Date();
-                        onChangePlanTime(new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, 0, 0));
+                        // Create new date preserving the selected day/month/year
+                        const newDate = new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, 0, 0);
+                        onChangePlanTime(newDate);
                       }}
                     >
                       <Text style={[dynamicStyles.typeChipText, selected && dynamicStyles.typeChipTextActive]}>

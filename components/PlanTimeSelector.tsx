@@ -124,8 +124,11 @@ export default function PlanTimeSelector({ planTime, onChangePlanTime }: PlanTim
 
   const handleTimeChange = (value: string) => {
     const [h, min] = value.split(":").map(Number);
+    // If no day selected, default to current day
     const base = planTime ?? new Date();
-    onChangePlanTime(new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, min, 0));
+    // Create new date preserving the selected day (or today if none selected)
+    const newDate = new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, min, 0);
+    onChangePlanTime(newDate);
   };
 
   return (

@@ -3,13 +3,28 @@ import { Deal } from "@/types/restaurant";
 export const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
 
 /**
+ * Convert "HH:MM:SS" or "HH:MM" time string to minutes from midnight.
+ */
+function getMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Convert a Date object to minutes from midnight (local time).
+ */
+function getDateMinutes(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+/**
  * Returns true if a recurring deal is active at `ref`.
  * When `lookahead` is true (live mode), also counts deals starting within 1 hour.
  * When false (planning for a chosen time), only counts deals active AT that time.
  */
 export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
   if (!deal.is_recurring) return false;
-  
+
   if (!deal.recurrence_days || !deal.recurrence_days.length || !deal.recurrence_start_time || !deal.recurrence_end_time) {
     // Incomplete recurring fields — treat as always-on (fall through to one-time check)
     return true;
@@ -19,19 +34,18 @@ export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean)
     return false;
   }
 
-  const currentTime = ref.toTimeString().slice(0, 8); // "HH:MM:SS"
+  const currentMinutes = getDateMinutes(ref);
+  const startMinutes = getMinutes(deal.recurrence_start_time);
+  const endMinutes = getMinutes(deal.recurrence_end_time);
 
   // Active at the reference time
-  if (currentTime >= deal.recurrence_start_time && currentTime <= deal.recurrence_end_time) {
+  if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
     return true;
   }
 
   // Live mode only: starts within 1 hour
-  if (lookahead && currentTime < deal.recurrence_start_time) {
-    const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
-    const startMinutes = sh * 60 + sm;
-    const refMinutes = ref.getHours() * 60 + ref.getMinutes();
-    return startMinutes >= refMinutes && startMinutes - refMinutes <= 60;
+  if (lookahead && currentMinutes < startMinutes) {
+    return startMinutes >= currentMinutes && startMinutes - currentMinutes <= 60;
   }
 
   return false;
