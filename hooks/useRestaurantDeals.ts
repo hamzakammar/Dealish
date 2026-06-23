@@ -1,139 +1,107 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { Deal } from "@/types/restaurant";
+import { filterActiveDeals } from "@/utils/dealActivity";
 
-const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
-
-/**
- * Returns true if a recurring deal is active now or starts within 1 hour today.
- */
-function isRecurringDealActive(deal: Deal): boolean {
-  if (!deal.is_recurring || !deal.recurrence_days || !deal.recurrence_start_time || !deal.recurrence_end_time) {
-    return false;
-  }
-
-  const now = new Date();
-  if (!deal.recurrence_days.includes(now.getDay())) {
-    return false;
-  }
-
-  const currentTime = now.toTimeString().slice(0, 8); // "HH:MM:SS"
-
-  // Active right now
-  if (currentTime >= deal.recurrence_start_time && currentTime <= deal.recurrence_end_time) {
-    return true;
-  }
-
-  // Starts within 1 hour
-  if (currentTime < deal.recurrence_start_time) {
-    const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
-    const startMinutes = sh * 60 + sm;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    return startMinutes - nowMinutes <= 60;
-  }
-
-  return false;
-}
-
-/**
- * Returns true if a one-time deal is active now or starts within 1 hour.
- */
-function isOneTimeDealActive(deal: Deal): boolean {
-  const now = new Date();
-
-  if (deal.end_at && new Date(deal.end_at) < now) {
-    return false;
-  }
-
-  if (deal.start_at) {
-    const startAt = new Date(deal.start_at);
-    if (startAt > now) {
-      // Not started yet — show if starting within 1 hour
-      return startAt.getTime() - now.getTime() <= SOON_MS;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Filters deals to active now or starting within 1 hour.
- */
-function filterActiveDeals(deals: Deal[]): Deal[] {
-  return deals.filter((deal) => {
-    const now = new Date();
-
-    if (deal.end_at && new Date(deal.end_at) < now) {
-      return false; // Expired
-    }
-
-    if (deal.is_recurring && deal.recurrence_days && deal.recurrence_start_time && deal.recurrence_end_time) {
-      return isRecurringDealActive(deal);
-    }
-
-    return isOneTimeDealActive(deal);
-  });
-}
+const PAGE_SIZE = 20;
 
 export function useRestaurantDeals(restaurantId: string | null) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  
+  const mountedRef = useRef(true);
+  const fetchCountRef = useRef(0);
+
+  const fetchDeals = useCallback(async (isInitial = true) => {
+    if (!restaurantId || !mountedRef.current) return;
+    
+    const currentFetchId = ++fetchCountRef.current;
+    
+    setLoading(true);
+    setError(null);
+
+    try {
+      const currentPage = isInitial ? 0 : page;
+      const from = currentPage * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from("deals")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .neq("is_flagged", true)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      if (mountedRef.current && currentFetchId === fetchCountRef.current) {
+        const processedDeals = filterActiveDeals(data || [], null);
+        
+        if (isInitial) {
+          setDeals(processedDeals);
+          setPage(1);
+        } else {
+          setDeals(prev => [...prev, ...processedDeals]);
+          setPage(prev => prev + 1);
+        }
+        
+        setHasMore((data?.length || 0) === PAGE_SIZE);
+      }
+    } catch (e: unknown) {
+      console.error("Error fetching deals:", e);
+      if (mountedRef.current && currentFetchId === fetchCountRef.current) {
+        setError(e instanceof Error ? e : new Error('Unknown error'));
+      }
+    } finally {
+      if (mountedRef.current && currentFetchId === fetchCountRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [restaurantId, page]);
 
   useEffect(() => {
-    if (!restaurantId) {
-      setDeals([]);
-      return;
+    mountedRef.current = true;
+    setPage(0);
+    setDeals([]);
+    setHasMore(true);
+    
+    if (restaurantId) {
+      fetchDeals(true);
     }
 
-    let mounted = true;
-
-    async function fetchDeals() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const { data, error } = await supabase
-          .from("deals")
-          .select("*")
-          .eq("restaurant_id", restaurantId)
-          .eq("is_active", true)
-          .neq("is_flagged", true)
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-
-        if (mounted) {
-          // Filter deals to only show currently active ones
-          const activeDeals = filterActiveDeals(data || []);
-          setDeals(activeDeals);
-        }
-      } catch (e: unknown) {
-        console.error("Error fetching deals:", e);
-        if (mounted) {
-          setError(e instanceof Error ? e : new Error('Unknown error'));
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+    // Exponential backoff or simple focus-based revalidation is preferred over tight polling.
+    // Here we use a visibility-based trigger + a slow background refresh.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && restaurantId) {
+        fetchDeals(true);
       }
-    }
+    };
 
-    fetchDeals();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Set up interval to re-check recurring deals every minute
     const interval = setInterval(() => {
-      if (mounted && restaurantId) {
-        fetchDeals();
+      if (mountedRef.current && restaurantId && document.visibilityState === 'visible') {
+        fetchDeals(true);
       }
-    }, 60000); // Check every minute
+    }, 300000); // 5 minutes background refresh
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
     };
   }, [restaurantId]);
 
-  return { deals, loading, error };
+  return { 
+    deals, 
+    loading, 
+    error, 
+    hasMore, 
+    loadMore: () => fetchDeals(false) 
+  };
 }

@@ -1,55 +1,80 @@
 import { Deal } from "@/types/restaurant";
+import { format, parseISO, isValid } from "date-fns";
 
 export const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
 
 /**
- * Returns true if a recurring deal is active at `ref`.
- * When `lookahead` is true (live mode), also counts deals starting within 1 hour.
- * When false (planning for a chosen time), only counts deals active AT that time.
+ * Robust datetime comparison handling timezones and cross-midnight spans.
  */
+function isTimeInRange(current: Date, startStr: string, endStr: string): boolean {
+  const [sh, sm] = startStr.split(':').map(Number);
+  const [eh, em] = endStr.split(':').map(Number);
+  
+  const start = new Date(current);
+  start.setHours(sh, sm, 0, 0);
+  
+  const end = new Date(current);
+  end.setHours(eh, em, 0, 0);
+
+  // Handle spans across midnight (e.g., 22:00 to 02:00)
+  if (end < start) {
+    if (current >= start) {
+      end.setDate(end.getDate() + 1);
+    } else {
+      start.setDate(start.getDate() - 1);
+    }
+  }
+
+  return current >= start && current <= end;
+}
+
 export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
   if (!deal.is_recurring) return false;
   
-  if (!deal.recurrence_days || !deal.recurrence_days.length || !deal.recurrence_start_time || !deal.recurrence_end_time) {
-    // Incomplete recurring fields — treat as always-on (fall through to one-time check)
-    return true;
+  if (!deal.recurrence_days?.length || !deal.recurrence_start_time || !deal.recurrence_end_time) {
+    return true; 
   }
 
-  if (!deal.recurrence_days.includes(ref.getDay())) {
-    return false;
+  // Handle day-of-week check, considering deals that started "yesterday" but end today (post-midnight)
+  const currentDay = ref.getDay();
+  const prevDay = (currentDay + 6) % 7;
+  
+  const isActiveToday = deal.recurrence_days.includes(currentDay) && 
+                       isTimeInRange(ref, deal.recurrence_start_time, deal.recurrence_end_time);
+                       
+  // If not active in today's slot, check if we are in the tail end of yesterday's slot
+  if (!isActiveToday && deal.recurrence_days.includes(prevDay)) {
+     // Check if the range crosses midnight
+     const [sh] = deal.recurrence_start_time.split(':').map(Number);
+     const [eh] = deal.recurrence_end_time.split(':').map(Number);
+     if (eh < sh) {
+       return isTimeInRange(ref, deal.recurrence_start_time, deal.recurrence_end_time);
+     }
   }
 
-  const currentTime = ref.toTimeString().slice(0, 8); // "HH:MM:SS"
+  if (isActiveToday) return true;
 
-  // Active at the reference time
-  if (currentTime >= deal.recurrence_start_time && currentTime <= deal.recurrence_end_time) {
-    return true;
-  }
-
-  // Live mode only: starts within 1 hour
-  if (lookahead && currentTime < deal.recurrence_start_time) {
+  // Lookahead logic
+  if (lookahead && deal.recurrence_days.includes(currentDay)) {
     const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
-    const startMinutes = sh * 60 + sm;
-    const refMinutes = ref.getHours() * 60 + ref.getMinutes();
-    return startMinutes >= refMinutes && startMinutes - refMinutes <= 60;
+    const startDate = new Date(ref);
+    startDate.setHours(sh, sm, 0, 0);
+    
+    const diff = startDate.getTime() - ref.getTime();
+    return diff > 0 && diff <= SOON_MS;
   }
 
   return false;
 }
 
-/**
- * Returns true if a one-time deal is active at `ref` (live mode also allows
- * deals starting within 1 hour).
- */
 export function isOneTimeDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
-  if (deal.end_at && new Date(deal.end_at) < ref) {
-    return false;
-  }
+  const startAt = deal.start_at ? parseISO(deal.start_at) : null;
+  const endAt = deal.end_at ? parseISO(deal.end_at) : null;
 
-  if (deal.start_at) {
-    const startAt = new Date(deal.start_at);
+  if (endAt && isValid(endAt) && endAt < ref) return false;
+
+  if (startAt && isValid(startAt)) {
     if (startAt > ref) {
-      // Not started yet — live mode shows if starting within 1 hour
       return lookahead && startAt.getTime() - ref.getTime() <= SOON_MS;
     }
   }
@@ -57,25 +82,13 @@ export function isOneTimeDealActive(deal: Deal, ref: Date, lookahead: boolean): 
   return true;
 }
 
-/**
- * Filters deals to those active at `atTime`. When `atTime` is null we use "now"
- * with a 1-hour lookahead (the default live behaviour); when a time is provided
- * (planning ahead) we match deals active AT that exact time.
- */
 export function filterActiveDeals(deals: Deal[], atTime: Date | null): Deal[] {
   const ref = atTime ?? new Date();
   const lookahead = atTime == null;
+  
   return deals.filter((deal) => {
-    // Most basic check: is the deal active?
     if (deal.is_active === false) return false;
 
-    // Check expiration regardless of recurring status
-    if (deal.end_at && new Date(deal.end_at) < ref) {
-      return false; // Expired
-    }
-
-    // A recurring deal is only evaluated by recurring logic if it has any recurring fields.
-    // If it's marked recurring but has NO fields, it falls through to one-time logic (always active).
     if (deal.is_recurring && (deal.recurrence_days?.length || deal.recurrence_start_time || deal.recurrence_end_time)) {
       return isRecurringDealActive(deal, ref, lookahead);
     }

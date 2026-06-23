@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Deal-scraping agent — Phase 1 (extract -> review queue; NO publishing).
  *
@@ -8,19 +7,6 @@
  *
  * It NEVER writes to `deals`. Publishing is a separate, admin-reviewed step (Phase 2).
  * Default mode is DRY-RUN (prints what it found, writes nothing).
- *
- * Usage:
- *   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... \
- *   GOOGLE_MAPS_API_KEY=<Places API enabled> \
- *   GEMINI_API_KEY=<key>            # or OPENAI_API_KEY=<key>
- *   node scripts/agent/grab-deals.js [--apply] [--limit=N] [--id=<uuid>] [--force]
- *
- *   --apply   write to scraped_deal_candidates + stamp deals_last_crawled_at (default: dry-run)
- *   --limit=N process at most N restaurants (default 10 in dry-run, all in --apply)
- *   --id=<u>  only this restaurant
- *   --force   ignore the content-hash "unchanged -> skip LLM" optimization
- *
- * Prereqs: apply database/migrations/add_deal_scraping_agent.sql first.
  */
 
 const crypto = require('crypto');
@@ -59,7 +45,6 @@ const DEAL_KEYWORDS = [
 ];
 const CANDIDATE_PATHS = ['', '/happy-hour', '/happyhour', '/specials', '/deals',
   '/drinks', '/menu', '/menus', '/food', '/promotions', '/events'];
-const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
 function log(...args) { console.log(`[${new Date().toISOString()}]`, ...args); }
 function sha256(s) { return crypto.createHash('sha256').update(s).digest('hex'); }
@@ -117,7 +102,6 @@ function extractLinks(html, baseUrl) {
   return [...links];
 }
 
-// keep only paragraphs near deal keywords (cuts tokens + nav/footer noise)
 function keywordPrefilter(text) {
   const lines = text.split('\n');
   const keep = [];
@@ -158,9 +142,10 @@ async function ensureWebsite(restaurant) {
   const found = await placesWebsite(restaurant);
   if (!found || !found.website) return null;
   if (APPLY) {
-    await supabase.from('restaurants')
+    const { error } = await supabase.from('restaurants')
       .update({ website_url: found.website, google_place_id: found.placeId })
       .eq('id', restaurant.id);
+    if (error) log(`  ! update restaurant website failed: ${error.message}`);
   }
   return found.website;
 }
@@ -275,8 +260,33 @@ function normalizeCandidate(raw, restaurant, sourceUrl, contentHash) {
   };
 }
 
-// Publish a candidate straight into `deals` (opt-in --auto-publish path; the default
-// flow is the operator review queue). Uses the service role, so RLS is bypassed.
+// Batch upsert candidates to avoid N+1 queries.
+// On conflict with (restaurant_id, dedupe_hash), we update the candidate but
+// PRESERVE the 'status' (don't revert published/rejected to pending).
+async function batchPersistCandidates(candidates) {
+  if (!candidates.length) return;
+  const { data, error } = await supabase
+    .from('scraped_deal_candidates')
+    .upsert(candidates, { onConflict: 'restaurant_id,dedupe_hash', ignoreDuplicates: false })
+    .select('id, status, confidence, title');
+
+  if (error) {
+    log(`  ! batch upsert failed: ${error.message}`);
+    return;
+  }
+
+  if (AUTO_PUBLISH) {
+    for (const row of (data || [])) {
+      if (row.status === 'pending' && (row.confidence ?? 0) >= MIN_CONFIDENCE) {
+        // Map back to candidate object for publishing (publishing still handles one-by-one
+        // to manage the separate deals table insert).
+        const c = candidates.find(cand => cand.title === row.title);
+        if (c) await publishCandidate(row.id, c);
+      }
+    }
+  }
+}
+
 async function publishCandidate(candidateId, c) {
   const dealId = crypto.randomUUID();
   const dealData = {
@@ -303,31 +313,11 @@ async function publishCandidate(candidateId, c) {
     dealData.end_at = c.end_at || null;
   }
   const { error } = await supabase.from('deals').insert([dealData]);
-  if (error && error.code !== 'PGRST204') { log(`    ! publish failed for "${c.title}": ${error.message}`); return; }
+  if (error) { log(`    ! publish failed for "${c.title}": ${error.message}`); return; }
   await supabase.from('scraped_deal_candidates')
     .update({ status: 'published', published_deal_id: dealId, reviewed_at: new Date().toISOString() })
     .eq('id', candidateId);
   log(`    ✓ auto-published "${c.title}" (conf ${(c.confidence ?? 0).toFixed(2)})`);
-}
-
-// Manual upsert that PRESERVES status (never reverts a published/rejected candidate
-// back to pending when the same deal is re-found).
-async function persistCandidate(c) {
-  const { data: rows } = await supabase
-    .from('scraped_deal_candidates')
-    .select('id, status')
-    .eq('restaurant_id', c.restaurant_id).eq('dedupe_hash', c.dedupe_hash).limit(1);
-  if (rows && rows.length) {
-    const ex = rows[0];
-    const { status, ...refresh } = c; // do not touch status on update
-    await supabase.from('scraped_deal_candidates').update(refresh).eq('id', ex.id);
-    if (AUTO_PUBLISH && ex.status === 'pending' && (c.confidence ?? 0) >= MIN_CONFIDENCE) await publishCandidate(ex.id, c);
-    return;
-  }
-  const { data: ins, error } = await supabase.from('scraped_deal_candidates').insert([c]).select('id').limit(1);
-  if (error) { log(`  ! insert failed for "${c.title}": ${error.message}`); return; }
-  const newId = ins && ins[0] && ins[0].id;
-  if (AUTO_PUBLISH && newId && (c.confidence ?? 0) >= MIN_CONFIDENCE) await publishCandidate(newId, c);
 }
 
 // ---------------------------------------------------------------- per restaurant
@@ -335,7 +325,6 @@ async function processRestaurant(restaurant) {
   const website = await ensureWebsite(restaurant);
   if (!website) return { name: restaurant.name, skipped: 'no website', candidates: [] };
 
-  // Gather candidate pages: guessed paths + keyword links on the homepage.
   const origin = (() => { try { return new URL(website).origin; } catch { return null; } })();
   if (!origin) return { name: restaurant.name, skipped: 'bad website url', candidates: [] };
 
@@ -355,33 +344,42 @@ async function processRestaurant(restaurant) {
 
   const relevant = keywordPrefilter(combined);
   if (!relevant.trim()) {
-    if (APPLY && !DUMP_TEXT) await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+    if (APPLY && !DUMP_TEXT) {
+      const { error } = await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+      if (error) log(`  ! update crawl time failed: ${error.message}`);
+    }
     return { name: restaurant.name, website, skipped: 'no deal text found', candidates: [] };
   }
 
-  // --dump-text: validate discovery + fetch + prefilter WITHOUT an LLM key.
   if (DUMP_TEXT) {
     return { name: restaurant.name, website, dumpText: relevant, urls: [...urls].slice(0, pages), candidates: [] };
   }
 
   const contentHash = sha256(relevant);
 
-  // Skip the LLM if this exact content was already processed (cheap + stable).
+  // Skip the LLM if this exact content was already processed recently.
+  // Force a fresh scrape if the last crawl was >7 days ago even if the hash matches.
   if (!FORCE) {
-    const { data: existing } = await supabase
-      .from('scraped_deal_candidates')
-      .select('id')
-      .eq('restaurant_id', restaurant.id)
-      .eq('content_hash', contentHash)
-      .limit(1);
-    if (existing && existing.length) {
-      if (APPLY) {
-        await supabase.from('scraped_deal_candidates')
-          .update({ last_seen_at: new Date().toISOString() })
-          .eq('restaurant_id', restaurant.id).eq('content_hash', contentHash);
-        await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+    const lastCrawl = restaurant.deals_last_crawled_at ? new Date(restaurant.deals_last_crawled_at) : null;
+    const isStale = !lastCrawl || (new Date() - lastCrawl) > (STALE_DAYS * 24 * 60 * 60 * 1000);
+
+    if (!isStale) {
+      const { data: existing } = await supabase
+        .from('scraped_deal_candidates')
+        .select('id')
+        .eq('restaurant_id', restaurant.id)
+        .eq('content_hash', contentHash)
+        .limit(1);
+
+      if (existing && existing.length) {
+        if (APPLY) {
+          await supabase.from('scraped_deal_candidates')
+            .update({ last_seen_at: new Date().toISOString() })
+            .eq('restaurant_id', restaurant.id).eq('content_hash', contentHash);
+          await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+        }
+        return { name: restaurant.name, website, skipped: 'content unchanged', candidates: [] };
       }
-      return { name: restaurant.name, website, skipped: 'content unchanged', candidates: [] };
     }
   }
 
@@ -391,8 +389,9 @@ async function processRestaurant(restaurant) {
     .filter(Boolean);
 
   if (APPLY) {
-    for (const c of candidates) await persistCandidate(c);
-    await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+    await batchPersistCandidates(candidates);
+    const { error } = await supabase.from('restaurants').update({ deals_last_crawled_at: new Date().toISOString() }).eq('id', restaurant.id);
+    if (error) log(`  ! update crawl time failed: ${error.message}`);
   }
 
   return { name: restaurant.name, website, candidates };
@@ -443,15 +442,13 @@ async function main() {
         totalCandidates += res.candidates.length;
       }
 
-      // Staleness: pending candidates for this restaurant not re-seen this run are
-      // retired. Only 'pending' rows are touched -- published/rejected are preserved,
-      // and a single transient fetch failure never deactivates an already-published deal.
       if (APPLY) {
-        const { data: st } = await supabase
+        const { data: st, error: stErr } = await supabase
           .from('scraped_deal_candidates')
           .update({ status: 'stale' })
           .eq('restaurant_id', r.id).eq('status', 'pending').lt('last_seen_at', runStartedAt)
           .select('id');
+        if (stErr) log(`  ! failed to retire stale candidates: ${stErr.message}`);
         if (st) staled += st.length;
       }
     } catch (err) {
