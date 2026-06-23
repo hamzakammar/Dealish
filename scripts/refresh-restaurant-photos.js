@@ -84,14 +84,28 @@ async function uploadToStorage(restaurantId, bytes, contentType) {
 }
 
 async function applyOverrides() {
+  // Gracefully handle missing overrides file
   if (!fs.existsSync(FROM)) {
-    console.error(`❌ overrides file not found: ${FROM}`);
+    log(`ℹ️ No overrides file found at ${FROM}. Skipping photo refresh.`);
+    return;
+  }
+  
+  let overrides;
+  try {
+    overrides = JSON.parse(fs.readFileSync(FROM, 'utf8'));
+  } catch (e) {
+    console.error(`❌ Failed to parse overrides file as JSON: ${e.message}`);
     process.exit(1);
   }
-  const overrides = JSON.parse(fs.readFileSync(FROM, 'utf8'));
+
   if (!Array.isArray(overrides)) {
     console.error(`❌ overrides file must be a JSON array of {id, url}`);
     process.exit(1);
+  }
+
+  if (overrides.length === 0) {
+    log(`ℹ️ Overrides array is empty. Nothing to refresh.`);
+    return;
   }
 
   log(APPLY ? 'APPLY MODE — writing to Storage + DB' : 'DRY-RUN MODE — pass --apply to write');
