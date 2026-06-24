@@ -4,7 +4,7 @@ appId: com.hamzakammar.dealish
 - waitForAnimationToEnd
 - assertVisible: "Search"
 # Wait for map markers to potentially load
-- sleep: 2000
+- delay: 2000
 # Maestro can tap by text or coordinate. Tapping the search bar to find a known restaurant
 - tapOn: "Search"
 - inputText: "Cuckoo Cakery"
