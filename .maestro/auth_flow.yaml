@@ -1,0 +1,12 @@
+appId: com.hamzakammar.dealish
+---
+- launchApp
+- assertVisible: "Find local deals"
+- tapOn: "Get Started"
+- assertVisible: "Email"
+- inputText: "test@example.com"
+- tapOn: "Password"
+- inputText: "password123"
+- tapOn: "Log In"
+- waitForAnimationToEnd
+- assertVisible: "Search"

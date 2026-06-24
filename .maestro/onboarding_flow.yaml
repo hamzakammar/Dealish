@@ -1,0 +1,22 @@
+appId: com.hamzakammar.dealish
+---
+- launchApp
+- clearState
+- tapOn: "Get Started"
+# Simulate a new account sign up
+- tapOn: "Create Account"
+- inputText: "newuser@example.com"
+- tapOn: "Password"
+- inputText: "securepass"
+- tapOn: "Sign Up"
+- waitForAnimationToEnd
+# Verify Onboarding Screen
+- assertVisible: "What's your name?"
+- inputText: "Hamza"
+- tapOn: "Continue"
+- assertVisible: "What do you like?"
+- tapOn: "Coffee"
+- tapOn: "Pastries"
+- tapOn: "Finish"
+- waitForAnimationToEnd
+- assertVisible: "Search"
