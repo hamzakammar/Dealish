@@ -447,6 +447,7 @@ export default function MapScreen() {
             <View style={styles.topBar}>
               <TouchableOpacity
                 testID="account-button"
+                accessible={true}
                 accessibilityLabel="Account"
                 style={[styles.topActionButton, { backgroundColor: colors.card }]}
                 onPress={() => setIsAccountPanelOpen(true)}
