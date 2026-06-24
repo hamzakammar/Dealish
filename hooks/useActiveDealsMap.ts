@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { AppState } from "react-native";
 import { supabase } from "@/app/lib/supabase";
 import { Restaurant } from "@/types/restaurant";
 import { filterActiveDeals } from "@/utils/dealActivity";
@@ -69,22 +70,17 @@ export function useActiveDealsMap(restaurants: Restaurant[], atTime: Date | null
 
     fetchActiveDeals();
 
-    // Disable continuous polling in favor of focus-based triggers
-    const handleFocus = () => {
-      if (document.visibilityState === 'visible') fetchActiveDeals();
-    };
-    
-    document.addEventListener("visibilitychange", handleFocus);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && mountedRef.current) fetchActiveDeals();
+    });
 
     const interval = setInterval(() => {
-      if (mountedRef.current && document.visibilityState === 'visible') {
-        fetchActiveDeals();
-      }
-    }, 300000); // 5 minute slow poll
+      if (mountedRef.current) fetchActiveDeals();
+    }, 300000);
 
     return () => {
       mountedRef.current = false;
-      document.removeEventListener("visibilitychange", handleFocus);
+      subscription.remove();
       clearInterval(interval);
     };
   }, [restaurants, atTime]);

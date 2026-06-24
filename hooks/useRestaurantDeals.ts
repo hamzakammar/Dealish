@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { AppState } from "react-native";
 import { supabase } from "@/app/lib/supabase";
 import { Deal } from "@/types/restaurant";
 import { filterActiveDeals } from "@/utils/dealActivity";
@@ -74,25 +75,17 @@ export function useRestaurantDeals(restaurantId: string | null) {
       fetchDeals(true);
     }
 
-    // Exponential backoff or simple focus-based revalidation is preferred over tight polling.
-    // Here we use a visibility-based trigger + a slow background refresh.
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && restaurantId) {
-        fetchDeals(true);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && mountedRef.current && restaurantId) fetchDeals(true);
+    });
 
     const interval = setInterval(() => {
-      if (mountedRef.current && restaurantId && document.visibilityState === 'visible') {
-        fetchDeals(true);
-      }
-    }, 300000); // 5 minutes background refresh
+      if (mountedRef.current && restaurantId) fetchDeals(true);
+    }, 300000);
 
     return () => {
       mountedRef.current = false;
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      subscription.remove();
       clearInterval(interval);
     };
   }, [restaurantId]);
