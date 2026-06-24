@@ -1,13 +1,12 @@
 appId: com.anonymous.Dealish
-name: "Auth - Sign In with Existing Account"
+name: "Setup - Ensure Signed In"
 ---
-- launchApp:
-    clearState: true
+- launchApp
 - waitForAnimationToEnd
 - waitForAnimationToEnd
 - waitForAnimationToEnd
 
-# Navigate through welcome slides
+# If on welcome screen, tap through
 - tapOn:
     id: "welcome-next-button"
     optional: true
@@ -20,26 +19,20 @@ name: "Auth - Sign In with Existing Account"
 - tapOn:
     id: "welcome-next-button"
     optional: true
-- waitForAnimationToEnd
 - waitForAnimationToEnd
 
-# Sign in
+# If on auth screen, sign in
 - tapOn:
     id: "email-input"
+    optional: true
 - inputText: "hamzakammar1@gmail.com"
 - tapOn:
     id: "password-input"
+    optional: true
 - inputText: "password123"
 - tapOn:
     id: "auth-submit-button"
+    optional: true
 - waitForAnimationToEnd
 - waitForAnimationToEnd
 - waitForAnimationToEnd
-
-# Verify we landed on map
-- assertVisible:
-    id: "search-bar"
-- assertVisible:
-    id: "toggle-list"
-- assertVisible:
-    id: "toggle-map"

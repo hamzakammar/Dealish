@@ -1,0 +1,29 @@
+appId: com.anonymous.Dealish
+name: "Deal Detail - View and QR Code"
+tags:
+  - requires-auth
+---
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Switch to list view
+- tapOn:
+    id: "toggle-list"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Scroll down to find deals
+- swipe:
+    direction: UP
+    duration: 500
+- waitForAnimationToEnd
+
+# Tap Show QR Code button
+- tapOn:
+    id: "show-qr-button"
+    optional: true
+- waitForAnimationToEnd
+
+# Go back
+- pressKey: back

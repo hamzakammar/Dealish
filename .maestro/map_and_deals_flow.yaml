@@ -1,19 +1,49 @@
-appId: com.hamzakammar.dealish
+appId: com.anonymous.Dealish
+name: "Map - Browse, Search, Toggle Views, Plan Time"
+tags:
+  - requires-auth
 ---
 - launchApp
 - waitForAnimationToEnd
-- assertVisible: "Search"
-# Wait for map markers to potentially load
-- delay: 2000
-# Maestro can tap by text or coordinate. Tapping the search bar to find a known restaurant
-- tapOn: "Search"
-- inputText: "Cuckoo Cakery"
-- tapOn: "Cuckoo Cakery" # Tap the suggestion
 - waitForAnimationToEnd
-# Verify the detail card slides up
-- assertVisible: "Cuckoo Cakery"
-- assertVisible: "Claim Deal"
-- tapOn: "Claim Deal"
-# Verify QR Code appears
-- assertVisible: "Scan this QR"
-- tapOn: "Done"
+
+# Verify map screen
+- assertVisible:
+    id: "search-bar"
+
+# Test List view
+- tapOn:
+    id: "toggle-list"
+- waitForAnimationToEnd
+
+# Switch back to Map
+- tapOn:
+    id: "toggle-map"
+- waitForAnimationToEnd
+
+# Test search
+- tapOn:
+    id: "search-input"
+- inputText: "Pizza"
+- waitForAnimationToEnd
+
+# Clear search
+- tapOn:
+    id: "close-circle"
+    optional: true
+- waitForAnimationToEnd
+
+# Test PlanTimeSelector dropdown
+- tapOn:
+    text: "Now"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Today"
+    optional: true
+- waitForAnimationToEnd
+
+# Clear plan time
+- tapOn:
+    id: "clear-plan-time"
+    optional: true

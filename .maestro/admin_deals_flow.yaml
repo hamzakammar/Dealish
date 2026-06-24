@@ -1,0 +1,44 @@
+appId: com.anonymous.Dealish
+name: "Admin - Create and Edit Deals"
+tags:
+  - requires-auth
+  - requires-admin
+---
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to admin → deals
+- tapOn:
+    point: "5%,6%"
+- tapOn:
+    text: "Admin"
+    optional: true
+- tapOn:
+    text: "Deals"
+    optional: true
+
+# Tap + to create a new deal
+- tapOn:
+    id: "add-circle"
+    optional: true
+
+# Fill in deal form
+- tapOn:
+    text: ".*title.*"
+    optional: true
+- inputText: "Maestro Test Deal 50% Off"
+- hideKeyboard
+
+# Set description
+- swipe:
+    direction: UP
+    duration: 500
+- tapOn:
+    text: ".*description.*"
+    optional: true
+- inputText: "Automated test deal"
+- hideKeyboard
+
+# Go back without saving (don't pollute data)
+- pressKey: back
+- pressKey: back

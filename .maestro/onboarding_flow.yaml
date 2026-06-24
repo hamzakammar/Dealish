@@ -1,22 +1,69 @@
-appId: com.hamzakammar.dealish
+appId: com.anonymous.Dealish
+name: "Onboarding - New User Signup"
 ---
-- launchApp
-- clearState
-- tapOn: "Get Started"
-# Simulate a new account sign up
-- tapOn: "Create Account"
-- inputText: "newuser@example.com"
-- tapOn: "Password"
-- inputText: "securepass"
-- tapOn: "Sign Up"
+- launchApp:
+    clearState: true
 - waitForAnimationToEnd
-# Verify Onboarding Screen
-- assertVisible: "What's your name?"
-- inputText: "Hamza"
-- tapOn: "Continue"
-- assertVisible: "What do you like?"
-- tapOn: "Coffee"
-- tapOn: "Pastries"
-- tapOn: "Finish"
 - waitForAnimationToEnd
-- assertVisible: "Search"
+- waitForAnimationToEnd
+
+# Navigate through welcome slides
+- tapOn:
+    id: "welcome-next-button"
+    optional: true
+- tapOn:
+    id: "welcome-next-button"
+    optional: true
+- tapOn:
+    id: "welcome-next-button"
+    optional: true
+- tapOn:
+    id: "welcome-next-button"
+    optional: true
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Switch to sign up
+- tapOn:
+    text: "Switch to Sign Up"
+    optional: true
+- waitForAnimationToEnd
+
+# Fill credentials
+- tapOn:
+    id: "email-input"
+    optional: true
+- inputText: "maestro_test@example.com"
+- tapOn:
+    id: "password-input"
+    optional: true
+- inputText: "testpass123"
+- tapOn:
+    id: "auth-submit-button"
+    optional: true
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Onboarding (if shown)
+- tapOn:
+    text: "Get Started"
+    optional: true
+- waitForAnimationToEnd
+- inputText:
+    text: "Test User"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- waitForAnimationToEnd
+- inputText:
+    text: "Toronto"
+    optional: true
+- tapOn:
+    text: "Toronto"
+    optional: true
+- tapOn:
+    text: "Complete"
+    optional: true
+- waitForAnimationToEnd

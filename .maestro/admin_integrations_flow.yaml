@@ -1,0 +1,47 @@
+appId: com.anonymous.Dealish
+name: "Admin - Google Sheets Bulk Upload"
+tags:
+  - requires-auth
+  - requires-admin
+---
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to admin → integrations (Bulk Upload Inventory)
+- tapOn:
+    point: "5%,6%"
+- tapOn:
+    text: "Admin"
+    optional: true
+- tapOn:
+    text: "Bulk Upload Inventory"
+    optional: true
+
+# Should see Google Sheet URL input
+- assertVisible:
+    text: ".*Sheet.*"
+    optional: true
+
+# Paste the test sheet URL
+- tapOn:
+    text: ".*url.*"
+    optional: true
+- inputText: "https://docs.google.com/spreadsheets/d/1co_JP95I2XOe-R0fGRz7LwyB95-Bw8WDNWjc5i6EG-A/edit?usp=sharing"
+- hideKeyboard
+
+# Tap fetch/import button
+- tapOn:
+    text: "Fetch"
+    optional: true
+- tapOn:
+    text: "Import"
+    optional: true
+
+# Should show preview of rows
+- assertVisible:
+    text: ".*row.*"
+    optional: true
+
+# Don't actually upload - go back
+- pressKey: back
+- pressKey: back

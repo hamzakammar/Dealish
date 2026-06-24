@@ -151,6 +151,8 @@ export default function PlanTimeSelector({ planTime, onChangePlanTime }: PlanTim
         )}
         {planTime && (
           <TouchableOpacity
+            testID="clear-plan-time"
+            accessibilityLabel="Clear time filter"
             style={styles.clearButton}
             onPress={() => onChangePlanTime(null)}
           >

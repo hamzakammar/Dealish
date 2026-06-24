@@ -541,6 +541,8 @@ export default function AuthScreen() {
 
         <View>
             <TextInput
+            testID="email-input"
+            accessibilityLabel="Email"
             style={[
                 dynamicStyles.input,
                 emailError && styles.inputError,
@@ -570,6 +572,8 @@ export default function AuthScreen() {
                 isRateLimited && styles.inputDisabled
             ]}>
                 <TextInput
+                testID="password-input"
+                accessibilityLabel="Password"
                 style={dynamicStyles.passwordInput}
                 placeholder="Your Password"
                 placeholderTextColor={colors.textTertiary}
@@ -603,12 +607,13 @@ export default function AuthScreen() {
             )}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
+          testID="auth-submit-button"
           style={[
-            styles.button, 
-            styles.emailButton, 
+            styles.button,
+            styles.emailButton,
             (loading || isRateLimited) && styles.buttonDisabled
-          ]} 
+          ]}
           onPress={handleEmailAuth}
           disabled={loading || isRateLimited}
           accessibilityLabel={isSignUp ? "Sign Up" : "Sign In"}

@@ -333,6 +333,8 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
 
       {/* QR Code Button - Users can show QR codes for restaurants to scan */}
       <TouchableOpacity
+        testID="show-qr-button"
+        accessibilityLabel="Show QR Code"
         style={styles.qrButton}
         onPress={() => setShowQRCode(true)}
       >

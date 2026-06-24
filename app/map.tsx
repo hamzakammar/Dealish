@@ -446,6 +446,8 @@ export default function MapScreen() {
           <View style={styles.topBarContent}>
             <View style={styles.topBar}>
               <TouchableOpacity
+                testID="account-button"
+                accessibilityLabel="Account"
                 style={[styles.topActionButton, { backgroundColor: colors.card }]}
                 onPress={() => setIsAccountPanelOpen(true)}
                 activeOpacity={0.7}
@@ -453,9 +455,10 @@ export default function MapScreen() {
                 <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
 
-              <View style={[styles.topSearchBar, { backgroundColor: colors.card }]}>
+              <View testID="search-bar" style={[styles.topSearchBar, { backgroundColor: colors.card }]}>
                 <Ionicons name="search" size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />
                 <TextInput
+                  testID="search-input"
                   style={[styles.topSearchInput, { color: colors.text }]}
                   placeholder="Search"
                   placeholderTextColor={colors.textTertiary}
@@ -473,8 +476,9 @@ export default function MapScreen() {
               </View>
 
               <TouchableOpacity
+                testID="filter-button"
                 style={[
-                  styles.topActionButton, 
+                  styles.topActionButton,
                   { backgroundColor: colors.card },
                   activeFilterCount > 0 && styles.topActionButtonActive
                 ]}
@@ -502,8 +506,10 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#3A3A3C" : "#E9EAEB" }]}>
+            <View testID="view-toggle" style={[styles.viewToggleContainer, { backgroundColor: colors.isDark ? "#3A3A3C" : "#E9EAEB" }]}>
               <TouchableOpacity
+                testID="toggle-list"
+                accessibilityLabel="List"
                 style={[
                   styles.viewToggleSegment,
                   viewMode === "list" && styles.viewToggleSegmentActive
@@ -523,6 +529,8 @@ export default function MapScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="toggle-map"
+                accessibilityLabel="Map"
                 style={[
                   styles.viewToggleSegment,
                   viewMode === "map" && styles.viewToggleSegmentActive

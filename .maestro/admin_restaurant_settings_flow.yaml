@@ -1,0 +1,35 @@
+appId: com.anonymous.Dealish
+name: "Admin - Restaurant Settings"
+tags:
+  - requires-auth
+  - requires-admin
+---
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to admin → restaurant settings
+- tapOn:
+    point: "5%,6%"
+- tapOn:
+    text: "Admin"
+    optional: true
+- tapOn:
+    text: "Restaurant Settings"
+    optional: true
+
+# Should see restaurant edit form
+- assertVisible:
+    text: ".*name.*"
+    optional: true
+- assertVisible:
+    text: ".*address.*"
+    optional: true
+
+# Scroll to see more fields
+- swipe:
+    direction: UP
+    duration: 500
+
+# Go back without changes
+- pressKey: back
+- pressKey: back

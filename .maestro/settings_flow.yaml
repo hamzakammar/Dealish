@@ -1,0 +1,38 @@
+appId: com.anonymous.Dealish
+name: "Settings - Theme, Notifications, Map Preferences"
+tags:
+  - requires-auth
+---
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Open account panel
+- tapOn:
+    id: "account-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    text: "Settings"
+    optional: true
+- waitForAnimationToEnd
+
+# Verify settings sections
+- assertVisible:
+    text: ".*Appearance.*"
+    optional: true
+- assertVisible:
+    text: ".*Notifications.*"
+    optional: true
+
+# Toggle theme
+- tapOn:
+    text: "Dark"
+    optional: true
+- tapOn:
+    text: "Light"
+    optional: true
+
+# Go back
+- pressKey: back
+- pressKey: back

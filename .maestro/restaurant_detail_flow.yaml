@@ -1,0 +1,34 @@
+appId: com.anonymous.Dealish
+name: "Restaurant Detail - View Card, See Deals, Show QR"
+tags:
+  - requires-auth
+---
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Switch to list view
+- tapOn:
+    id: "toggle-list"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Scroll down and tap on a restaurant
+- swipe:
+    direction: UP
+    duration: 500
+- waitForAnimationToEnd
+
+# Tap in list area to select a restaurant
+- tapOn:
+    point: "50%,40%"
+- waitForAnimationToEnd
+
+# Try to tap Show QR Code
+- tapOn:
+    id: "show-qr-button"
+    optional: true
+- waitForAnimationToEnd
+
+# Go back
+- pressKey: back

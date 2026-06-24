@@ -176,7 +176,7 @@ export default function WelcomeScreen() {
         </View>
 
         {/* Next/Get Started Button */}
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+        <TouchableOpacity testID="welcome-next-button" accessibilityLabel={currentIndex === slides.length - 1 ? 'Get Started' : 'Next'} style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>
             {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
           </Text>

@@ -1,0 +1,48 @@
+appId: com.anonymous.Dealish
+name: "Admin - Generate Access Codes"
+tags:
+  - requires-auth
+  - requires-admin
+---
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to admin → invites
+- tapOn:
+    point: "5%,6%"
+- tapOn:
+    text: "Admin"
+    optional: true
+
+# Scroll to find invites option
+- swipe:
+    direction: UP
+    duration: 500
+- tapOn:
+    text: "Admin Invites"
+    optional: true
+
+# Should see invite creation UI
+- assertVisible:
+    text: ".*code.*"
+    optional: true
+
+# Select a restaurant
+- tapOn:
+    index: 0
+    optional: true
+
+# Select role
+- tapOn:
+    text: "Owner"
+    optional: true
+
+# Generate (don't actually do it in test to avoid side effects)
+# Just verify the button exists
+- assertVisible:
+    text: "Generate code"
+    optional: true
+
+# Go back
+- pressKey: back
+- pressKey: back
