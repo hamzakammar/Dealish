@@ -11,7 +11,6 @@ type RestaurantMarkerProps = {
   scale?: number;
 };
 
-// No-op warmup — kept for API compatibility, no longer needed without PNG assets
 export function MarkerAssetsWarmup() {
   return null;
 }
@@ -20,22 +19,36 @@ function MarkerView({
   isSelected,
   hasActiveDeal,
   isPartner,
+  scale = 1,
 }: {
   isSelected: boolean;
   hasActiveDeal: boolean;
   isPartner: boolean;
+  scale?: number;
 }) {
+  const baseSize = isSelected ? 36 : 28;
+  const size = Math.round(baseSize * scale);
+  const radius = Math.round(size / 2);
+  const borderW = isSelected ? 3 : isPartner ? 2.5 : 2;
+  const fontSize = Math.round(13 * scale);
+
   return (
     <View
       style={[
         styles.bubble,
+        {
+          minWidth: size,
+          height: size,
+          borderRadius: radius,
+          borderWidth: borderW,
+        },
         isPartner && styles.bubblePartner,
         isSelected && styles.bubbleSelected,
       ]}
       {...(Platform.OS === "android" && { collapsable: false })}
     >
       {hasActiveDeal && (
-        <Text style={styles.dealLabel}>$</Text>
+        <Text style={[styles.dealLabel, { fontSize }]}>$</Text>
       )}
     </View>
   );
@@ -46,20 +59,27 @@ export default function RestaurantMarker({
   isSelected,
   onPress,
   hasActiveDeal,
+  scale = 1,
 }: RestaurantMarkerProps) {
   const isPartner = Boolean(restaurant.partner);
 
-  // Android needs tracksViewChanges=true briefly so the native layer
-  // captures the rendered view, then we turn it off for performance.
+  // Android: track view changes briefly after any visual prop changes
+  // so the native bitmap captures correctly. Then turn off for performance.
   const [tracking, setTracking] = React.useState(Platform.OS === "android");
+  const prevScaleRef = React.useRef(scale);
+
   React.useEffect(() => {
     if (Platform.OS !== "android") return;
+    // Only re-track if scale changed meaningfully (avoid constant re-renders during pan)
+    const scaleDiff = Math.abs(scale - prevScaleRef.current);
+    if (scaleDiff < 0.1 && !isSelected) {
+      return;
+    }
+    prevScaleRef.current = scale;
     setTracking(true);
-    // double-rAF alone isn't enough on Hermes in release builds —
-    // the native marker slot may not be ready yet. 300ms covers it.
     const t = setTimeout(() => setTracking(false), 300);
     return () => clearTimeout(t);
-  }, [isSelected, hasActiveDeal, isPartner]);
+  }, [isSelected, hasActiveDeal, isPartner, scale]);
 
   const handlePress = React.useCallback(() => {
     onPress(restaurant);
@@ -80,6 +100,7 @@ export default function RestaurantMarker({
         isSelected={isSelected}
         hasActiveDeal={hasActiveDeal}
         isPartner={isPartner}
+        scale={scale}
       />
     </Marker>
   );
@@ -103,14 +124,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   bubblePartner: {
-    backgroundColor: "#FE902A",
-    borderColor: "#FFD700", // gold border for partners
-    borderWidth: 2.5,
+    borderColor: "#FFD700",
   },
   bubbleSelected: {
-    minWidth: 36,
-    height: 36,
-    borderRadius: 18,
     borderWidth: 3,
   },
   dealLabel: {

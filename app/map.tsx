@@ -396,6 +396,7 @@ export default function MapScreen() {
                     isSelected={isSelected}
                     onPress={handleRestaurantSelect}
                     hasActiveDeal={hasActiveDeal}
+                    scale={Math.min(Math.max(0.01 / latitudeDelta, 0.6), 1.8)}
                   />
                 );
               })}
