@@ -23,22 +23,7 @@ type FilterPanelProps = {
   onClearFilters: () => void;
   restaurants: Restaurant[];
   activeFilterCount: number;
-  planTime?: Date | null;
-  onChangePlanTime?: (t: Date | null) => void;
 };
-
-const PLAN_HOURS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
-function hourLabel(h: number): string {
-  const ampm = h < 12 ? "AM" : "PM";
-  const hr = h % 12 === 0 ? 12 : h % 12;
-  return `${hr}${ampm}`;
-}
-function dayLabel(d: Date, today: Date): string {
-  const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Tomorrow";
-  return d.toLocaleDateString("en-US", { weekday: "short" });
-}
 
 export default function FilterPanel({
   isOpen,
@@ -48,8 +33,6 @@ export default function FilterPanel({
   onClearFilters,
   restaurants,
   activeFilterCount,
-  planTime = null,
-  onChangePlanTime,
 }: FilterPanelProps) {
   const colors = useThemeColors();
   const screenWidth = Dimensions.get("window").width;
@@ -246,71 +229,6 @@ export default function FilterPanel({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Planning for (time-travel deal availability) */}
-          {onChangePlanTime && (
-            <View style={styles.section}>
-              <Text style={dynamicStyles.sectionTitle}>Planning for</Text>
-              <Text style={dynamicStyles.toggleDescription}>
-                {planTime
-                  ? `Showing deals available ${dayLabel(planTime, new Date())} at ${hourLabel(planTime.getHours())}`
-                  : "Showing deals available now"}
-              </Text>
-
-              {/* Day chips (next 7 days) */}
-              <View style={[styles.chipContainer, { marginTop: 12 }]}>
-                <TouchableOpacity
-                  style={[dynamicStyles.typeChip, !planTime && dynamicStyles.typeChipActive]}
-                  onPress={() => onChangePlanTime(null)}
-                >
-                  <Text style={[dynamicStyles.typeChipText, !planTime && dynamicStyles.typeChipTextActive]}>Now</Text>
-                </TouchableOpacity>
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const today = new Date();
-                  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-                  const selected = !!planTime &&
-                    planTime.getFullYear() === d.getFullYear() &&
-                    planTime.getMonth() === d.getMonth() &&
-                    planTime.getDate() === d.getDate();
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={[dynamicStyles.typeChip, selected && dynamicStyles.typeChipActive]}
-                      onPress={() => {
-                        const hour = planTime ? planTime.getHours() : 18;
-                        onChangePlanTime(new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0));
-                      }}
-                    >
-                      <Text style={[dynamicStyles.typeChipText, selected && dynamicStyles.typeChipTextActive]}>
-                        {dayLabel(d, today)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Hour chips */}
-              <View style={[styles.chipContainer, { marginTop: 4 }]}>
-                {PLAN_HOURS.map((h) => {
-                  const selected = !!planTime && planTime.getHours() === h;
-                  return (
-                    <TouchableOpacity
-                      key={h}
-                      style={[dynamicStyles.typeChip, selected && dynamicStyles.typeChipActive]}
-                      onPress={() => {
-                        const base = planTime ?? new Date();
-                        onChangePlanTime(new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, 0, 0));
-                      }}
-                    >
-                      <Text style={[dynamicStyles.typeChipText, selected && dynamicStyles.typeChipTextActive]}>
-                        {hourLabel(h)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
           {/* Rating Filter - Slider */}
           <View style={styles.section}>
             <Text style={dynamicStyles.sectionTitle}>Minimum Rating</Text>

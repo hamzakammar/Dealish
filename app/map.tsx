@@ -604,8 +604,6 @@ export default function MapScreen() {
         onClearFilters={clearFilters}
         restaurants={restaurants}
         activeFilterCount={activeFilterCount}
-        planTime={planTime}
-        onChangePlanTime={setPlanTime}
       />
 
       {!isAccountPanelOpen && !isFilterPanelOpen && searchSuggestions.length > 0 && (
