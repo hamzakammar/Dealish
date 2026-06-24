@@ -542,7 +542,9 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
             
-            <PlanTimeSelector planTime={planTime} onChangePlanTime={setPlanTime} />
+            {!selectedRestaurant && (
+              <PlanTimeSelector planTime={planTime} onChangePlanTime={setPlanTime} />
+            )}
           </View>
         </View>
       )}
