@@ -631,7 +631,7 @@ export default function AccountPage() {
 
                         return (
                             <RecentActivityCard
-                                key={activity.id}
+                                key={activity.id ?? idx}
                                 logo={activity.restaurants?.logo_url}
                                 name={activity.restaurants?.name || 'Unknown Restaurant'}
                                 description={description}

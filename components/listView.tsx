@@ -1,6 +1,7 @@
 import RatingDisplay from "@/components/RatingDisplay";
 import { supabase } from "@/app/lib/supabase";
 import { Deal, Restaurant, UserLocation } from "@/types/restaurant";
+import { filterActiveDeals } from "@/utils/dealActivity";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -173,15 +174,12 @@ export default function RestaurantList({
         if (error) throw error;
         if (!mounted) return;
 
-        const now = new Date();
-        const map = new Map<string, Deal[]>();
-        for (const deal of data || []) {
-          // Basic active check
-          if (deal.start_at && new Date(deal.start_at) > now) continue;
-          if (deal.end_at && new Date(deal.end_at) < now) continue;
+        const activeDeals = filterActiveDeals((data || []) as Deal[], null);
 
+        const map = new Map<string, Deal[]>();
+        for (const deal of activeDeals) {
           const list = map.get(deal.restaurant_id) || [];
-          list.push(deal as Deal);
+          list.push(deal);
           map.set(deal.restaurant_id, list);
         }
         setDealsMap(map);

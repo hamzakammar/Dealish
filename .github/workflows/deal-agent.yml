@@ -14,10 +14,22 @@ on:
         description: 'Write to the DB (--apply). Off = dry-run.'
         type: boolean
         default: false
+      auto_publish:
+        description: 'Auto-publish high-confidence deals (--auto-publish)'
+        type: boolean
+        default: false
       limit:
         description: 'Max restaurants to process (blank = all)'
         type: string
         default: ''
+      ids:
+        description: 'Comma-separated restaurant IDs to target (blank = normal queue)'
+        type: string
+        default: ''
+      force:
+        description: 'Force re-scrape even if content unchanged (--force)'
+        type: boolean
+        default: false
 
 concurrency:
   group: deal-agent
@@ -43,12 +55,28 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           ARGS=""
-          # Scheduled runs always --apply (fill the queue). Manual runs default to dry-run.
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.apply }}" = "true" ]; then
             ARGS="--apply"
+          fi
+          if [ "${{ inputs.auto_publish }}" = "true" ]; then
+            ARGS="$ARGS --auto-publish --min-confidence=0.85"
+          fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            ARGS="$ARGS --force"
           fi
           if [ -n "${{ inputs.limit }}" ]; then
             ARGS="$ARGS --limit=${{ inputs.limit }}"
           fi
-          echo "Running: node scripts/agent/grab-deals.js $ARGS"
-          node scripts/agent/grab-deals.js $ARGS
+          # Support multiple IDs by running the agent once per ID
+          IDS="${{ inputs.ids }}"
+          if [ -n "$IDS" ]; then
+            IFS=',' read -ra ID_ARRAY <<< "$IDS"
+            for id in "${ID_ARRAY[@]}"; do
+              id=$(echo "$id" | xargs)
+              echo "Running: node scripts/agent/grab-deals.js $ARGS --id=$id"
+              node scripts/agent/grab-deals.js $ARGS --id=$id
+            done
+          else
+            echo "Running: node scripts/agent/grab-deals.js $ARGS"
+            node scripts/agent/grab-deals.js $ARGS
+          fi

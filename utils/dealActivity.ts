@@ -31,16 +31,23 @@ function isTimeInRange(current: Date, startStr: string, endStr: string): boolean
 export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
   if (!deal.is_recurring) return false;
   
-  if (!deal.recurrence_days?.length || !deal.recurrence_start_time || !deal.recurrence_end_time) {
-    return true; 
+  if (!deal.recurrence_days?.length) {
+    return true;
   }
 
   const currentDay = ref.getDay();
   const prevDay = (currentDay + 6) % 7;
-  
-  const isActiveToday = deal.recurrence_days.includes(currentDay) && 
+
+  // If no time constraints, just check day of week
+  if (!deal.recurrence_start_time || !deal.recurrence_end_time) {
+    if (deal.recurrence_days.includes(currentDay)) return true;
+    if (lookahead) return false;
+    return false;
+  }
+
+  const isActiveToday = deal.recurrence_days.includes(currentDay) &&
                        isTimeInRange(ref, deal.recurrence_start_time, deal.recurrence_end_time);
-                       
+
   if (!isActiveToday && deal.recurrence_days.includes(prevDay)) {
      const [sh] = deal.recurrence_start_time.split(':').map(Number);
      const [eh] = deal.recurrence_end_time.split(':').map(Number);
@@ -55,7 +62,7 @@ export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean)
     const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
     const startDate = new Date(ref);
     startDate.setHours(sh, sm, 0, 0);
-    
+
     const diff = startDate.getTime() - ref.getTime();
     return diff > 0 && diff <= SOON_MS;
   }
