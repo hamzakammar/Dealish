@@ -18,7 +18,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
+
+// Conditionally import map components only on native platforms
+const MapView = (Platform.OS === 'web' ? null : require("react-native-maps").default) as any;
+const Polyline = (Platform.OS === 'web' ? null : require("react-native-maps").Polyline) as any;
+const PROVIDER_GOOGLE = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_GOOGLE) as any;
+const PROVIDER_DEFAULT = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_DEFAULT) as any;
+
+// Type definitions for web compatibility
+type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+type Camera = {
+  center: { latitude: number; longitude: number };
+  pitch: number;
+  heading: number;
+  altitude: number;
+  zoom: number;
+};
 
 const fallbackRegion: Region = {
   latitude: 43.6532,
@@ -28,8 +49,8 @@ const fallbackRegion: Region = {
 };
 
 export default function MapScreen() {
-  const mapRef = useRef<MapView | null>(null);
-  const blurredMapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<any>(null);
+  const blurredMapRef = useRef<any>(null);
   const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
   const currentRegionRef = useRef<Region | null>(null);
   const regionBeforeSelectRef = useRef<Region | null>(null);
@@ -290,7 +311,7 @@ export default function MapScreen() {
       regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
     }
     if (!cameraBeforeSelectRef.current) {
-      mapRef.current?.getCamera?.().then((cam) => {
+      mapRef.current?.getCamera?.().then((cam: any) => {
         if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
       }).catch(() => {});
     }
@@ -348,9 +369,15 @@ export default function MapScreen() {
     <View style={{ flex: 1 }}>
       <MarkerAssetsWarmup />
       <View style={styles.contentWrapper}>
-        {viewMode === "map" ? (
+        {viewMode === "map" && !MapView ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <Text style={{ fontSize: 18, color: colors.text, textAlign: "center" }}>
+              Map view is not available on web. Please use the mobile app for the full map experience.
+            </Text>
+          </View>
+        ) : viewMode === "map" ? (
           <MapView
-            ref={(r) => {
+            ref={(r: any) => {
               mapRef.current = r;
             }}
             style={{ flex: 1 }}
@@ -362,14 +389,14 @@ export default function MapScreen() {
             customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
             pitchEnabled={Platform.OS !== 'android'}
             toolbarEnabled={false}
-            onRegionChangeComplete={(r) => {
+            onRegionChangeComplete={(r: any) => {
               currentRegionRef.current = r;
               setLatitudeDelta(r.latitudeDelta);
               if (blurredMapRef.current) {
                 blurredMapRef.current.animateToRegion(r, 0);
               }
             }}
-            onPress={(e) => {
+            onPress={(e: any) => {
               if (e.nativeEvent.action === 'marker-press') {
                 return;
               }
@@ -421,10 +448,10 @@ export default function MapScreen() {
 
       {!isAccountPanelOpen && !isFilterPanelOpen && (
         <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
-          {viewMode === "map" && region && Platform.OS === 'ios' && (
+          {viewMode === "map" && region && Platform.OS === 'ios' && MapView && (
             <View style={styles.blurredMapBackground}>
               <MapView
-                ref={(r) => {
+                ref={(r: any) => {
                   blurredMapRef.current = r;
                 }}
                 style={StyleSheet.absoluteFillObject}
@@ -441,7 +468,10 @@ export default function MapScreen() {
               <BlurView intensity={colors.isDark ? 80 : 60} style={StyleSheet.absoluteFillObject} tint={colors.isDark ? "dark" : "light"} />
             </View>
           )}
-          {viewMode === "map" && Platform.OS === 'android' && (
+          {viewMode === "map" && Platform.OS === 'android' && MapView && (
+            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
+          )}
+          {viewMode === "map" && Platform.OS === 'web' && (
             <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
           )}
           <View style={styles.topBarContent}>
@@ -589,7 +619,7 @@ export default function MapScreen() {
             regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
           }
           if (!cameraBeforeSelectRef.current) {
-            mapRef.current?.getCamera?.().then((cam) => {
+            mapRef.current?.getCamera?.().then((cam: any) => {
               if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
             }).catch(() => {});
           }
