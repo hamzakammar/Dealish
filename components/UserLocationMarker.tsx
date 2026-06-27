@@ -1,8 +1,13 @@
 import React from "react";
 import { View, StyleSheet, Platform, PixelRatio } from "react-native";
-import { Marker } from "react-native-maps";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { UserLocation } from "@/types/restaurant";
+
+// Conditionally import Marker only on native platforms
+const Marker = Platform.select({
+  native: () => require("react-native-maps").Marker,
+  default: () => null,
+})?.();
 
 const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
 
@@ -15,6 +20,9 @@ export default function UserLocationMarker({ location }: UserLocationMarkerProps
   const haloSize = rnd(40);
   const circleSize = rnd(32);
   const borderWidth = rnd(3);
+
+  // On web, return null since maps are not supported
+  if (!Marker) return null;
 
   return (
     <Marker

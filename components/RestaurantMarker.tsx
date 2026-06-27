@@ -1,7 +1,12 @@
 import { Restaurant } from "@/types/restaurant";
 import React from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
-import { Marker } from "react-native-maps";
+
+// Conditionally import Marker only on native platforms
+const Marker = Platform.select({
+  native: () => require("react-native-maps").Marker,
+  default: () => null,
+})?.();
 
 type RestaurantMarkerProps = {
   restaurant: Restaurant;
@@ -86,6 +91,9 @@ export default function RestaurantMarker({
   }, [restaurant, onPress]);
 
   if (restaurant.lat == null || restaurant.lng == null) return null;
+
+  // On web, return null since maps are not supported
+  if (!Marker) return null;
 
   return (
     <Marker

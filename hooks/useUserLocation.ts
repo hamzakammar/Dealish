@@ -2,8 +2,15 @@ import { UserLocation as UserLocationType } from "@/types/restaurant";
 import { withTimeout } from "@/utils/async";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
-import { Alert } from "react-native";
-import { Region } from "react-native-maps";
+import { Alert, Platform } from "react-native";
+
+// Type definition for Region (compatible with react-native-maps)
+type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
 
 const DEFAULT_REGION: Region = {
   latitude: 43.6532,
