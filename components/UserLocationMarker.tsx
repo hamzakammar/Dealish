@@ -3,11 +3,8 @@ import { View, StyleSheet, Platform, PixelRatio } from "react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { UserLocation } from "@/types/restaurant";
 
-// Conditionally import Marker only on native platforms
-const Marker = Platform.select({
-  native: () => require("react-native-maps").Marker,
-  default: () => null,
-})?.();
+// Only import Marker on native platforms to prevent web build failures
+const Marker = (Platform.OS === 'web' ? null : require("react-native-maps").Marker) as any;
 
 const rnd = (n: number) => PixelRatio.roundToNearestPixel(n);
 

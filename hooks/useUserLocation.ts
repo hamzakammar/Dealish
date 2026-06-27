@@ -2,10 +2,10 @@ import { UserLocation as UserLocationType } from "@/types/restaurant";
 import { withTimeout } from "@/utils/async";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Alert } from "react-native";
 
 // Type definition for Region (compatible with react-native-maps)
-type Region = {
+export type Region = {
   latitude: number;
   longitude: number;
   latitudeDelta: number;
@@ -31,7 +31,7 @@ const LOCATION_UPDATE_DISTANCE = 5;
 
 const LOCATION_UPDATE_INTERVAL = 5000;
 
-export function useUserLocation(mapRef: React.RefObject<any>) {
+export function useUserLocation(mapRef: React.RefObject<any> | React.MutableRefObject<any>) {
   const [userLocation, setUserLocation] = useState<UserLocationType | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);

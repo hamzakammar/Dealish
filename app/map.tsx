@@ -19,7 +19,7 @@ import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-// Conditionally import map components only on native platforms
+// Only import map components on native platforms to prevent web build failures
 const MapView = (Platform.OS === 'web' ? null : require("react-native-maps").default) as any;
 const Polyline = (Platform.OS === 'web' ? null : require("react-native-maps").Polyline) as any;
 const PROVIDER_GOOGLE = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_GOOGLE) as any;
@@ -56,7 +56,7 @@ export default function MapScreen() {
   const regionBeforeSelectRef = useRef<Region | null>(null);
   const cameraBeforeSelectRef = useRef<Camera | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [viewMode, setViewMode] = useState<"map" | "list">("map");
+  const [viewMode, setViewMode] = useState<"map" | "list">(Platform.OS === 'web' ? "list" : "map");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -369,13 +369,7 @@ export default function MapScreen() {
     <View style={{ flex: 1 }}>
       <MarkerAssetsWarmup />
       <View style={styles.contentWrapper}>
-        {viewMode === "map" && !MapView ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
-            <Text style={{ fontSize: 18, color: colors.text, textAlign: "center" }}>
-              Map view is not available on web. Please use the mobile app for the full map experience.
-            </Text>
-          </View>
-        ) : viewMode === "map" ? (
+        {viewMode === "map" && MapView ? (
           <MapView
             ref={(r: any) => {
               mapRef.current = r;
@@ -428,7 +422,7 @@ export default function MapScreen() {
                 );
               })}
 
-            {selectedRestaurant && routeCoordinates.length > 0 && (
+            {selectedRestaurant && routeCoordinates.length > 0 && Polyline && (
               <Polyline
                 coordinates={routeCoordinates}
                 strokeColor="#FE902A"
@@ -436,6 +430,16 @@ export default function MapScreen() {
               />
             )}
           </MapView>
+        ) : viewMode === "map" ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: colors.background }}>
+            <Ionicons name="map-outline" size={64} color={colors.textTertiary} style={{ marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, color: colors.text, textAlign: "center", fontWeight: "600", marginBottom: 8 }}>
+              Map View Not Available on Web
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: "center" }}>
+              Please use the List view or download the mobile app for the full map experience.
+            </Text>
+          </View>
         ) : (
           <RestaurantList
             restaurants={filteredRestaurants}
@@ -569,13 +573,13 @@ export default function MapScreen() {
                 ]}
                 onPress={() => setViewMode("map")}
                 activeOpacity={0.7}
-                disabled={!hasLocationPermission}
+                disabled={!hasLocationPermission || Platform.OS === 'web'}
               >
                 <Text style={[
                   styles.viewToggleText,
-                  { color: viewMode === "map" ? "#fff" : (!hasLocationPermission ? colors.textTertiary : colors.textSecondary) },
+                  { color: viewMode === "map" ? "#fff" : ((! hasLocationPermission || Platform.OS === 'web') ? colors.textTertiary : colors.textSecondary) },
                   viewMode === "map" && styles.viewToggleTextActive,
-                  !hasLocationPermission && styles.viewToggleTextDisabled
+                  (!hasLocationPermission || Platform.OS === 'web') && styles.viewToggleTextDisabled
                 ]}>
                   Map
                 </Text>
