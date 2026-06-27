@@ -20,10 +20,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 // Conditionally import map components only on native platforms
-const MapView = (Platform.OS !== 'web' ? require("react-native-maps").default : null) as any;
-const Polyline = (Platform.OS !== 'web' ? require("react-native-maps").Polyline : null) as any;
-const PROVIDER_GOOGLE = (Platform.OS !== 'web' ? require("react-native-maps").PROVIDER_GOOGLE : null) as any;
-const PROVIDER_DEFAULT = (Platform.OS !== 'web' ? require("react-native-maps").PROVIDER_DEFAULT : null) as any;
+const MapView = (Platform.OS === 'web' ? null : require("react-native-maps").default) as any;
+const Polyline = (Platform.OS === 'web' ? null : require("react-native-maps").Polyline) as any;
+const PROVIDER_GOOGLE = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_GOOGLE) as any;
+const PROVIDER_DEFAULT = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_DEFAULT) as any;
 
 // Type definitions for web compatibility
 type Region = {
