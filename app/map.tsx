@@ -18,9 +18,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import MapView, { Camera, Polyline, Region, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
-const fallbackRegion: Region = {
+// Only import map components on native platforms to prevent web build failures
+const MapView = (Platform.OS === 'web' ? null : require("react-native-maps").default) as any;
+const Polyline = (Platform.OS === 'web' ? null : require("react-native-maps").Polyline) as any;
+const PROVIDER_GOOGLE = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_GOOGLE) as any;
+const PROVIDER_DEFAULT = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_DEFAULT) as any;
+
+// Type definitions for TypeScript (web-compatible)
+type RegionType = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+type CameraType = {
+  center: { latitude: number; longitude: number };
+  pitch: number;
+  heading: number;
+  altitude: number;
+  zoom: number;
+};
+
+const fallbackRegion: RegionType = {
   latitude: 43.6532,
   longitude: -79.3832,
   latitudeDelta: 0.05,
@@ -28,14 +49,14 @@ const fallbackRegion: Region = {
 };
 
 export default function MapScreen() {
-  const mapRef = useRef<MapView | null>(null);
-  const blurredMapRef = useRef<MapView | null>(null);
-  const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
-  const currentRegionRef = useRef<Region | null>(null);
-  const regionBeforeSelectRef = useRef<Region | null>(null);
-  const cameraBeforeSelectRef = useRef<Camera | null>(null);
+  const mapRef = useRef<any>(null);
+  const blurredMapRef = useRef<any>(null);
+  const restaurantCardRef = useRef<RestaurantDetailCardRef | null>(null);
+  const currentRegionRef = useRef<RegionType | null>(null);
+  const regionBeforeSelectRef = useRef<RegionType | null>(null);
+  const cameraBeforeSelectRef = useRef<CameraType | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [viewMode, setViewMode] = useState<"map" | "list">("map");
+  const [viewMode, setViewMode] = useState<"map" | "list">(Platform.OS === 'web' ? "list" : "map");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,7 +311,7 @@ export default function MapScreen() {
       regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
     }
     if (!cameraBeforeSelectRef.current) {
-      mapRef.current?.getCamera?.().then((cam) => {
+      mapRef.current?.getCamera?.().then((cam: any) => {
         if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
       }).catch(() => {});
     }
@@ -326,7 +347,7 @@ export default function MapScreen() {
   const handleRecenter = () => {
     if (!userLocation || viewMode !== "map") return;
 
-    const targetRegion: Region = {
+    const targetRegion: RegionType = {
       latitude: userLocation.lat,
       longitude: userLocation.lng,
       latitudeDelta: 0.01,
@@ -348,9 +369,9 @@ export default function MapScreen() {
     <View style={{ flex: 1 }}>
       <MarkerAssetsWarmup />
       <View style={styles.contentWrapper}>
-        {viewMode === "map" ? (
+        {viewMode === "map" && MapView ? (
           <MapView
-            ref={(r) => {
+            ref={(r: any) => {
               mapRef.current = r;
             }}
             style={{ flex: 1 }}
@@ -362,14 +383,14 @@ export default function MapScreen() {
             customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
             pitchEnabled={Platform.OS !== 'android'}
             toolbarEnabled={false}
-            onRegionChangeComplete={(r) => {
+            onRegionChangeComplete={(r: any) => {
               currentRegionRef.current = r;
               setLatitudeDelta(r.latitudeDelta);
               if (blurredMapRef.current) {
                 blurredMapRef.current.animateToRegion(r, 0);
               }
             }}
-            onPress={(e) => {
+            onPress={(e: any) => {
               if (e.nativeEvent.action === 'marker-press') {
                 return;
               }
@@ -401,7 +422,7 @@ export default function MapScreen() {
                 );
               })}
 
-            {selectedRestaurant && routeCoordinates.length > 0 && (
+            {selectedRestaurant && routeCoordinates.length > 0 && Polyline && (
               <Polyline
                 coordinates={routeCoordinates}
                 strokeColor="#FE902A"
@@ -409,6 +430,16 @@ export default function MapScreen() {
               />
             )}
           </MapView>
+        ) : viewMode === "map" ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: colors.background }}>
+            <Ionicons name="map-outline" size={64} color={colors.textTertiary} style={{ marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, color: colors.text, textAlign: "center", fontWeight: "600", marginBottom: 8 }}>
+              Map View Not Available on Web
+            </Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: "center" }}>
+              Please use the List view or download the mobile app for the full map experience.
+            </Text>
+          </View>
         ) : (
           <RestaurantList
             restaurants={filteredRestaurants}
@@ -421,10 +452,10 @@ export default function MapScreen() {
 
       {!isAccountPanelOpen && !isFilterPanelOpen && (
         <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
-          {viewMode === "map" && region && Platform.OS === 'ios' && (
+          {viewMode === "map" && region && Platform.OS === 'ios' && MapView && (
             <View style={styles.blurredMapBackground}>
               <MapView
-                ref={(r) => {
+                ref={(r: any) => {
                   blurredMapRef.current = r;
                 }}
                 style={StyleSheet.absoluteFillObject}
@@ -441,7 +472,10 @@ export default function MapScreen() {
               <BlurView intensity={colors.isDark ? 80 : 60} style={StyleSheet.absoluteFillObject} tint={colors.isDark ? "dark" : "light"} />
             </View>
           )}
-          {viewMode === "map" && Platform.OS === 'android' && (
+          {viewMode === "map" && Platform.OS === 'android' && MapView && (
+            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
+          )}
+          {viewMode === "map" && Platform.OS === 'web' && (
             <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
           )}
           <View style={styles.topBarContent}>
@@ -539,13 +573,13 @@ export default function MapScreen() {
                 ]}
                 onPress={() => setViewMode("map")}
                 activeOpacity={0.7}
-                disabled={!hasLocationPermission}
+                disabled={!hasLocationPermission || Platform.OS === 'web'}
               >
                 <Text style={[
                   styles.viewToggleText,
-                  { color: viewMode === "map" ? "#fff" : (!hasLocationPermission ? colors.textTertiary : colors.textSecondary) },
+                  { color: viewMode === "map" ? "#fff" : ((! hasLocationPermission || Platform.OS === 'web') ? colors.textTertiary : colors.textSecondary) },
                   viewMode === "map" && styles.viewToggleTextActive,
-                  !hasLocationPermission && styles.viewToggleTextDisabled
+                  (!hasLocationPermission || Platform.OS === 'web') && styles.viewToggleTextDisabled
                 ]}>
                   Map
                 </Text>
@@ -589,7 +623,7 @@ export default function MapScreen() {
             regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
           }
           if (!cameraBeforeSelectRef.current) {
-            mapRef.current?.getCamera?.().then((cam) => {
+            mapRef.current?.getCamera?.().then((cam: any) => {
               if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
             }).catch(() => {});
           }
