@@ -311,7 +311,7 @@ export default function MapScreen() {
       regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
     }
     if (!cameraBeforeSelectRef.current) {
-      mapRef.current?.getCamera?.().then((cam) => {
+      mapRef.current?.getCamera?.().then((cam: any) => {
         if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
       }).catch(() => {});
     }
@@ -377,7 +377,7 @@ export default function MapScreen() {
           </View>
         ) : viewMode === "map" ? (
           <MapView
-            ref={(r) => {
+            ref={(r: any) => {
               mapRef.current = r;
             }}
             style={{ flex: 1 }}
@@ -389,14 +389,14 @@ export default function MapScreen() {
             customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
             pitchEnabled={Platform.OS !== 'android'}
             toolbarEnabled={false}
-            onRegionChangeComplete={(r) => {
+            onRegionChangeComplete={(r: any) => {
               currentRegionRef.current = r;
               setLatitudeDelta(r.latitudeDelta);
               if (blurredMapRef.current) {
                 blurredMapRef.current.animateToRegion(r, 0);
               }
             }}
-            onPress={(e) => {
+            onPress={(e: any) => {
               if (e.nativeEvent.action === 'marker-press') {
                 return;
               }
@@ -451,7 +451,7 @@ export default function MapScreen() {
           {viewMode === "map" && region && Platform.OS === 'ios' && MapView && (
             <View style={styles.blurredMapBackground}>
               <MapView
-                ref={(r) => {
+                ref={(r: any) => {
                   blurredMapRef.current = r;
                 }}
                 style={StyleSheet.absoluteFillObject}
@@ -619,7 +619,7 @@ export default function MapScreen() {
             regionBeforeSelectRef.current = currentRegionRef.current ?? region ?? fallbackRegion;
           }
           if (!cameraBeforeSelectRef.current) {
-            mapRef.current?.getCamera?.().then((cam) => {
+            mapRef.current?.getCamera?.().then((cam: any) => {
               if (!cameraBeforeSelectRef.current) cameraBeforeSelectRef.current = cam;
             }).catch(() => {});
           }
