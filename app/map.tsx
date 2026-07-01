@@ -25,15 +25,15 @@ const Polyline = (Platform.OS === 'web' ? null : require("react-native-maps").Po
 const PROVIDER_GOOGLE = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_GOOGLE) as any;
 const PROVIDER_DEFAULT = (Platform.OS === 'web' ? null : require("react-native-maps").PROVIDER_DEFAULT) as any;
 
-// Type definitions for web compatibility
-type Region = {
+// Type definitions for TypeScript (web-compatible)
+type RegionType = {
   latitude: number;
   longitude: number;
   latitudeDelta: number;
   longitudeDelta: number;
 };
 
-type Camera = {
+type CameraType = {
   center: { latitude: number; longitude: number };
   pitch: number;
   heading: number;
@@ -41,7 +41,7 @@ type Camera = {
   zoom: number;
 };
 
-const fallbackRegion: Region = {
+const fallbackRegion: RegionType = {
   latitude: 43.6532,
   longitude: -79.3832,
   latitudeDelta: 0.05,
@@ -51,10 +51,10 @@ const fallbackRegion: Region = {
 export default function MapScreen() {
   const mapRef = useRef<any>(null);
   const blurredMapRef = useRef<any>(null);
-  const restaurantCardRef = useRef<RestaurantDetailCardRef>(null);
-  const currentRegionRef = useRef<Region | null>(null);
-  const regionBeforeSelectRef = useRef<Region | null>(null);
-  const cameraBeforeSelectRef = useRef<Camera | null>(null);
+  const restaurantCardRef = useRef<RestaurantDetailCardRef | null>(null);
+  const currentRegionRef = useRef<RegionType | null>(null);
+  const regionBeforeSelectRef = useRef<RegionType | null>(null);
+  const cameraBeforeSelectRef = useRef<CameraType | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "list">(Platform.OS === 'web' ? "list" : "map");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
@@ -347,7 +347,7 @@ export default function MapScreen() {
   const handleRecenter = () => {
     if (!userLocation || viewMode !== "map") return;
 
-    const targetRegion: Region = {
+    const targetRegion: RegionType = {
       latitude: userLocation.lat,
       longitude: userLocation.lng,
       latitudeDelta: 0.01,

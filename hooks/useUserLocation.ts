@@ -4,7 +4,7 @@ import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
-// Type definition for Region (compatible with react-native-maps)
+// Type definition for Region (compatible with react-native-maps on native, standalone on web)
 export type Region = {
   latitude: number;
   longitude: number;
