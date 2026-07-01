@@ -1,70 +1,85 @@
 import { Deal } from "@/types/restaurant";
 
 export const SOON_MS = 60 * 60 * 1000; // 1 hour lookahead
+const DEFAULT_TZ = 'America/Toronto';
 
 /**
- * Robust datetime comparison handling timezones and cross-midnight spans.
- * Uses native JS Date objects without external dependencies.
+ * Gets local components (day, hours, minutes) for a given date in a specific timezone.
  */
-function isTimeInRange(current: Date, startStr: string, endStr: string): boolean {
-  const [sh, sm] = startStr.split(':').map(Number);
-  const [eh, em] = endStr.split(':').map(Number);
-  
-  const start = new Date(current);
-  start.setHours(sh, sm, 0, 0);
-  
-  const end = new Date(current);
-  end.setHours(eh, em, 0, 0);
+function getLocalComponents(date: Date, tz: string) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour12: false,
+    weekday: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  });
 
-  // Handle spans across midnight (e.g., 22:00 to 02:00)
-  if (end < start) {
-    if (current >= start) {
-      end.setDate(end.getDate() + 1);
-    } else {
-      start.setDate(start.getDate() - 1);
-    }
-  }
+  const parts = formatter.formatToParts(date);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value;
 
-  return current >= start && current <= end;
+  // Intl weekday numeric: Sunday is 1 or something else depending on locale? 
+  // Standardizing: Date.getDay() returns 0=Sun, 6=Sat. 
+  // We use the day name and map it to be safe.
+  const weekdayName = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(date);
+  const dayMap: Record<string, number> = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  
+  return {
+    day: dayMap[weekdayName],
+    hour: parseInt(getPart('hour') || '0', 10),
+    minute: parseInt(getPart('minute') || '0', 10),
+  };
 }
 
-export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean): boolean {
-  if (!deal.is_recurring) return false;
-  
-  if (!deal.recurrence_days?.length) {
-    return true;
-  }
+/**
+ * Converts "HH:MM:SS" or "HH:MM" to minutes since midnight.
+ */
+function timeToMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
 
-  const currentDay = ref.getDay();
-  const prevDay = (currentDay + 6) % 7;
+export function isRecurringDealActive(deal: Deal, ref: Date, lookahead: boolean, tz: string = DEFAULT_TZ): boolean {
+  if (!deal.is_recurring) return false;
+  if (!deal.recurrence_days?.length) return true;
+
+  const { day, hour, minute } = getLocalComponents(ref, tz);
+  const currentMinutes = hour * 60 + minute;
+  const yesterday = (day + 6) % 7;
 
   // If no time constraints, just check day of week
   if (!deal.recurrence_start_time || !deal.recurrence_end_time) {
-    if (deal.recurrence_days.includes(currentDay)) return true;
-    if (lookahead) return false;
-    return false;
+    return deal.recurrence_days.includes(day);
   }
 
-  const isActiveToday = deal.recurrence_days.includes(currentDay) &&
-                       isTimeInRange(ref, deal.recurrence_start_time, deal.recurrence_end_time);
+  const startMins = timeToMinutes(deal.recurrence_start_time);
+  const endMins = timeToMinutes(deal.recurrence_end_time);
+  const spansMidnight = endMins < startMins;
 
-  if (!isActiveToday && deal.recurrence_days.includes(prevDay)) {
-     const [sh] = deal.recurrence_start_time.split(':').map(Number);
-     const [eh] = deal.recurrence_end_time.split(':').map(Number);
-     if (eh < sh) {
-       return isTimeInRange(ref, deal.recurrence_start_time, deal.recurrence_end_time);
-     }
+  // 1. Check if deal started TODAY and is active
+  let activeToday = false;
+  if (spansMidnight) {
+    // Started today, ends tomorrow: current must be after start
+    activeToday = (currentMinutes >= startMins);
+  } else {
+    // Normal span: current between start and end
+    activeToday = (currentMinutes >= startMins && currentMinutes <= endMins);
   }
 
-  if (isActiveToday) return true;
+  if (activeToday && deal.recurrence_days.includes(day)) return true;
 
-  if (lookahead && deal.recurrence_days.includes(currentDay)) {
-    const [sh, sm] = deal.recurrence_start_time.split(':').map(Number);
-    const startDate = new Date(ref);
-    startDate.setHours(sh, sm, 0, 0);
+  // 2. Check if deal started YESTERDAY and is still active (cross-midnight)
+  if (spansMidnight && currentMinutes <= endMins) {
+    if (deal.recurrence_days.includes(yesterday)) return true;
+  }
 
-    const diff = startDate.getTime() - ref.getTime();
-    return diff > 0 && diff <= SOON_MS;
+  // 3. Lookahead logic (for "Starting Soon" badges)
+  if (lookahead) {
+    const diff = startMins - currentMinutes;
+    if (deal.recurrence_days.includes(day) && diff > 0 && diff <= 60) {
+      return true;
+    }
   }
 
   return false;
@@ -85,7 +100,7 @@ export function isOneTimeDealActive(deal: Deal, ref: Date, lookahead: boolean): 
   return true;
 }
 
-export function filterActiveDeals(deals: Deal[], atTime: Date | null): Deal[] {
+export function filterActiveDeals(deals: Deal[], atTime: Date | null, tz: string = DEFAULT_TZ): Deal[] {
   const ref = atTime ?? new Date();
   const lookahead = atTime == null;
   
@@ -93,7 +108,7 @@ export function filterActiveDeals(deals: Deal[], atTime: Date | null): Deal[] {
     if (deal.is_active === false) return false;
 
     if (deal.is_recurring && (deal.recurrence_days?.length || deal.recurrence_start_time || deal.recurrence_end_time)) {
-      return isRecurringDealActive(deal, ref, lookahead);
+      return isRecurringDealActive(deal, ref, lookahead, tz);
     }
 
     return isOneTimeDealActive(deal, ref, lookahead);
