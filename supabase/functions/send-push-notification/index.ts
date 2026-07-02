@@ -29,6 +29,11 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client (service role for token/settings lookups).
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const { user_id, title, body, data, type } = await req.json() as NotificationRequest;
 
     if (!user_id || !title || !body) {
@@ -38,14 +43,41 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // AUTHORIZATION: this function is deployed with JWT verification, so any
+    // authenticated caller reaches here. Prevent one user from spamming another:
+    // allow only (a) notifying yourself, or (b) owner/admin callers who legitimately
+    // fan out deal/partner notifications. Anything else is rejected.
+    const authHeader = req.headers.get('authorization');
+    const jwt = authHeader?.replace('Bearer ', '');
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    const { data: { user: caller }, error: callerErr } = await supabase.auth.getUser(jwt);
+    if (callerErr || !caller) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid session' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (caller.id !== user_id) {
+      const { data: callerProfile } = await supabase
+        .from('profiles').select('role').eq('id', caller.id).single();
+      const isMerchant = callerProfile?.role === 'owner' || callerProfile?.role === 'admin';
+      if (!isMerchant) {
+        return new Response(
+          JSON.stringify({ error: 'Not authorized to notify other users' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
-    // Get user's profile for settings and all registered push tokens
+    // Get user's profile (settings + legacy push_token column) and all registered
+    // push tokens in one round trip each.
     const [profileResult, tokensResult] = await Promise.all([
-      supabase.from('profiles').select('settings').eq('id', user_id).single(),
+      supabase.from('profiles').select('settings, push_token').eq('id', user_id).single(),
       supabase.from('user_push_tokens').select('push_token').eq('user_id', user_id)
     ]);
 
@@ -53,17 +85,14 @@ serve(async (req) => {
       throw new Error(`Profile fetch error: ${profileResult.error.message}`);
     }
 
-    // Determine all active tokens for this user
-    // We check both the new multi-token table and the legacy column on profiles
+    // Determine all active tokens for this user. We check both the new multi-token
+    // table and the legacy column on profiles.
     const tokens = new Set<string>();
     if (tokensResult.data) {
       tokensResult.data.forEach((t: any) => tokens.add(t.push_token));
     }
-    
-    // Check legacy column as fallback (from profiles schema)
-    const { data: legacyProfile } = await supabase.from('profiles').select('push_token').eq('id', user_id).single();
-    if (legacyProfile?.push_token) {
-      tokens.add(legacyProfile.push_token);
+    if (profileResult.data?.push_token) {
+      tokens.add(profileResult.data.push_token);
     }
 
     if (tokens.size === 0) {

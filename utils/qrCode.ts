@@ -1,10 +1,8 @@
 import { supabase } from "@/app/lib/supabase";
-import * as Crypto from "expo-crypto";
 
 export type QRCodeData = {
-  deal_id: string;
   token: string;
-  user_id?: string;
+  deal_id?: string;
 };
 
 export type RedeemResult = {
@@ -14,18 +12,49 @@ export type RedeemResult = {
   deal_title?: string;
   out_restaurant_id?: string;
   restaurant_name?: string;
+  out_user_id?: string;
 };
 
-export async function redeemDealScan(
-  dealId: string,
-  token: string,
-  userId: string
-): Promise<RedeemResult> {
+export type MintedRedemption = {
+  redemption_id: string;
+  token: string;
+  pin: string;
+  expires_at: string;
+};
+
+/**
+ * Customer-side: mint a fresh, single-use, expiring redemption token bound
+ * server-side to the current user. Re-calling rotates the token (the previous
+ * unused one is voided), so it is safe to call each time the QR modal opens.
+ */
+export async function mintRedemption(dealId: string): Promise<MintedRedemption | null> {
   try {
-    const { data, error } = await supabase.rpc("redeem_deal_scan", {
+    const { data, error } = await supabase.rpc("mint_redemption", {
       p_deal_id: dealId,
-      p_token: token,
-      p_user_id: userId,
+    });
+
+    if (error) {
+      console.error("Error minting redemption:", error.message);
+      throw error;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.token) return null;
+    return row as MintedRedemption;
+  } catch (err) {
+    console.error("Error minting redemption:", err);
+    throw err;
+  }
+}
+
+/**
+ * Merchant-side: redeem a scanned token (or a typed PIN). The customer credited
+ * is derived from the bound redemption row on the server, never from the QR.
+ */
+export async function redeemRedemptionToken(tokenOrPin: string): Promise<RedeemResult> {
+  try {
+    const { data, error } = await supabase.rpc("redeem_redemption_token", {
+      p_token: tokenOrPin,
     });
 
     if (error) return { ok: false, message: error.message };
@@ -40,73 +69,43 @@ export async function redeemDealScan(
   }
 }
 
-export async function generateQRCodeToken(dealId: string): Promise<string | null> {
-  try {
-    const { data: existingDeal } = await supabase
-      .from("deals")
-      .select("qr_code_token")
-      .eq("id", dealId)
-      .single();
-
-    if (existingDeal?.qr_code_token) {
-      return existingDeal.qr_code_token;
-    }
-
-    const token = Crypto.randomUUID();
-
-    const { error } = await supabase
-      .from("deals")
-      .update({
-        qr_code_token: token,
-        qr_code_generated_at: new Date().toISOString(),
-      })
-      .eq("id", dealId);
-
-    if (error) {
-      console.error("Error generating QR code token:", error);
-      return null;
-    }
-
-    return token;
-  } catch (error) {
-    console.error("Error generating QR code token:", error);
-    return null;
-  }
-}
-
 /**
- * Create QR code data string from deal ID and token
+ * Build the QR payload from a minted redemption token. The token is opaque and
+ * single-use; no deal id or user id is embedded.
  */
-export function createQRCodeData(dealId: string, token: string, userId?: string): string {
-  const base = `dealish://scan?deal_id=${dealId}&token=${token}`;
-  return userId ? `${base}&user_id=${userId}` : base;
+export function createQRCodeData(token: string): string {
+  return `dealish://redeem?token=${encodeURIComponent(token)}`;
 }
 
 /**
- * Parse QR code data string
+ * Parse a scanned QR payload into a redemption token.
+ * Accepts the `dealish://redeem?token=...` form and a bare token fallback.
  */
 export function parseQRCodeData(qrData: string): QRCodeData | null {
   try {
-    // Handle different QR code formats
     if (qrData.startsWith("dealish://")) {
       const url = new URL(qrData);
-      const dealId = url.searchParams.get("deal_id");
       const token = url.searchParams.get("token");
-
-      if (dealId && token) {
-        const userId = url.searchParams.get("user_id") ?? undefined;
-        return { deal_id: dealId, token, user_id: userId };
+      if (token) {
+        const dealId = url.searchParams.get("deal_id") ?? undefined;
+        return { token, deal_id: dealId };
       }
+      return null;
     }
 
-    // Fallback: try to parse as JSON
+    // Fallback: JSON payload with a token.
     try {
       const parsed = JSON.parse(qrData);
-      if (parsed.deal_id && parsed.token) {
-        return { deal_id: parsed.deal_id, token: parsed.token };
+      if (parsed?.token) {
+        return { token: String(parsed.token), deal_id: parsed.deal_id };
       }
     } catch {
-      // Not JSON, continue
+      // Not JSON.
+    }
+
+    // Fallback: a bare hex token (32 chars from gen_random_bytes(16)).
+    if (/^[a-f0-9]{16,}$/i.test(qrData.trim())) {
+      return { token: qrData.trim() };
     }
 
     return null;

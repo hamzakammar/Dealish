@@ -10,7 +10,6 @@ function getLocalComponents(date: Date, tz: string) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     hour12: false,
-    weekday: 'numeric',
     hour: 'numeric',
     minute: 'numeric',
     second: 'numeric',

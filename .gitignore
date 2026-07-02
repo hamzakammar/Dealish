@@ -49,3 +49,6 @@ dealish-*.json
 # generated native folders
 /ios
 /android
+
+# Supabase CLI scratch state (project ref, versions, pooler URL) — not source
+supabase/.temp/

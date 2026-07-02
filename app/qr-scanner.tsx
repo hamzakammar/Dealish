@@ -1,7 +1,7 @@
 import { useAuthContext } from "@/app/providers/auth";
 import QRScanner from "@/components/QRScanner";
 import { sendPushNotification } from "@/utils/notifications";
-import { parseQRCodeData, redeemDealScan } from "@/utils/qrCode";
+import { parseQRCodeData, redeemRedemptionToken } from "@/utils/qrCode";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -26,14 +26,12 @@ export default function QRScannerScreen() {
         return;
       }
 
-      // Attribute the redemption to the customer (from the QR payload), not the
-      // owner/admin holding the scanner. Falls back to the scanner only if absent.
-      const targetUserId = qrData.user_id || session.user.id;
-
-      // Redeem server-side: validates token + active state + ownership, records the
-      // scan, and credits the customer's visit/savings. Cross-user writes can't be
-      // done from the merchant device under RLS, so this goes through a definer RPC.
-      const result = await redeemDealScan(qrData.deal_id, qrData.token, targetUserId);
+      // Redeem server-side by opaque single-use token. The credited customer is
+      // derived from the bound redemption row on the server — never from the QR —
+      // which validates token + expiry + active state + merchant ownership. The
+      // cross-user credit can't be done from the merchant device under RLS, so this
+      // goes through a definer RPC.
+      const result = await redeemRedemptionToken(qrData.token);
 
       if (!result.ok) {
         Alert.alert("Cannot Redeem", result.message || "This deal could not be redeemed.");
@@ -41,22 +39,24 @@ export default function QRScannerScreen() {
         return;
       }
 
-      // Notify the customer's device (best-effort; never blocks the flow).
-      try {
-        await sendPushNotification(targetUserId, {
-          type: "deal_redeemed",
-          title: "Deal Redeemed!",
-          body: result.restaurant_name
-            ? `You redeemed: ${result.deal_title} at ${result.restaurant_name}`
-            : `You redeemed: ${result.deal_title ?? "your deal"}`,
-          data: {
-            deal_id: qrData.deal_id,
-            restaurant_id: result.out_restaurant_id,
-            screen: "/account",
-          },
-        });
-      } catch (notifError) {
-        console.error("Error sending redemption notification:", notifError);
+      // Notify the customer's device (best-effort; never blocks the flow). The
+      // customer id is returned by the server from the bound redemption row.
+      if (result.out_user_id) {
+        try {
+          await sendPushNotification(result.out_user_id, {
+            type: "deal_redeemed",
+            title: "Deal Redeemed!",
+            body: result.restaurant_name
+              ? `You redeemed: ${result.deal_title} at ${result.restaurant_name}`
+              : `You redeemed: ${result.deal_title ?? "your deal"}`,
+            data: {
+              restaurant_id: result.out_restaurant_id,
+              screen: "/account",
+            },
+          });
+        } catch (notifError) {
+          console.error("Error sending redemption notification:", notifError);
+        }
       }
 
       // Brief success confirmation on the scanner (restaurant's device)

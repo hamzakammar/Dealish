@@ -12,7 +12,7 @@ type DealQRCodeProps = {
 };
 
 export default function DealQRCode({ deal, visible, onClose }: DealQRCodeProps) {
-  const { qrCodeData, loading, error } = useDealQRCode(deal.id);
+  const { qrCodeData, pin, loading, error } = useDealQRCode(deal.id);
 
   return (
     <Modal
@@ -55,8 +55,15 @@ export default function DealQRCode({ deal, visible, onClose }: DealQRCodeProps) 
               ) : null}
             </View>
 
+            {pin ? (
+              <Text style={styles.pinText}>
+                Or give code: <Text style={styles.pinValue}>{pin}</Text>
+              </Text>
+            ) : null}
+
             <Text style={styles.instructionText}>
-              Show this QR code at the restaurant to track your visit
+              Show this at the restaurant to redeem. This code is single-use and
+              expires in 20 minutes.
             </Text>
           </View>
         </View>
@@ -144,5 +151,16 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     paddingHorizontal: 20,
+  },
+  pinText: {
+    fontSize: 15,
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  pinValue: {
+    fontWeight: "700",
+    letterSpacing: 4,
+    color: "#FE902A",
   },
 });

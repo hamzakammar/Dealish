@@ -24,7 +24,9 @@ async function validateApiKey(supabase: any, rawKey: string): Promise<string | n
     .eq('key_hash', hash)
     .single();
   if (error || !data) return null;
-  supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', data.id);
+  // Await so the write actually executes before the edge function returns; an
+  // un-awaited PostgREST builder may never be sent.
+  await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', data.id);
   return data.restaurant_id;
 }
 
@@ -183,16 +185,27 @@ serve(async (req) => {
       const mapping = integration.detected_mapping || {};
       const results: { row_index: number; action: string; inventory_item_id?: string; error?: string }[] = [];
 
+      // Batch: fetch already-synced rows once instead of one SELECT per row.
+      const syncedByRowIndex = new Map<number, any>();
+      {
+        const rowIndexes = rows
+          .map((r: { row_index: number }) => r.row_index)
+          .filter((n: unknown) => typeof n === 'number');
+        if (rowIndexes.length) {
+          const { data: syncedRows } = await supabase
+            .from('sheet_synced_rows')
+            .select('*')
+            .eq('integration_id', integration_id)
+            .in('row_index', rowIndexes);
+          (syncedRows || []).forEach((r: any) => syncedByRowIndex.set(r.row_index, r));
+        }
+      }
+
       for (const { row_index, data: rowData } of rows) {
         try {
           const rowHash = simpleHash(rowData);
 
-          const { data: existingSync } = await supabase
-            .from('sheet_synced_rows')
-            .select('*')
-            .eq('integration_id', integration_id)
-            .eq('row_index', row_index)
-            .single();
+          const existingSync = syncedByRowIndex.get(row_index);
 
           if (existingSync?.row_hash === rowHash) {
             results.push({ row_index, action: 'skipped_unchanged' });

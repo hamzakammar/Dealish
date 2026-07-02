@@ -233,6 +233,17 @@ async function pollIntegration(supabase: any, integration: any) {
 
   const results = { created: 0, updated: 0, skipped: 0, errors: 0 };
 
+  // Batch: fetch every already-synced row for this integration up front instead
+  // of one SELECT per sheet row (was up to ~500 sequential round trips per poll).
+  const syncedByRowIndex = new Map<number, any>();
+  {
+    const { data: syncedRows } = await supabase
+      .from('sheet_synced_rows')
+      .select('*')
+      .eq('integration_id', integrationId);
+    (syncedRows || []).forEach((r: any) => syncedByRowIndex.set(r.row_index, r));
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const rowIndex = i + 2;
     const rowData = rows[i];
@@ -247,12 +258,7 @@ async function pollIntegration(supabase: any, integration: any) {
 
     const rowHash = simpleHash(rowObj);
 
-    const { data: existingSync } = await supabase
-      .from('sheet_synced_rows')
-      .select('*')
-      .eq('integration_id', integrationId)
-      .eq('row_index', rowIndex)
-      .single();
+    const existingSync = syncedByRowIndex.get(rowIndex);
 
     if (existingSync?.row_hash === rowHash) {
       results.skipped++;

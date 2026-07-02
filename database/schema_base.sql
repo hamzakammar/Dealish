@@ -307,6 +307,28 @@ drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
   for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
+-- LOCKDOWN: profiles_update_own lets a user update their own row including `role`,
+-- which combined with the role-based deals/analytics policies would be a privilege
+-- escalation. Block role changes from the app (authenticated/anon) here in the base
+-- schema so the guard exists regardless of which feature migrations are applied.
+-- Service role, the SQL editor (postgres), and SECURITY DEFINER RPCs (which run as
+-- the function owner) can still change roles via the invite/admin flow.
+create or replace function public.prevent_role_self_escalation()
+returns trigger language plpgsql as $$
+begin
+  if NEW.role is distinct from OLD.role
+     and current_user in ('authenticated', 'anon') then
+    raise exception 'role can only be changed via an authorized invite/admin flow';
+  end if;
+  return NEW;
+end;
+$$;
+
+drop trigger if exists trg_prevent_role_escalation on public.profiles;
+create trigger trg_prevent_role_escalation
+  before update on public.profiles
+  for each row execute function public.prevent_role_self_escalation();
+
 -- restaurants -----------------------------------------------------------------
 drop policy if exists restaurants_public_read_active on public.restaurants;
 create policy restaurants_public_read_active on public.restaurants

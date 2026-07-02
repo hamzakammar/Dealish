@@ -1,70 +1,71 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/app/lib/supabase";
-import { generateQRCodeToken, createQRCodeData } from "@/utils/qrCode";
+import { mintRedemption, createQRCodeData } from "@/utils/qrCode";
 import { useAuthContext } from "@/app/providers/auth";
 
-export function useDealQRCode(dealId: string | null) {
+type UseDealQRCode = {
+  qrCodeData: string | null;
+  pin: string | null;
+  expiresAt: string | null;
+  loading: boolean;
+  error: Error | null;
+};
+
+/**
+ * Mints a fresh single-use redemption token for the given deal and returns the
+ * QR payload plus the numeric PIN fallback. A new token is minted each time the
+ * modal opens (dealId changes / becomes non-null); the previous unused token is
+ * rotated out server-side.
+ */
+export function useDealQRCode(dealId: string | null): UseDealQRCode {
   const { session } = useAuthContext();
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!dealId) {
+    if (!dealId || !session?.user?.id) {
       setQrCodeData(null);
+      setPin(null);
+      setExpiresAt(null);
       return;
     }
 
     let mounted = true;
+    const currentDealId = dealId;
 
-    async function fetchOrGenerateQRCode() {
-      if (!dealId) return;
-      const currentDealId = dealId; // Narrow type for closure
+    async function mint() {
       setLoading(true);
       setError(null);
 
       try {
-        // First, check if deal already has a QR code token
-        const { data: deal, error: fetchError } = await supabase
-          .from("deals")
-          .select("qr_code_token")
-          .eq("id", currentDealId)
-          .single();
-
-        if (fetchError) throw fetchError;
-
-        let token = deal?.qr_code_token;
-
-        // If no token exists, generate one
-        if (!token) {
-          token = await generateQRCodeToken(currentDealId);
-          if (!token) {
-            throw new Error("Failed to generate QR code token");
-          }
-        }
+        const minted = await mintRedemption(currentDealId);
+        if (!minted) throw new Error("Could not create a redemption code");
 
         if (mounted) {
-          const qrData = createQRCodeData(currentDealId, token, session?.user?.id);
-          setQrCodeData(qrData);
+          setQrCodeData(createQRCodeData(minted.token));
+          setPin(minted.pin);
+          setExpiresAt(minted.expires_at);
         }
       } catch (e: unknown) {
-        console.error("Error fetching/generating QR code:", e);
+        console.error("Error minting redemption code:", e);
         if (mounted) {
-          setError(e instanceof Error ? e : new Error('Unknown error'));
+          setError(e instanceof Error ? e : new Error("Unknown error"));
+          setQrCodeData(null);
+          setPin(null);
         }
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     }
 
-    fetchOrGenerateQRCode();
+    mint();
 
     return () => {
       mounted = false;
     };
-  }, [dealId]);
+  }, [dealId, session?.user?.id]);
 
-  return { qrCodeData, loading, error };
+  return { qrCodeData, pin, expiresAt, loading, error };
 }
