@@ -52,3 +52,5 @@ dealish-*.json
 
 # Supabase CLI scratch state (project ref, versions, pooler URL) — not source
 supabase/.temp/
+.vercel
+
