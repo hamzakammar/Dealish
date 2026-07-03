@@ -116,11 +116,10 @@ export default function RestaurantMarker({
       key={`${restaurant.id}-${isSelected}-${hasActiveDeal}`}
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
-      anchor={{ x: 0.5, y: 1.0 }}
+      anchor={{ x: 0.5, y: 0.5 }}
       tracksViewChanges={false}
       tappable={true}
-      icon={markerImage}
-      style={markerSize}
+      image={markerImage}
     />
   );
 }

@@ -245,8 +245,8 @@ function normalizeCandidate(raw, restaurant, sourceUrl, contentHash) {
       ? raw.deal_category : 'other',
     discount_type: dt,
     discount_value: typeof raw.discount_value === 'number' ? raw.discount_value : null,
-    is_recurring: !!(days && days.length),
-    recurrence_days: days,
+    is_recurring: true,
+    recurrence_days: (days && days.length) ? days : [0, 1, 2, 3, 4, 5, 6],
     recurrence_start_time: start,
     recurrence_end_time: end,
     tags: [],
@@ -288,6 +288,11 @@ async function batchPersistCandidates(candidates) {
 }
 
 async function publishCandidate(candidateId, c) {
+  // Never publish deals without a time range
+  if (!c.recurrence_start_time || !c.recurrence_end_time) {
+    log(`    ⊘ skipped "${c.title}" (no time range)`);
+    return;
+  }
   const dealId = crypto.randomUUID();
   const dealData = {
     id: dealId,

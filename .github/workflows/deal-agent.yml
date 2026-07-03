@@ -56,10 +56,10 @@ jobs:
         run: |
           ARGS=""
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.apply }}" = "true" ]; then
-            ARGS="--apply"
+            ARGS="--apply --auto-publish --min-confidence=0.90"
           fi
           if [ "${{ inputs.auto_publish }}" = "true" ]; then
-            ARGS="$ARGS --auto-publish --min-confidence=0.85"
+            ARGS="$ARGS --auto-publish --min-confidence=0.90"
           fi
           if [ "${{ inputs.force }}" = "true" ]; then
             ARGS="$ARGS --force"
