@@ -210,6 +210,24 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 
 async function savePushToken(userId: string, token: string): Promise<void> {
   try {
+    // Remove this push token from ANY other user it was previously registered to.
+    // This prevents stale associations when multiple users log in on the same device
+    // (e.g. a customer shows their QR on the restaurant iPad, then the owner logs
+    // back in — without this cleanup the iPad token stays linked to the customer and
+    // deal-redeemed notifications arrive on the wrong device).
+    await supabase
+      .from('user_push_tokens')
+      .delete()
+      .eq('push_token', token)
+      .neq('user_id', userId);
+
+    // Also clear the legacy column on any other profile that held this token
+    await supabase
+      .from('profiles')
+      .update({ push_token: null })
+      .eq('push_token', token)
+      .neq('id', userId);
+
     // Write to legacy column for backwards compat
     await supabase
       .from('profiles')

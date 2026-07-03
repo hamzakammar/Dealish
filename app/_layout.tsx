@@ -1,5 +1,5 @@
 import { supabase } from '@/app/lib/supabase';
-import AuthProvider from '@/app/providers/auth';
+import AuthProvider, { useAuthContext } from '@/app/providers/auth';
 import { setRecoveryFlow, initRecoveryState } from '@/app/lib/recoveryState';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -241,25 +241,34 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
 // Component to handle push notifications inside AuthProvider context
 function NotificationHandler() {
   const router = useRouter();
-  
+  const { profile } = useAuthContext();
+
   // Initialize push notifications (now inside AuthProvider)
   const { notification, lastNotificationResponse } = usePushNotifications();
 
   // Handle notification taps (both foreground and background)
   useEffect(() => {
     try {
-      const notificationData = lastNotificationResponse?.notification?.request?.content?.data || 
+      const notificationData = lastNotificationResponse?.notification?.request?.content?.data ||
                              notification?.request?.content?.data;
-      
-      if (notificationData?.screen) {
-        // Navigate to the screen specified in notification data
-        router.push(notificationData.screen as any);
+
+      if (!notificationData?.screen) return;
+
+      // Guard: don't navigate owner/admin devices on deal_redeemed notifications.
+      // This is a defence-in-depth measure — the primary fix removes stale push
+      // tokens so the notification should never arrive here in the first place.
+      const isOwnerDevice = profile?.role === 'owner' || profile?.role === 'admin';
+      if (isOwnerDevice && notificationData?.type === 'deal_redeemed') {
+        return;
       }
+
+      // Navigate to the screen specified in notification data
+      router.push(notificationData.screen as any);
     } catch (e) {
       // Ignore errors in notification handling
       console.warn('Error handling notification:', e);
     }
-  }, [notification, lastNotificationResponse, router]);
+  }, [notification, lastNotificationResponse, router, profile?.role]);
 
   return null; // This component doesn't render anything
 }
