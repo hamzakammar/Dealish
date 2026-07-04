@@ -238,11 +238,8 @@ export default function MapScreen() {
   useEffect(() => {
     if (!locationLoading && !userLocation) {
       setHasLocationPermission(false);
-      setViewMode("list");
-      setSelectedRestaurant(null);
-      clearRoute();
     }
-  }, [locationLoading, userLocation, clearRoute]);
+  }, [locationLoading, userLocation]);
 
   useEffect(() => {
     if (viewMode === "list") {
@@ -588,13 +585,13 @@ export default function MapScreen() {
                 ]}
                 onPress={() => { lightTap(); setViewMode("map"); }}
                 activeOpacity={0.7}
-                disabled={!hasLocationPermission || Platform.OS === 'web'}
+                disabled={Platform.OS === 'web'}
               >
                 <Text style={[
                   styles.viewToggleText,
-                  { color: viewMode === "map" ? "#fff" : ((! hasLocationPermission || Platform.OS === 'web') ? colors.textTertiary : colors.textSecondary) },
+                  { color: viewMode === "map" ? "#fff" : (Platform.OS === 'web' ? colors.textTertiary : colors.textSecondary) },
                   viewMode === "map" && styles.viewToggleTextActive,
-                  (!hasLocationPermission || Platform.OS === 'web') && styles.viewToggleTextDisabled
+                  Platform.OS === 'web' && styles.viewToggleTextDisabled
                 ]}>
                   Map
                 </Text>

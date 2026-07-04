@@ -68,13 +68,20 @@ export default function RestaurantMarker({
   const markerImage = getMarkerImage(hasActiveDeal, isSelected);
   const size = getMarkerSize(hasActiveDeal, isSelected, scale);
 
+  const [tracked, setTracked] = React.useState(true);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setTracked(false), 500);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <Marker
       key={`${restaurant.id}-${isSelected}-${hasActiveDeal}`}
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={false}
+      tracksViewChanges={tracked}
       tappable={true}
     >
       <View style={{ width: size, height: size }}>
