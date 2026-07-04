@@ -102,7 +102,7 @@ export function isOneTimeDealActive(deal: Deal, ref: Date, lookahead: boolean): 
 export function filterActiveDeals(deals: Deal[], atTime: Date | null, tz: string = DEFAULT_TZ): Deal[] {
   const ref = atTime ?? new Date();
   const lookahead = atTime == null;
-  
+
   return deals.filter((deal) => {
     if (deal.is_active === false) return false;
 
@@ -112,4 +112,53 @@ export function filterActiveDeals(deals: Deal[], atTime: Date | null, tz: string
 
     return isOneTimeDealActive(deal, ref, lookahead);
   });
+}
+
+/**
+ * Finds the next upcoming deal that will become active today.
+ * Returns the deal along with its formatted start time, or null if none found.
+ */
+export function getNextUpcomingDeal(
+  deals: Deal[],
+  restaurantNames: Map<string, string>,
+  tz: string = DEFAULT_TZ
+): { deal: Deal; restaurantName: string; startTimeFormatted: string } | null {
+  const now = new Date();
+  const { day, hour, minute } = getLocalComponents(now, tz);
+  const currentMinutes = hour * 60 + minute;
+
+  let earliest: { deal: Deal; startMins: number } | null = null;
+
+  for (const deal of deals) {
+    if (deal.is_active === false) continue;
+    if (!deal.is_recurring) continue;
+    if (!deal.recurrence_days?.includes(day)) continue;
+    if (!deal.recurrence_start_time) continue;
+
+    const startMins = timeToMinutes(deal.recurrence_start_time);
+    // Only consider deals that haven't started yet
+    if (startMins <= currentMinutes) continue;
+
+    if (!earliest || startMins < earliest.startMins) {
+      earliest = { deal, startMins };
+    }
+  }
+
+  if (!earliest) return null;
+
+  // Format the start time nicely (e.g., "3:00 PM")
+  const startHour = Math.floor(earliest.startMins / 60);
+  const startMinute = earliest.startMins % 60;
+  const period = startHour >= 12 ? 'PM' : 'AM';
+  const displayHour = startHour === 0 ? 12 : startHour > 12 ? startHour - 12 : startHour;
+  const displayMinute = startMinute.toString().padStart(2, '0');
+  const startTimeFormatted = `${displayHour}:${displayMinute} ${period}`;
+
+  const restaurantName = restaurantNames.get(earliest.deal.restaurant_id) || 'Unknown';
+
+  return {
+    deal: earliest.deal,
+    restaurantName,
+    startTimeFormatted,
+  };
 }

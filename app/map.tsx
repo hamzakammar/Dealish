@@ -5,6 +5,7 @@ import PlanTimeSelector from "@/components/PlanTimeSelector";
 import RestaurantList from "@/components/listView";
 import RestaurantDetailCard, { RestaurantDetailCardRef } from "@/components/RestaurantDetailCard";
 import RestaurantMarker, { MarkerAssetsWarmup } from "@/components/RestaurantMarker";
+import SkeletonCard from "@/components/SkeletonCard";
 import { useRestaurantFilters } from "@/hooks/useRestaurantFilters";
 import { useRestaurants } from "@/hooks/useRestaurants";
 import { useUserLocation } from "@/hooks/useUserLocation";
@@ -13,11 +14,12 @@ import { useDirections } from "@/hooks/useDirections";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useColorScheme } from "@/components/useColorScheme";
+import { lightTap } from "@/utils/haptics";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 // Only import map components on native platforms to prevent web build failures
 const MapView = (Platform.OS === 'web' ? null : require("react-native-maps").default) as any;
@@ -73,7 +75,15 @@ export default function MapScreen() {
   const [planTime, setPlanTime] = useState<Date | null>(null);
   const { activeDealsMap, dealTitlesMap } = useActiveDealsMap(restaurants, planTime);
   const systemColorScheme = useColorScheme();
-  
+
+  const activeDealCount = useMemo(() => {
+    let count = 0;
+    activeDealsMap.forEach((hasDeals) => {
+      if (hasDeals) count++;
+    });
+    return count;
+  }, [activeDealsMap]);
+
   const isDarkMode = useMemo(() => {
     if (!settings?.appearance?.theme) return false;
     if (settings.appearance.theme === 'dark') return true;
@@ -303,6 +313,7 @@ export default function MapScreen() {
     if (selectedRestaurant?.id === restaurant.id) {
       return;
     }
+    lightTap();
     setMapIsTransitioning(true);
     setTimeout(() => setMapIsTransitioning(false), 650);
     clearRoute();
@@ -359,8 +370,10 @@ export default function MapScreen() {
 
   if (loading && restaurants.length === 0 && !region && !mapGateBypass) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color="#FE902A" />
+      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: 80, paddingHorizontal: 16 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <SkeletonCard key={i} variant="restaurant-card" />
+        ))}
       </View>
     );
   }
@@ -446,6 +459,7 @@ export default function MapScreen() {
             onRestaurantPress={handleRestaurantSelect}
             selectedRestaurant={selectedRestaurant}
             userLocation={userLocation}
+            loading={restaurantsLoading}
           />
         )}
       </View>
@@ -551,6 +565,7 @@ export default function MapScreen() {
                   viewMode === "list" && styles.viewToggleSegmentActive
                 ]}
                 onPress={() => {
+                  lightTap();
                   setViewMode("list");
                   setSelectedRestaurant(null);
                 }}
@@ -571,7 +586,7 @@ export default function MapScreen() {
                   styles.viewToggleSegment,
                   viewMode === "map" && styles.viewToggleSegmentActive
                 ]}
-                onPress={() => setViewMode("map")}
+                onPress={() => { lightTap(); setViewMode("map"); }}
                 activeOpacity={0.7}
                 disabled={!hasLocationPermission || Platform.OS === 'web'}
               >
@@ -586,6 +601,12 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
             
+            {activeDealCount > 0 && !selectedRestaurant && (
+              <Text style={[styles.activeDealCountText, { color: colors.textSecondary }]}>
+                {activeDealCount} {activeDealCount === 1 ? 'deal' : 'deals'} active nearby
+              </Text>
+            )}
+
             {!selectedRestaurant && (
               <PlanTimeSelector planTime={planTime} onChangePlanTime={setPlanTime} />
             )}
@@ -803,6 +824,12 @@ const styles = StyleSheet.create({
   },
   viewToggleTextDisabled: {
     color: '#CCC',
+  },
+  activeDealCountText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 8,
   },
   suggestionsContainer: {
     position: 'absolute',

@@ -1,6 +1,7 @@
 import { useAuthContext } from "@/app/providers/auth";
 import QRScanner from "@/components/QRScanner";
 import { sendPushNotification } from "@/utils/notifications";
+import { success as hapticSuccess } from "@/utils/haptics";
 import { parseQRCodeData, redeemRedemptionToken } from "@/utils/qrCode";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -60,6 +61,7 @@ export default function QRScannerScreen() {
       }
 
       // Brief success confirmation on the scanner (restaurant's device)
+      hapticSuccess();
       Alert.alert(
         "Verified!",
         `Deal "${result.deal_title ?? ""}" has been redeemed.`,

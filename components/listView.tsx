@@ -1,7 +1,8 @@
 import RatingDisplay from "@/components/RatingDisplay";
+import SkeletonCard from "@/components/SkeletonCard";
 import { supabase } from "@/app/lib/supabase";
 import { Deal, Restaurant, UserLocation } from "@/types/restaurant";
-import { filterActiveDeals } from "@/utils/dealActivity";
+import { filterActiveDeals, getNextUpcomingDeal } from "@/utils/dealActivity";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -9,6 +10,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   FlatList,
   Modal,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,6 +24,7 @@ interface RestaurantListProps {
   onRestaurantPress: (restaurant: Restaurant) => void;
   selectedRestaurant: Restaurant | null;
   userLocation?: UserLocation | null;
+  loading?: boolean;
 }
 
 const RestaurantCard = React.memo(function RestaurantCard({
@@ -146,57 +149,72 @@ export default function RestaurantList({
   onRestaurantPress,
   selectedRestaurant,
   userLocation,
+  loading,
 }: RestaurantListProps) {
   const [sortBy, setSortBy] = useState<SortOption>("distance");
   const [showSortModal, setShowSortModal] = useState(false);
   const [dealsMap, setDealsMap] = useState<Map<string, Deal[]>>(new Map());
+  const [allDeals, setAllDeals] = useState<Deal[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDeals = useCallback(async () => {
+    if (restaurants.length === 0) {
+      setDealsMap(new Map());
+      setAllDeals([]);
+      return;
+    }
+
+    try {
+      const ids = restaurants.map((r) => r.id);
+      const { data, error } = await supabase
+        .from("deals")
+        .select("*")
+        .in("restaurant_id", ids)
+        .eq("is_active", true)
+        .neq("is_flagged", true)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const allFetchedDeals = (data || []) as Deal[];
+      setAllDeals(allFetchedDeals);
+
+      const activeDeals = filterActiveDeals(allFetchedDeals, null);
+
+      const map = new Map<string, Deal[]>();
+      for (const deal of activeDeals) {
+        const list = map.get(deal.restaurant_id) || [];
+        list.push(deal);
+        map.set(deal.restaurant_id, list);
+      }
+      setDealsMap(map);
+    } catch (e) {
+      if (__DEV__) console.error("Error batch-fetching deals:", e);
+    }
+  }, [restaurants]);
 
   // Batch-fetch deals for all restaurants (single query instead of N queries)
   useEffect(() => {
     if (restaurants.length === 0) {
       setDealsMap(new Map());
+      setAllDeals([]);
       return;
     }
 
-    let mounted = true;
-
-    async function fetchAllDeals() {
-      try {
-        const ids = restaurants.map((r) => r.id);
-        const { data, error } = await supabase
-          .from("deals")
-          .select("*")
-          .in("restaurant_id", ids)
-          .eq("is_active", true)
-          .neq("is_flagged", true)
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-        if (!mounted) return;
-
-        const activeDeals = filterActiveDeals((data || []) as Deal[], null);
-
-        const map = new Map<string, Deal[]>();
-        for (const deal of activeDeals) {
-          const list = map.get(deal.restaurant_id) || [];
-          list.push(deal);
-          map.set(deal.restaurant_id, list);
-        }
-        setDealsMap(map);
-      } catch (e) {
-        if (__DEV__) console.error("Error batch-fetching deals:", e);
-      }
-    }
-
-    fetchAllDeals();
+    fetchDeals();
 
     // Refresh every 2 minutes (single query, not N queries)
-    const interval = setInterval(fetchAllDeals, 120000);
+    const interval = setInterval(fetchDeals, 120000);
     return () => {
-      mounted = false;
       clearInterval(interval);
     };
-  }, [restaurants]);
+  }, [restaurants, fetchDeals]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDeals();
+    setRefreshing(false);
+  }, [fetchDeals]);
 
   // Calculate distances and sort restaurants
   const sortedRestaurants = useMemo(() => {
@@ -238,6 +256,14 @@ export default function RestaurantList({
     return sorted.map((item) => item.restaurant);
   }, [restaurants, userLocation, sortBy]);
 
+  // Compute next upcoming deal for smart empty state
+  const nextDealInfo = useMemo(() => {
+    if (sortedRestaurants.length > 0) return null;
+    const restaurantNames = new Map<string, string>();
+    restaurants.forEach((r) => restaurantNames.set(r.id, r.name));
+    return getNextUpcomingDeal(allDeals, restaurantNames);
+  }, [sortedRestaurants.length, allDeals, restaurants]);
+
   const renderRestaurant = useCallback(({ item }: { item: Restaurant }) => {
     const isSelected = selectedRestaurant?.id === item.id;
 
@@ -276,19 +302,53 @@ export default function RestaurantList({
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        testID="restaurant-flatlist"
-        data={sortedRestaurants}
-        renderItem={renderRestaurant}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        style={styles.listBackground}
-        removeClippedSubviews={true}
-        initialNumToRender={8}
-        maxToRenderPerBatch={5}
-        windowSize={10}
-      />
+      {loading && restaurants.length === 0 ? (
+        <View style={styles.listContainer}>
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonCard key={i} variant="restaurant-card" />
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          testID="restaurant-flatlist"
+          data={sortedRestaurants}
+          renderItem={renderRestaurant}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.listContainer,
+            sortedRestaurants.length === 0 && styles.emptyListContainer,
+          ]}
+          showsVerticalScrollIndicator={false}
+          style={styles.listBackground}
+          removeClippedSubviews={true}
+          initialNumToRender={8}
+          maxToRenderPerBatch={5}
+          windowSize={10}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#FE902A"
+              colors={["#FE902A"]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="restaurant-outline" size={48} color="#ccc" />
+              <Text style={styles.emptyStateTitle}>No deals right now</Text>
+              {nextDealInfo ? (
+                <Text style={styles.emptyStateSubtitle}>
+                  Next: {nextDealInfo.deal.title} at {nextDealInfo.restaurantName} starts at {nextDealInfo.startTimeFormatted}
+                </Text>
+              ) : (
+                <Text style={styles.emptyStateSubtitle}>
+                  Check back later for upcoming deals nearby
+                </Text>
+              )}
+            </View>
+          }
+        />
+      )}
 
       {/* Sort Modal */}
       <Modal
@@ -375,6 +435,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 100,
+  },
+  emptyListContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 48,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1a1a1a",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 20,
   },
   modalOverlay: {
     flex: 1,
