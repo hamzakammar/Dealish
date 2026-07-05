@@ -432,6 +432,7 @@ export default function MapScreen() {
                     isSelected={isSelected}
                     onPress={handleRestaurantSelect}
                     hasActiveDeal={hasActiveDeal}
+                    isPartner={!!r.partner}
                     scale={Math.min(Math.max(0.01 / latitudeDelta, 0.6), 1.8)}
                   />
                 );
@@ -881,7 +882,7 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     flex: 1,
-    paddingTop: 240,
+    paddingTop: 170,
   },
   accountPanelOverlay: {
     position: 'absolute',
