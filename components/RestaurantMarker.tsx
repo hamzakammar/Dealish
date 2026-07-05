@@ -88,13 +88,13 @@ export default function RestaurantMarker({
   const [tracked, setTracked] = React.useState(true);
 
   React.useEffect(() => {
+    setTracked(true);
     const t = setTimeout(() => setTracked(false), 500);
     return () => clearTimeout(t);
-  }, []);
+  }, [isSelected, hasActiveDeal]);
 
   return (
     <Marker
-      key={`${restaurant.id}-${isSelected}-${hasActiveDeal}`}
       coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }}
       onPress={handlePress}
       anchor={{ x: 0.5, y: 0.5 }}
