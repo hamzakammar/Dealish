@@ -14,6 +14,7 @@ import { useDirections } from "@/hooks/useDirections";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useColorScheme } from "@/components/useColorScheme";
+import { calculateDistance } from "@/utils/distance";
 import { lightTap } from "@/utils/haptics";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
@@ -77,12 +78,16 @@ export default function MapScreen() {
   const systemColorScheme = useColorScheme();
 
   const activeDealCount = useMemo(() => {
+    if (!userLocation) return 0;
     let count = 0;
-    activeDealsMap.forEach((hasDeals) => {
-      if (hasDeals) count++;
+    restaurants.forEach((r) => {
+      if (!activeDealsMap.get(r.id)) return;
+      if (r.lat == null || r.lng == null) return;
+      const dist = calculateDistance(userLocation.lat, userLocation.lng, r.lat, r.lng);
+      if (dist <= 10) count++;
     });
     return count;
-  }, [activeDealsMap]);
+  }, [activeDealsMap, restaurants, userLocation]);
 
   const isDarkMode = useMemo(() => {
     if (!settings?.appearance?.theme) return false;

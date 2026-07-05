@@ -9,8 +9,13 @@ import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
+import { LogBox } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+LogBox.ignoreLogs([
+  'Uncaught (in promise',
+]);
 
 import AppErrorBoundary from '@/components/ErrorBoundary';
 import { useColorScheme } from '@/components/useColorScheme';
