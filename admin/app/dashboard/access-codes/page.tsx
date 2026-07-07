@@ -56,7 +56,9 @@ export default function AccessCodesPage() {
       .map((m) => m.restaurant)
       .filter(Boolean) as Restaurant[];
 
-    setRestaurants(rlist);
+    const sortedList = rlist.sort((a, b) => a.name.localeCompare(b.name));
+
+    setRestaurants(sortedList);
 
     const restaurantIds = rlist.map((r) => r.id);
     let inviteData: any[] = [];

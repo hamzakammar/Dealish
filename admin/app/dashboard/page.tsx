@@ -54,9 +54,11 @@ export default function DashboardPage() {
       .map((m) => m.restaurant)
       .filter(Boolean) as Restaurant[];
 
-    setRestaurants(list);
-    if (list.length > 0) {
-      setSelectedRestaurantId(list[0].id);
+    const sortedList = list.sort((a, b) => a.name.localeCompare(b.name));
+
+    setRestaurants(sortedList);
+    if (sortedList.length > 0) {
+      setSelectedRestaurantId(sortedList[0].id);
     }
     setLoading(false);
   };

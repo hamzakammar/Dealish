@@ -43,9 +43,11 @@ export default function ScanRedeemPage() {
       .map((m) => m.restaurant)
       .filter(Boolean) as Restaurant[];
 
-    setRestaurants(list);
-    if (list.length > 0) {
-      setRestaurantId(list[0].id);
+    const sortedList = list.sort((a, b) => a.name.localeCompare(b.name));
+
+    setRestaurants(sortedList);
+    if (sortedList.length > 0) {
+      setRestaurantId(sortedList[0].id);
     }
     setLoading(false);
   };
