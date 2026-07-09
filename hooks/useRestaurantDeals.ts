@@ -6,7 +6,7 @@ import { filterActiveDeals } from "@/utils/dealActivity";
 
 const PAGE_SIZE = 20;
 
-export function useRestaurantDeals(restaurantId: string | null) {
+export function useRestaurantDeals(restaurantId: string | null, atTime: Date | null = null) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -41,7 +41,7 @@ export function useRestaurantDeals(restaurantId: string | null) {
       if (error) throw error;
 
       if (mountedRef.current && currentFetchId === fetchCountRef.current) {
-        const processedDeals = filterActiveDeals(data || [], null);
+        const processedDeals = filterActiveDeals(data || [], atTime);
         
         if (isInitial) {
           setDeals(processedDeals);
@@ -63,7 +63,7 @@ export function useRestaurantDeals(restaurantId: string | null) {
         setLoading(false);
       }
     }
-  }, [restaurantId, page]);
+  }, [restaurantId, page, atTime]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -88,7 +88,7 @@ export function useRestaurantDeals(restaurantId: string | null) {
       subscription.remove();
       clearInterval(interval);
     };
-  }, [restaurantId]);
+  }, [restaurantId, atTime]);
 
   return { 
     deals, 

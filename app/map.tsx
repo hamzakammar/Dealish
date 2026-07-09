@@ -627,6 +627,7 @@ export default function MapScreen() {
             onOpenExternalMaps={handleOpenExternalMaps}
             canPreviewDirections={isDirectionsAvailable && !!userLocation}
             userLocation={userLocation}
+            planTime={planTime}
           />
         </>
       )}

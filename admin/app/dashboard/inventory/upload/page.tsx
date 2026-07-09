@@ -25,6 +25,27 @@ type ParsedRow = {
 
 type Field = Exclude<keyof ParsedRow, "rowIndex" | "error">;
 
+function estimateExpiryDate(name: string, category: string | null): string | null {
+  const n = (name + " " + (category || "")).toLowerCase();
+  const today = new Date();
+  let days = 0;
+
+  if (/milk|cream|yogurt|sour cream/.test(n)) days = 14;
+  else if (/bread|roll|bun|bagel|croissant/.test(n)) days = 7;
+  else if (/lettuce|spinach|herb|arugula|microgreen/.test(n)) days = 5;
+  else if (/tomato|pepper|avocado|cucumber|zucchini/.test(n)) days = 7;
+  else if (/chicken|beef|pork|lamb|fish|salmon|shrimp|seafood/.test(n)) days = 5;
+  else if (/egg/.test(n)) days = 30;
+  else if (/cheese/.test(n)) days = 21;
+  else if (/butter/.test(n)) days = 30;
+  else if (/juice|fresh/.test(n)) days = 10;
+  else if (/cooked|prepared|soup|sauce/.test(n)) days = 4;
+  else return null;
+
+  today.setDate(today.getDate() + days);
+  return today.toISOString().split("T")[0];
+}
+
 const HEADER_ALIASES: Record<string, Field> = {
   "item id": "external_product_id",
   sku: "external_product_id",
@@ -363,8 +384,9 @@ export default function BulkUploadPage() {
           price: r.unit_cost || null,
           quantity: r.quantity!,
           unit: r.unit || null,
-          expiry_date: r.expiration_date || null,
-          is_available: true,
+          expiry_date: r.expiration_date || estimateExpiryDate(r.name, r.category),
+          status: r.status || null,
+          is_available: r.status !== "out_of_stock",
         };
 
         if (found?.id) {

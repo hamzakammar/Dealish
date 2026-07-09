@@ -92,6 +92,7 @@ type RestaurantDetailCardProps = {
   userLocation?: UserLocation | null;
   /** Initial state of the sheet. Defaults to 'half' for backward compatibility */
   initialState?: SheetState;
+  planTime?: Date | null;
 };
 
 export type RestaurantDetailCardRef = {
@@ -128,11 +129,12 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   canPreviewDirections = false,
   userLocation,
   initialState = 'half', // Default to 'half' for backward compatibility
+  planTime = null,
 }, ref) => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const mapsAppName = Platform.OS === "ios" ? "Apple Maps" : "Google Maps";
-  const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id);
+  const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id, planTime);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
   const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
   const [requestCount, setRequestCount] = useState<number>(0);
