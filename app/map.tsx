@@ -89,6 +89,14 @@ export default function MapScreen() {
     return count;
   }, [activeDealsMap, restaurants, userLocation]);
 
+  const showComingSoonBanner = useMemo(() => {
+    if (!userLocation || restaurants.length === 0) return false;
+    return !restaurants.some((r) => {
+      if (r.lat == null || r.lng == null) return false;
+      return calculateDistance(userLocation.lat, userLocation.lng, r.lat, r.lng) <= 20;
+    });
+  }, [restaurants, userLocation]);
+
   const isDarkMode = useMemo(() => {
     if (!settings?.appearance?.theme) return false;
     if (settings.appearance.theme === 'dark') return true;
@@ -604,7 +612,14 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
             
-            {activeDealCount > 0 && !selectedRestaurant && (
+            {showComingSoonBanner && !selectedRestaurant && (
+              <View style={styles.comingSoonBanner}>
+                <Ionicons name="sparkles" size={16} color="#FE902A" />
+                <Text style={styles.comingSoonText}>Dealish is coming to your city soon!</Text>
+              </View>
+            )}
+
+            {activeDealCount > 0 && !selectedRestaurant && !showComingSoonBanner && (
               <Text style={[styles.activeDealCountText, { color: colors.textSecondary }]}>
                 {activeDealCount} {activeDealCount === 1 ? 'deal' : 'deals'} active nearby
               </Text>
@@ -834,6 +849,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 8,
+  },
+  comingSoonBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: '#FEF3E2',
+    borderRadius: 10,
+  },
+  comingSoonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#C26A00',
   },
   suggestionsContainer: {
     position: 'absolute',
