@@ -318,22 +318,24 @@ export default function AnalyticsPage() {
             <h2 className="text-sm font-semibold text-gray-900 mb-4">
               Customer Activity
             </h2>
-            <div className="flex items-end justify-between gap-1 h-40">
+            <div className="flex items-end justify-between gap-1" style={{ height: 160 }}>
               {chartData.map((value, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-1 flex-col items-center gap-1"
+                  className="flex flex-1 flex-col items-center h-full"
                 >
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-gray-400 mb-1">
                     {value > 0 ? value : ""}
                   </span>
-                  <div
-                    className="w-full max-w-[24px] rounded-t bg-[#FE902A] transition-all"
-                    style={{
-                      height: `${Math.max((value / maxChartValue) * 100, 2)}%`,
-                    }}
-                  />
-                  <span className="text-[9px] text-gray-400 truncate w-full text-center">
+                  <div className="flex-1 w-full flex items-end justify-center">
+                    <div
+                      className="w-full max-w-[24px] rounded-t bg-[#FE902A] transition-all"
+                      style={{
+                        height: `${Math.max((value / maxChartValue) * 100, value > 0 ? 8 : 2)}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-gray-400 truncate w-full text-center mt-1">
                     {chartLabels[idx]}
                   </span>
                 </div>
