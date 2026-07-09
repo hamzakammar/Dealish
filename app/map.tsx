@@ -614,8 +614,7 @@ export default function MapScreen() {
             
             {showComingSoonBanner && !selectedRestaurant && (
               <View style={styles.comingSoonBanner}>
-                <Ionicons name="sparkles" size={16} color="#FE902A" />
-                <Text style={styles.comingSoonText}>Dealish is coming to your city soon!</Text>
+                <Text style={styles.comingSoonText}>Dealish is coming to your city soon.</Text>
               </View>
             )}
 
