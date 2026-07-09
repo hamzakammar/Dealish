@@ -48,15 +48,14 @@ export default function Index() {
       // Wait for AsyncStorage checks to complete
       if (hasSeenWelcome === null || hasCompletedOnboarding === null) return;
 
-      // While auth is still resolving session/profile, isLoading is true and we return above.
-      // Do NOT block on `session && profile === null`: after a failed/missing profile fetch,
-      // profile stays null and isLoading is false — the old check caused an infinite splash.
+      // If authenticated but profile hasn't loaded yet, wait for it.
+      // The 8s profile timeout handles the case where it never resolves.
+      if (session && profile === undefined) return;
 
       // Prevent duplicate navigation
       if (hasNavigatedRef.current) return;
 
       // If this is a password recovery deep link, _layout.tsx owns navigation.
-      // Must still hide the native splash, or it stays up forever (was the main "infinite" splash bug).
       if (isRecoveryFlow()) {
         await SplashScreen.hideAsync().catch(() => {});
         return;
@@ -64,14 +63,10 @@ export default function Index() {
 
       hasNavigatedRef.current = true;
 
-      // Hide native splash right before navigating — no JS splash needed
+      // Hide native splash right before navigating
       await SplashScreen.hideAsync().catch(() => {});
 
       if (session) {
-        // profile === undefined means the fetch hasn't started yet (initial state).
-        // Wait for it — the 8s timeout in this file handles the case where it never resolves.
-        if (profile === undefined) return;
-
         // Validate token freshness
         const isTokenValid = session.expires_at && session.expires_at > Date.now() / 1000;
         
