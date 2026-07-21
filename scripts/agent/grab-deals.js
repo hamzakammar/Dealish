@@ -179,7 +179,7 @@ TEXT:
 }
 
 async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -213,7 +213,10 @@ async function extractDeals(restaurant, text) {
   const prompt = buildPrompt(restaurant, text);
   const raw = GEMINI_KEY ? await callGemini(prompt) : await callOpenAI(prompt);
   let parsed;
-  try { parsed = JSON.parse(raw); } catch { return []; }
+  try { parsed = JSON.parse(raw); } catch (e) {
+    log(`  ! JSON parse failed for "${restaurant.name}": ${e.message}`);
+    return [];
+  }
   return Array.isArray(parsed?.deals) ? parsed.deals : [];
 }
 
