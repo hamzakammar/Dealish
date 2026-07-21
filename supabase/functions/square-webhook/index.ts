@@ -15,13 +15,28 @@ import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts';
 
 const SQUARE_WEBHOOK_SIGNATURE_KEY = Deno.env.get('SQUARE_WEBHOOK_SIGNATURE_KEY') || '';
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  if (bufA.byteLength !== bufB.byteLength) return false;
+  let diff = 0;
+  for (let i = 0; i < bufA.byteLength; i++) {
+    diff |= bufA[i] ^ bufB[i];
+  }
+  return diff === 0;
+}
+
 function verifySignature(body: string, signature: string, url: string): boolean {
-  if (!SQUARE_WEBHOOK_SIGNATURE_KEY) return true; // Skip in dev
+  if (!SQUARE_WEBHOOK_SIGNATURE_KEY) {
+    console.error('SQUARE_WEBHOOK_SIGNATURE_KEY is not set — rejecting request');
+    return false;
+  }
   const payload = url + body;
   const hash = createHmac('sha256', SQUARE_WEBHOOK_SIGNATURE_KEY)
     .update(payload)
     .digest('base64');
-  return hash === signature;
+  return timingSafeEqual(hash, signature);
 }
 
 serve(async (req) => {
@@ -64,7 +79,7 @@ serve(async (req) => {
     const restaurantId = tokenRow.restaurant_id;
 
     if (eventType === 'order.created' || eventType === 'order.updated') {
-      await handleOrder(supabase, restaurantId, event.data?.object?.order_created);
+      await handleOrder(supabase, restaurantId, event.data?.object?.order);
     } else if (eventType === 'inventory.count.updated') {
       await handleInventoryUpdate(supabase, restaurantId, event.data?.object?.inventory_counts);
     } else if (eventType === 'catalog.version.updated') {
