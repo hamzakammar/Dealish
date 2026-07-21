@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+
+type ScanRecord = {
+  id: string;
+  scanned_at: string;
+  deal_id: string;
+};
 
 type DealStat = {
   deal_id: string;
@@ -15,6 +21,7 @@ type Restaurant = { id: string; name: string };
 
 const TIME_RANGES = ["1D", "1W", "1M", "3M", "6M"] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
+const PAGE_SIZE = 25;
 
 export default function AnalyticsPage() {
   const supabase = createClient();
@@ -26,6 +33,9 @@ export default function AnalyticsPage() {
   const [dealStats, setDealStats] = useState<DealStat[]>([]);
   const [chartData, setChartData] = useState<number[]>([]);
   const [chartLabels, setChartLabels] = useState<string[]>([]);
+  const [scanRecords, setScanRecords] = useState<ScanRecord[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,9 +74,7 @@ export default function AnalyticsPage() {
     setLoading(false);
   };
 
-  const fetchAnalytics = async () => {
-    if (!selectedRestaurantId) return;
-
+  const getStartDate = useCallback(() => {
     const now = new Date();
     const startDate = new Date();
     switch (timeRange) {
@@ -86,6 +94,14 @@ export default function AnalyticsPage() {
         startDate.setMonth(now.getMonth() - 6);
         break;
     }
+    return startDate;
+  }, [timeRange]);
+
+  const fetchAnalytics = async () => {
+    if (!selectedRestaurantId) return;
+
+    const now = new Date();
+    const startDate = getStartDate();
 
     const { data: deals } = await supabase
       .from("deals")
@@ -98,23 +114,61 @@ export default function AnalyticsPage() {
       setDealStats([]);
       setChartData([]);
       setChartLabels([]);
+      setScanRecords([]);
+      setHasMore(false);
       return;
     }
 
-    const { data: scans } = await supabase
+    // Fetch first page of scans for display
+    const { data: scans, count } = await supabase
       .from("qr_code_scans")
-      .select("id, scanned_at, deal_id")
+      .select("id, scanned_at, deal_id", { count: "exact" })
       .in("deal_id", dealIds)
       .gte("scanned_at", startDate.toISOString())
-      .order("scanned_at", { ascending: false });
+      .order("scanned_at", { ascending: false })
+      .range(0, PAGE_SIZE - 1);
+
+    const total = count ?? 0;
+    const records = (scans || []) as ScanRecord[];
+    setScanRecords(records);
+    setHasMore(total > PAGE_SIZE);
 
     const dealMap: Record<string, string> = {};
     (deals || []).forEach((deal) => {
       dealMap[deal.id] = deal.title;
     });
 
+    // For stats + chart, fetch all scans but only the minimal fields needed
+    // Use pagination to avoid loading everything at once for very large datasets
+    let allScans: ScanRecord[] = [];
+    if (total <= 500) {
+      const { data: all } = await supabase
+        .from("qr_code_scans")
+        .select("id, scanned_at, deal_id")
+        .in("deal_id", dealIds)
+        .gte("scanned_at", startDate.toISOString())
+        .order("scanned_at", { ascending: false })
+        .range(0, 499);
+      allScans = (all || []) as ScanRecord[];
+    } else {
+      // For very large datasets, fetch in batches of 500
+      let offset = 0;
+      while (offset < total) {
+        const { data: batch } = await supabase
+          .from("qr_code_scans")
+          .select("id, scanned_at, deal_id")
+          .in("deal_id", dealIds)
+          .gte("scanned_at", startDate.toISOString())
+          .order("scanned_at", { ascending: false })
+          .range(offset, offset + 499);
+        if (!batch || batch.length === 0) break;
+        allScans = allScans.concat(batch as ScanRecord[]);
+        offset += 500;
+      }
+    }
+
     const dealScanMap: Record<string, { title: string; count: number }> = {};
-    (scans || []).forEach((scan) => {
+    allScans.forEach((scan) => {
       const dealId = scan.deal_id;
       if (dealId) {
         if (!dealScanMap[dealId]) {
@@ -124,7 +178,6 @@ export default function AnalyticsPage() {
       }
     });
 
-    const total = scans?.length || 0;
     const maxScans = Math.max(
       ...Object.values(dealScanMap).map((d) => d.count),
       1
@@ -151,7 +204,7 @@ export default function AnalyticsPage() {
           date.setDate(date.getDate() - (6 - i));
           return date.toLocaleDateString("en-US", { weekday: "short" });
         });
-        (scans || []).forEach((scan) => {
+        allScans.forEach((scan) => {
           const scanDate = new Date(scan.scanned_at);
           const daysAgo = Math.floor(
             (now.getTime() - scanDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -168,7 +221,7 @@ export default function AnalyticsPage() {
           const hour = (now.getHours() - (23 - i) + 24) % 24;
           return `${hour}:00`;
         });
-        (scans || []).forEach((scan) => {
+        allScans.forEach((scan) => {
           const scanDate = new Date(scan.scanned_at);
           const hoursAgo = Math.floor(
             (now.getTime() - scanDate.getTime()) / (1000 * 60 * 60)
@@ -186,7 +239,7 @@ export default function AnalyticsPage() {
           date.setDate(date.getDate() - (29 - i));
           return `${date.getMonth() + 1}/${date.getDate()}`;
         });
-        (scans || []).forEach((scan) => {
+        allScans.forEach((scan) => {
           const scanDate = new Date(scan.scanned_at);
           const daysAgo = Math.floor(
             (now.getTime() - scanDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -200,7 +253,7 @@ export default function AnalyticsPage() {
       case "3M": {
         cData = new Array(12).fill(0);
         cLabels = Array.from({ length: 12 }, (_, i) => `W${i + 1}`);
-        (scans || []).forEach((scan) => {
+        allScans.forEach((scan) => {
           const scanDate = new Date(scan.scanned_at);
           const weeksAgo = Math.floor(
             (now.getTime() - scanDate.getTime()) / (1000 * 60 * 60 * 24 * 7)
@@ -218,7 +271,7 @@ export default function AnalyticsPage() {
           date.setMonth(date.getMonth() - (5 - i));
           return date.toLocaleDateString("en-US", { month: "short" });
         });
-        (scans || []).forEach((scan) => {
+        allScans.forEach((scan) => {
           const scanDate = new Date(scan.scanned_at);
           const monthsAgo =
             (now.getFullYear() - scanDate.getFullYear()) * 12 +
@@ -235,6 +288,33 @@ export default function AnalyticsPage() {
     setDealStats(stats);
     setChartData(cData);
     setChartLabels(cLabels);
+  };
+
+  const loadMoreScans = async () => {
+    if (!selectedRestaurantId || loadingMore) return;
+    setLoadingMore(true);
+
+    const startDate = getStartDate();
+    const { data: deals } = await supabase
+      .from("deals")
+      .select("id")
+      .eq("restaurant_id", selectedRestaurantId);
+
+    const dealIds = (deals || []).map((d) => d.id);
+    const offset = scanRecords.length;
+
+    const { data: scans } = await supabase
+      .from("qr_code_scans")
+      .select("id, scanned_at, deal_id")
+      .in("deal_id", dealIds)
+      .gte("scanned_at", startDate.toISOString())
+      .order("scanned_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    const newRecords = (scans || []) as ScanRecord[];
+    setScanRecords((prev) => [...prev, ...newRecords]);
+    setHasMore(newRecords.length === PAGE_SIZE);
+    setLoadingMore(false);
   };
 
   if (loading) {
@@ -373,6 +453,47 @@ export default function AnalyticsPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Recent Scans */}
+          {scanRecords.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Recent Scans
+              </h2>
+              <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Deal</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-gray-500">Scanned At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scanRecords.map((scan) => {
+                      const dealTitle = dealStats.find((d) => d.deal_id === scan.deal_id)?.deal_title || "Unknown";
+                      return (
+                        <tr key={scan.id} className="border-b border-gray-50 last:border-0">
+                          <td className="px-4 py-2.5 text-gray-900">{dealTitle}</td>
+                          <td className="px-4 py-2.5 text-gray-500">
+                            {new Date(scan.scanned_at).toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {hasMore && (
+                <button
+                  onClick={loadMoreScans}
+                  disabled={loadingMore}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  {loadingMore ? "Loading..." : "Load More"}
+                </button>
+              )}
             </div>
           )}
         </>
