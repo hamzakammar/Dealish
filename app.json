@@ -19,7 +19,6 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Dealish uses your location to show nearby restaurants with active deals on the map and sort them by distance from you.",
-        "NSLocationAlwaysUsageDescription": "Dealish uses your location to show nearby restaurants with active deals on the map and sort them by distance from you.",
         "NSCameraUsageDescription": "Dealish uses your camera to scan QR codes at restaurants so you can redeem deals at checkout.",
         "NSPhotoLibraryUsageDescription": "Dealish accesses your photo library so restaurant owners can upload hero photos of their restaurant (storefront, dishes, interior) when creating or editing their listing.",
         "NSPhotoLibraryAddUsageDescription": "Dealish saves QR codes you generate for your restaurant deals to your photo library so you can print or share them."
@@ -40,8 +39,11 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Dealish",
       "versionCode": 44,
+      "allowBackup": false,
       "permissions": [
-        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],
       "intentFilters": [
@@ -96,7 +98,8 @@
       ],
       "./plugins/withEntitlementsModification",
       "./plugins/withGoogleMaps",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
 // Use static property access so Expo's Babel plugin can inline these at build time
@@ -38,18 +40,24 @@ export const getAuthRedirectUrl = () => {
   return 'dealish://auth/callback';
 };
 
+const SecureStoreAdapter = {
+    getItem: (key: string) => SecureStore.getItemAsync(key),
+    setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+    removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+};
+
+const storage = isServer
+    ? undefined
+    : Platform.OS === 'web'
+        ? AsyncStorage
+        : SecureStoreAdapter;
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        storage: isServer ? undefined : AsyncStorage, // Don't use AsyncStorage during static export
-        persistSession: !isServer, // Don't persist sessions during static export
-        autoRefreshToken: !isServer, // Auto-refresh tokens to keep session alive
-        detectSessionInUrl: !isServer, // Don't detect session in URL during static export (avoids htmlRoutes error)
-        // Session persistence:
-        // - Access tokens expire after 1 hour (default)
-        // - Refresh tokens expire after 2 weeks (default) 
-        // - autoRefreshToken will automatically refresh access tokens using refresh tokens
-        // - Sessions persist in AsyncStorage and will be restored on app restart
-        // - If refresh token expires (after 2 weeks of inactivity), user will need to sign in again
-        storageKey: 'dealish-auth-token', // Custom storage key for better isolation
+        storage,
+        persistSession: !isServer,
+        autoRefreshToken: !isServer,
+        detectSessionInUrl: !isServer,
+        storageKey: 'dealish-auth-token',
     }
 });

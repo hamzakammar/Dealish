@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Only import map components on native platforms to prevent web build failures
 const MapView = (Platform.OS === 'web' ? null : require("react-native-maps").default) as any;
@@ -52,6 +53,7 @@ const fallbackRegion: RegionType = {
 };
 
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
   const blurredMapRef = useRef<any>(null);
   const restaurantCardRef = useRef<RestaurantDetailCardRef | null>(null);
@@ -476,7 +478,7 @@ export default function MapScreen() {
       </View>
 
       {!isAccountPanelOpen && !isFilterPanelOpen && (
-        <View style={[styles.topBarContainer, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
+        <View style={[styles.topBarContainer, { paddingTop: insets.top + 8 }, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
           {viewMode === "map" && region && Platform.OS === 'ios' && MapView && (
             <View style={styles.blurredMapBackground}>
               <MapView
@@ -733,7 +735,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingTop: 50,
     paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: 'transparent',

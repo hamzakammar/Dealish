@@ -1,19 +1,10 @@
+import { supabase } from "@/app/lib/supabase";
 import { RouteCoordinate, UserLocation } from "@/types/restaurant";
 import polyline from "@mapbox/polyline";
 import { useCallback, useRef, useState, type RefObject } from "react";
 import { Alert } from "react-native";
 
-const ORS_API_KEY = process.env.EXPO_PUBLIC_ORS_API_KEY || "";
-
-// Validate API key at module load time
-const isDirectionsAvailable = Boolean(ORS_API_KEY && ORS_API_KEY.trim() !== "");
-
-if (!isDirectionsAvailable) {
-  console.warn(
-    "Directions feature is disabled: EXPO_PUBLIC_ORS_API_KEY is not configured. " +
-    "To enable directions, add your OpenRouteService API key to your .env file."
-  );
-}
+const isDirectionsAvailable = true;
 
 // Multiplier for route bounds padding to ensure the route is visible with adequate margin
 // A value of 1.5 adds 50% padding on each side, preventing the route from touching map edges
@@ -40,11 +31,8 @@ export function useDirections() {
         return;
       }
 
-      if (!isDirectionsAvailable || !ORS_API_KEY) {
-        Alert.alert(
-          "Directions Unavailable",
-          "Directions are not configured. Please add your OpenRouteService API key to the EXPO_PUBLIC_ORS_API_KEY environment variable."
-        );
+      if (!isDirectionsAvailable) {
+        Alert.alert("Directions Unavailable", "Directions are not configured.");
         return;
       }
 
@@ -54,30 +42,17 @@ export function useDirections() {
         const start = [userLocation.lng, userLocation.lat];
         const end = [destinationLng, destinationLat];
 
-        const response = await fetch(
-          "https://api.openrouteservice.org/v2/directions/driving-car?format=geojson",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: ORS_API_KEY,
-            },
-            body: JSON.stringify({
-              coordinates: [start, end],
-            }),
-          }
-        );
+        const { data, error } = await supabase.functions.invoke("directions", {
+          body: { start, end },
+        });
 
         if (myGeneration !== directionsGenerationRef.current) {
           return;
         }
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Directions API error: ${response.status} - ${errorText}`);
+        if (error) {
+          throw new Error(error.message || "Directions request failed");
         }
-
-        const data = await response.json();
 
         if (myGeneration !== directionsGenerationRef.current) {
           return;
