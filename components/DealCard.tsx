@@ -236,14 +236,6 @@ export default function DealCard({ deal, isPartner = false, isActive }: DealCard
           </View>
         )}
 
-        {/* Auto-detected (scraped) deals are unverified by the restaurant */}
-        {deal.source === 'scraped' && (
-          <View style={styles.unverifiedRow}>
-            <Ionicons name="sparkles-outline" size={12} color="#92400E" />
-            <Text style={styles.unverifiedText}>Auto-detected · not yet verified by the restaurant</Text>
-          </View>
-        )}
-
         {/* Description */}
         {deal.description && (
           <Text style={[styles.dealDescription, { color: colors.textSecondary }]} numberOfLines={4}>
@@ -454,22 +446,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#22C55E",
-  },
-  unverifiedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
-  },
-  unverifiedText: {
-    fontSize: 11,
-    color: '#92400E',
-    fontWeight: '600',
   },
   dealDescription: {
     fontSize: 14,

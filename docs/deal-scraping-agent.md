@@ -2,7 +2,9 @@
 
 A weekly job that auto-detects deals for **non-partner** restaurants from their own
 website and feeds them into a **review queue** for admin approval. Approved deals
-are published into `deals` with `source='scraped'` and an "unverified" badge.
+are published into `deals` with `source='scraped'`. (The consumer-facing
+"Auto-detected · unverified" badge on `DealCard` was **removed** on 2026-07-31 by
+product decision; `source='scraped'` is still stored for provenance/opt-out/flagging.)
 
 > Status: **code complete (phases 0–3), but never provisioned or run.** As of the
 > last check the agent schema is **not applied to the live DB** (`scraped_deal_candidates`,
@@ -28,8 +30,11 @@ shaped by accuracy + consent, not by extraction cleverness:
   an admin approves; approval publishes.
 - **Provenance is mandatory.** Every candidate stores `source_url`, an
   `evidence_quote` (the exact text it was read from), and a `confidence` score.
-- **Unverified labeling.** Published scraped deals render with an
-  "Auto-detected · unverified" badge + a "Claim / correct" CTA (partner funnel).
+- **Unverified labeling.** ~~Published scraped deals render with an
+  "Auto-detected · unverified" badge~~ — the consumer badge was **removed 2026-07-31**
+  by product decision. Provenance is still tracked server-side (`source`,
+  `source_url`, `evidence_quote`, `confidence`) and the "Claim / correct" partner
+  funnel is unaffected. Re-adding the badge is a separate product decision.
 - **One-click opt-out**, honored immediately (`restaurants.deals_scrape_opt_out`).
 - **Self-correcting.** `deal_flags` thumbs-down on a scraped deal auto-deactivates it
   past a threshold.
@@ -94,8 +99,9 @@ RLS). Not an edge function — the batch is long-running/bursty, which edge func
   discovery/fetch with no LLM key.
 - **Phase 2 — review + publish.** Operator screen `app/admin/deal-review.tsx`
   (`hooks/useScrapedDealCandidates.ts`): approve publishes a `deals` row
-  (`source='scraped'`); `DealCard` shows the "Auto-detected · unverified" badge;
-  `deal_flags` auto-deactivation trigger retires repeatedly-flagged scraped deals.
+  (`source='scraped'`; the consumer "Auto-detected · unverified" badge was removed
+  2026-07-31); `deal_flags` auto-deactivation trigger retires repeatedly-flagged
+  scraped deals.
 - **Phase 3 — automate.** Weekly GitHub Actions cron (`.github/workflows/deal-agent.yml`);
   per-restaurant staleness expiry (un-reviewed candidates not re-found → `stale`);
   opt-in `--auto-publish --min-confidence=` (off by default — v1 is queue-only).
