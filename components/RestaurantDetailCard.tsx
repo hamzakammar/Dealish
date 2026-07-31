@@ -7,6 +7,11 @@ import { useRestaurantDeals } from "@/hooks/useRestaurantDeals";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { Restaurant, UserLocation } from "@/types/restaurant";
 import { trackVisit } from "@/utils/activity";
+import {
+  getActiveDealIdSet,
+  getDealScheduleLabel,
+  getPrimaryDeal,
+} from "@/utils/dealActivity";
 import { calculateDistance, formatDistance } from "@/utils/distance";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,12 +88,8 @@ export type SheetState = 'peek' | 'half' | 'full';
 type RestaurantDetailCardProps = {
   restaurant: Restaurant;
   onClose: () => void;
-  /** In-app route preview (e.g. ORS polyline on the map). */
-  onPreviewRoute?: () => void;
   /** Open Apple Maps / Google Maps for turn-by-turn navigation. */
   onOpenExternalMaps: () => void;
-  /** When true, primary action can draw a preview route (API key + user location available). */
-  canPreviewDirections?: boolean;
   userLocation?: UserLocation | null;
   /** Initial state of the sheet. Defaults to 'half' for backward compatibility */
   initialState?: SheetState;
@@ -124,9 +125,7 @@ async function fetchIsFavourite(restaurantId: string): Promise<boolean> {
 const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetailCardProps>(({
   restaurant,
   onClose,
-  onPreviewRoute,
   onOpenExternalMaps,
-  canPreviewDirections = false,
   userLocation,
   initialState = 'half', // Default to 'half' for backward compatibility
   planTime = null,
@@ -268,6 +267,32 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     );
     return formatDistance(dist);
   }, [userLocation, restaurant.lat, restaurant.lng]);
+
+  /**
+   * Deal presentation:
+   * - `activeDealIds` marks which deals are currently active (or active at the
+   *   chosen plan time) using the shared deal-activity logic.
+   * - `sortedDeals` shows every available deal, active ones first.
+   * - `primaryDeal` is the headline deal shown above rating/address.
+   */
+  const activeDealIds = useMemo(
+    () => getActiveDealIdSet(deals, planTime),
+    [deals, planTime]
+  );
+  const sortedDeals = useMemo(
+    () =>
+      [...deals].sort(
+        (a, b) =>
+          (activeDealIds.has(a.id) ? 0 : 1) - (activeDealIds.has(b.id) ? 0 : 1)
+      ),
+    [deals, activeDealIds]
+  );
+  const primaryDeal = useMemo(
+    () => getPrimaryDeal(deals, planTime),
+    [deals, planTime]
+  );
+  const primaryDealActive = primaryDeal ? activeDealIds.has(primaryDeal.id) : false;
+  const primaryDealSchedule = primaryDeal ? getDealScheduleLabel(primaryDeal) : null;
   
   /**
    * Clamp helper for height bounds
@@ -548,6 +573,10 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   // Combine base animation with drag gesture and state offset
   const translateY = Animated.add(baseTranslateY, dragY);
 
+  const hasHero = Boolean(
+    (restaurant.display_image || restaurant.image_url) && !heroError
+  );
+
   return (
     <Animated.View
       style={[
@@ -560,117 +589,153 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
       ]}
       pointerEvents="box-none"
     >
-      {/* Hero image section - full state only, positioned absolutely to fill from top */}
-      {sheetState === 'full' && (restaurant.display_image || restaurant.image_url) && !heroError && (
-        <View style={styles.heroFullContainer}>
-          <Image
-            source={{ uri: restaurant.display_image || restaurant.image_url }}
-            style={styles.heroImage}
-            resizeMode="cover"
-            onError={() => setHeroError(true)}
-          />
-          <View style={styles.heroOverlay} />
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>{restaurant.name}</Text>
-            {restaurant.address && (
-              <View style={styles.heroAddressRow}>
-                <AntDesign name="environment" size={14} color="#fff" />
-                <Text style={styles.heroAddressText}>{restaurant.address}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-
-
-      {/* Draggable area: handle + header */}
+      {/* Draggable area: handle + compact header (always visible) */}
       <Animated.View
         {...panResponder.panHandlers}
-        style={[
-          styles.draggableArea,
-          sheetState === 'full' && styles.draggableAreaOverlayFull,
-        ]}
+        style={styles.draggableArea}
         pointerEvents="box-none"
       >
         <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
-        <View style={[styles.header, { borderBottomColor: colors.border }, sheetState === 'full' && styles.headerOverlayFull]} pointerEvents="auto">
+        <View style={[styles.header, { borderBottomColor: colors.border }]} pointerEvents="auto">
           <View style={styles.headerMain}>
-            {sheetState !== 'full' && (
-              <View style={styles.logoContainer}>
-                {(restaurant.logo_url || restaurant.image_url || restaurant.display_image) && !logoError ? (
-                  <Image
-                    source={{ uri: restaurant.logo_url || restaurant.image_url || restaurant.display_image }}
-                    style={styles.logo}
-                    resizeMode="cover"
-                    onError={() => setLogoError(true)}
-                  />
-                ) : (
-                  <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: colors.cardSecondary }]}>
-                    <AntDesign name="picture" size={24} color={colors.textTertiary} />
-                  </View>
-                )}
-              </View>
-            )}
-            <View style={styles.headerContent}>
-              {!(sheetState === 'full' && (restaurant.display_image || restaurant.image_url)) && (
-                <Text style={[styles.restaurantName, { color: colors.text }]}>
-                  {restaurant.name}
-                </Text>
-              )}
-              {sheetState === 'half' && (
-                <RatingDisplay
-                  rating={restaurant.rating}
-                  ratingCount={restaurant.rating_count}
-                  size={14}
-                  showCount={true}
+            <View style={styles.logoContainer}>
+              {(restaurant.logo_url || restaurant.image_url || restaurant.display_image) && !logoError ? (
+                <Image
+                  source={{ uri: restaurant.logo_url || restaurant.image_url || restaurant.display_image }}
+                  style={styles.logo}
+                  resizeMode="cover"
+                  onError={() => setLogoError(true)}
                 />
-              )}
-              {/* Show address and distance in half and full states */}
-              {sheetState !== 'peek' && sheetState !== 'full' && restaurant.address && (
-                <View style={styles.addressRow}>
-                  <AntDesign name="environment" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.addressText, { color: colors.textSecondary }]}>{restaurant.address}</Text>
+              ) : (
+                <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: colors.cardSecondary }]}>
+                  <AntDesign name="picture" size={24} color={colors.textTertiary} />
                 </View>
               )}
-              {sheetState !== 'peek' && sheetState !== 'full' && distance && (
-                <View style={styles.distanceRow}>
-                  <AntDesign name="environment" size={14} color="#FE902A" />
-                  <Text style={styles.distanceText}>{distance} away</Text>
-                </View>
-              )}
-              {/* Show distance only in peek state */}
+            </View>
+            <View style={styles.headerContent}>
+              <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
+                {restaurant.name}
+              </Text>
               {sheetState === 'peek' && distance && (
                 <Text style={styles.peekDistanceText}>{distance} away</Text>
               )}
             </View>
           </View>
           <TouchableOpacity
-            style={[styles.closeButton, sheetState === 'full' && styles.closeButtonOverlayFull]}
+            style={styles.closeButton}
             onPress={handleClose}
           >
-            <AntDesign name="close" size={20} color={sheetState === 'full' ? '#fff' : colors.text} />
+            <AntDesign name="close" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
       </Animated.View>
 
-      {/* Content area - only show in half and full states */}
+      {/* Unified scroll: hero + info + headings + deals scroll together */}
       {sheetState !== 'peek' && (
         <ScrollView
-          style={[styles.content, sheetState === 'full' && styles.contentFullState]}
+          style={styles.content}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={sheetState === 'full' ? styles.fullScrollContent : styles.scrollContent}
+          contentContainerStyle={styles.scrollContent}
           pointerEvents="auto"
-          scrollEnabled={true} // Already inside sheetState !== 'peek' block
+          scrollEnabled={true}
         >
-          {/* Description - show in half state only */}
-          {sheetState === 'half' && restaurant.description && (
+          {/* Hero image (full state) — in-flow so it scrolls with the content */}
+          {sheetState === 'full' && hasHero && (
+            <Image
+              source={{ uri: restaurant.display_image || restaurant.image_url }}
+              style={styles.heroImageInline}
+              resizeMode="cover"
+              onError={() => setHeroError(true)}
+            />
+          )}
+
+          {/* Primary deal headline — name + schedule/status, before rating/address */}
+          {!dealsLoading && primaryDeal && (
+            <View
+              style={[
+                styles.primaryDeal,
+                primaryDealActive
+                  ? (colors.isDark ? styles.primaryDealActiveDark : styles.primaryDealActive)
+                  : { backgroundColor: colors.cardSecondary, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.primaryDealTopRow}>
+                <Text style={[styles.primaryDealName, { color: colors.text }]} numberOfLines={2}>
+                  {primaryDeal.title}
+                </Text>
+                <View style={[styles.statusPill, primaryDealActive ? styles.statusPillActive : styles.statusPillInactive]}>
+                  {primaryDealActive && <View style={styles.statusDot} />}
+                  <Text style={primaryDealActive ? styles.statusPillActiveText : styles.statusPillInactiveText}>
+                    {primaryDealActive ? 'Active now' : 'Upcoming'}
+                  </Text>
+                </View>
+              </View>
+              {primaryDealSchedule && (
+                <View style={styles.primaryDealScheduleRow}>
+                  <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.primaryDealSchedule, { color: colors.textSecondary }]}>
+                    {primaryDealSchedule}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Restaurant meta: rating, address, distance (after deal headline) */}
+          <View style={styles.metaSection}>
+            <RatingDisplay
+              rating={restaurant.rating}
+              ratingCount={restaurant.rating_count}
+              size={14}
+              showCount={true}
+            />
+            {restaurant.address && (
+              <View style={styles.addressRow}>
+                <AntDesign name="environment" size={14} color={colors.textSecondary} />
+                <Text style={[styles.addressText, { color: colors.textSecondary }]}>{restaurant.address}</Text>
+              </View>
+            )}
+            {distance && (
+              <View style={styles.distanceRow}>
+                <AntDesign name="environment" size={14} color="#FE902A" />
+                <Text style={styles.distanceText}>{distance} away</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Description */}
+          {restaurant.description && (
             <View style={styles.section}>
               <Text style={[styles.description, { color: colors.textSecondary }]}>{restaurant.description}</Text>
             </View>
           )}
 
-          {/* Partner request button - show for non-partner restaurants in half and full states */}
+          {/* Deals section — all available deals; active ones get green treatment */}
+          <View style={styles.dealsSection}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Deals</Text>
+            {dealsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FE902A" />
+              </View>
+            ) : sortedDeals.length > 0 ? (
+              sortedDeals.map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  isPartner={Boolean(restaurant.partner)}
+                  isActive={activeDealIds.has(deal.id)}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <AntDesign name="inbox" size={48} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No deals available</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Partner request CTA — below deal information */}
           {!restaurant.partner && (
             <View style={styles.partnerRequestSection}>
               <TouchableOpacity
@@ -694,36 +759,10 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               </TouchableOpacity>
             </View>
           )}
-
-          {/* Deals section */}
-          <View style={sheetState === 'full' ? styles.fullDealsSection : styles.dealsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Deals</Text>
-            {dealsLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#FE902A" />
-              </View>
-            ) : deals.length > 0 ? (
-              deals.map((deal) => (
-                <DealCard key={deal.id} deal={deal} isPartner={Boolean(restaurant.partner)} />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <AntDesign name="inbox" size={48} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No deals available</Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Additional content for full state only */}
-          {sheetState === 'full' && (
-            <View style={styles.fullStateContent}>
-              {/* Placeholder for future full state content */}
-            </View>
-          )}
         </ScrollView>
       )}
 
-      {/* Footer - always visible */}
+      {/* Footer - always visible: Navigate (external maps) + favourite */}
       <View
         style={[
           styles.footer,
@@ -736,65 +775,24 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
         ]}
         pointerEvents="auto"
       >
-        <View style={styles.directionsButtonGroup}>
-          {canPreviewDirections && onPreviewRoute ? (
-            <TouchableOpacity
-              style={[styles.directionsButton, styles.directionsButtonInGroup]}
-              onPress={() => {
-                setSheetState('peek');
-                onPreviewRoute();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Show driving route on the map"
-            >
-              <AntDesign
-                name="arrow-right"
-                size={17}
-                color="#fff"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.directionsButtonText}>Show route</Text>
-            </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity
-            style={
-              canPreviewDirections && onPreviewRoute
-                ? [styles.externalNavigateButton, { borderColor: colors.primary }]
-                : [styles.directionsButton, styles.directionsButtonInGroup]
-            }
-            onPress={() => {
-              setSheetState('peek');
-              onOpenExternalMaps();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Navigate with turn-by-turn in ${mapsAppName}`}
-            accessibilityHint={`Leaves Dealish and opens ${mapsAppName} with directions to ${restaurant.name}`}
-          >
-            {canPreviewDirections && onPreviewRoute ? (
-              <View style={styles.externalNavigateContent}>
-                <Ionicons name="navigate" size={17} color={colors.primary} />
-                <View style={styles.externalNavigateTexts}>
-                  <Text style={[styles.externalNavigateTitle, { color: colors.text }]}>Navigate</Text>
-                  <Text
-                    style={[styles.externalNavigateSubtitle, { color: colors.textSecondary }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {`Turn-by-turn in ${mapsAppName}`}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.singleNavigateContent}>
-                <AntDesign name="car" size={16} color="#fff" style={{ marginRight: 7 }} />
-                <View style={styles.singleNavigateLabels}>
-                  <Text style={styles.directionsButtonText}>Navigate</Text>
-                  <Text style={styles.directionsButtonSubcaption}>Opens {mapsAppName}</Text>
-                </View>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.directionsButton, styles.navigateButton]}
+          onPress={() => {
+            setSheetState('peek');
+            onOpenExternalMaps();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Navigate with turn-by-turn in ${mapsAppName}`}
+          accessibilityHint={`Leaves Dealish and opens ${mapsAppName} with directions to ${restaurant.name}`}
+        >
+          <View style={styles.singleNavigateContent}>
+            <AntDesign name="car" size={16} color="#fff" style={{ marginRight: 7 }} />
+            <View style={styles.singleNavigateLabels}>
+              <Text style={styles.directionsButtonText}>Navigate</Text>
+              <Text style={styles.directionsButtonSubcaption}>Opens {mapsAppName}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.favoriteButton,
@@ -926,6 +924,7 @@ const styles = StyleSheet.create({
   addressRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 8,
     marginBottom: 6,
     gap: 4,
   },
@@ -965,12 +964,95 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  contentFullState: {
-    marginTop: 280, // account for hero image height
-  },
   scrollContent: {
     padding: 20,
     paddingBottom: 10,
+  },
+  /**
+   * In-flow hero image for the full state — scrolls with the rest of the
+   * content (no absolute overlay / sticky overlap).
+   */
+  heroImageInline: {
+    width: "100%",
+    height: 180,
+    borderRadius: 16,
+    marginBottom: 16,
+    backgroundColor: "#f0f0f0",
+  },
+  /**
+   * Primary deal headline — shown above rating/address.
+   */
+  primaryDeal: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 16,
+  },
+  primaryDealActive: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#22C55E",
+  },
+  primaryDealActiveDark: {
+    backgroundColor: "rgba(34, 197, 94, 0.14)",
+    borderColor: "#22C55E",
+  },
+  primaryDealTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  primaryDealName: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  primaryDealScheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 8,
+  },
+  primaryDealSchedule: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusPillActive: {
+    backgroundColor: "#DCFCE7",
+  },
+  statusPillInactive: {
+    backgroundColor: "rgba(120,120,128,0.16)",
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22C55E",
+  },
+  statusPillActiveText: {
+    color: "#166534",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statusPillInactiveText: {
+    color: "#6B7280",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  /**
+   * Restaurant meta block (rating / address / distance) — below deal headline.
+   */
+  metaSection: {
+    marginBottom: 16,
   },
   fullScrollContent: {
     paddingBottom: 10,
@@ -1209,6 +1291,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  navigateButton: {
+    flex: 1,
+    minHeight: 40,
   },
   directionsButtonText: {
     color: "#fff",

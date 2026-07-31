@@ -19,6 +19,7 @@ import { lightTap } from "@/utils/haptics";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BackHandler, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,11 +46,14 @@ type CameraType = {
   zoom: number;
 };
 
+// Wider fallback so more downtown Toronto deal pins show on first load before a
+// user location is available. Later user-controlled movement is preserved
+// because the map uses `initialRegion` (uncontrolled) after mount.
 const fallbackRegion: RegionType = {
   latitude: 43.6532,
   longitude: -79.3832,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
 };
 
 export default function MapScreen() {
@@ -68,10 +72,12 @@ export default function MapScreen() {
   const [latitudeDelta, setLatitudeDelta] = useState(0.05);
   const [mapIsTransitioning, setMapIsTransitioning] = useState(false);
   const [mapGateBypass, setMapGateBypass] = useState(false);
+  const params = useLocalSearchParams<{ focus?: string }>();
+  const focusHandledRef = useRef<string | null>(null);
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
-  const { routeCoordinates, getDirections, clearRoute, isDirectionsAvailable } = useDirections();
+  const { clearRoute } = useDirections();
   const { settings } = useUserSettings();
   const colors = useThemeColors();
   
@@ -300,11 +306,6 @@ export default function MapScreen() {
     });
   };
 
-  const handlePreviewRoute = () => {
-    if (!selectedRestaurant || !userLocation) return;
-    getDirections(userLocation, selectedRestaurant.lat, selectedRestaurant.lng, mapRef);
-  };
-
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -366,6 +367,20 @@ export default function MapScreen() {
       );
     }
   }, [selectedRestaurant, viewMode, region]);
+
+  // Deep-link / cross-screen focus: when arriving with ?focus=<restaurantId>
+  // (e.g. from the Liked view), select and pan to that restaurant on the map.
+  useEffect(() => {
+    const focusId = typeof params.focus === "string" ? params.focus : undefined;
+    if (!focusId || restaurants.length === 0) return;
+    if (focusHandledRef.current === focusId) return;
+    const target = restaurants.find((r) => r.id === focusId);
+    if (target) {
+      focusHandledRef.current = focusId;
+      setViewMode("map");
+      handleRestaurantSelect(target);
+    }
+  }, [params.focus, restaurants, handleRestaurantSelect]);
 
   const handleRecenter = () => {
     if (!userLocation || viewMode !== "map") return;
@@ -448,13 +463,6 @@ export default function MapScreen() {
                 );
               })}
 
-            {selectedRestaurant && routeCoordinates.length > 0 && Polyline && (
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeColor="#FE902A"
-                strokeWidth={4}
-              />
-            )}
           </MapView>
         ) : viewMode === "map" ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: colors.background }}>
@@ -639,9 +647,7 @@ export default function MapScreen() {
             ref={restaurantCardRef}
             restaurant={selectedRestaurant}
             onClose={handleCloseRestaurant}
-            onPreviewRoute={isDirectionsAvailable ? handlePreviewRoute : undefined}
             onOpenExternalMaps={handleOpenExternalMaps}
-            canPreviewDirections={isDirectionsAvailable && !!userLocation}
             userLocation={userLocation}
             planTime={planTime}
           />

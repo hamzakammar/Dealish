@@ -33,6 +33,39 @@ Severity guide:
 
 <!-- Add new entries below this line, newest first. -->
 
+### [DEBT-017] In-app ORS route-preview path is now unused by the UI
+- **Severity:** low
+- **Area:** `hooks/useDirections.ts`, `app/map.tsx`
+- **Logged:** 2026-06-06
+- **Author:** PM revision ticket
+- **Description:** The PM revision removed the "Show route" button from the
+  restaurant card (nav cleanup — keep only "Navigate", hand off to the external
+  maps app). `map.tsx` no longer calls `getDirections`, renders no `Polyline`, and
+  passes no preview props to the card. `useDirections` still exports
+  `getDirections`/`routeCoordinates`/`isDirectionsAvailable` and `map.tsx` keeps
+  `clearRoute` (harmless no-op) plus the platform `Polyline` require. So the ORS
+  polyline preview infrastructure is now dormant.
+- **Impact:** Dead-but-harmless code paths; potential confusion about whether the
+  in-app route preview is a supported feature.
+- **Fix:** Either remove `useDirections`'s preview surface (and the unused
+  `Polyline`/`clearRoute` wiring in `map.tsx`) or, if in-app previews are wanted
+  again, re-add a UI entry point. Deferred to avoid unrelated churn in this ticket.
+
+### [DEBT-018] Expired one-time deals can render on the restaurant card
+- **Severity:** low
+- **Area:** `hooks/useRestaurantDeals.ts`, `components/RestaurantDetailCard.tsx`
+- **Logged:** 2026-06-06
+- **Author:** PM revision ticket
+- **Description:** Per ADR-0003 the restaurant card now shows all published deals
+  (`is_active = true`, not flagged) without schedule filtering, so a one-time deal
+  whose `end_at` has passed but which is still `is_active = true` will render
+  (muted, with an "Expired" badge, sorted last). This is intentional given
+  "do not hide inactive deals at the query/data layer," but it relies on owners
+  disabling ended deals for clean data.
+- **Impact:** Stale/expired deals may appear until an owner sets `is_active = false`.
+- **Fix:** Product decision — either auto-hide clearly-expired one-time deals at the
+  card layer, or add owner tooling / a scheduled job to deactivate ended deals.
+
 > Entries DEBT-001..016 were logged on 2026-05-29 from a full repo + live-schema
 > audit. Severities reflect impact at time of logging. Findings 1–3 were verified
 > by grepping the app (it never references `merchant`, `mint_redemption`,

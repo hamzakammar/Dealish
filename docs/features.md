@@ -24,19 +24,34 @@ objects it touches. Database details live in [`database-schema.md`](./database-s
 - **Components:** `components/listView.tsx`, `RestaurantMarker.tsx`,
   `RestaurantDetailCard.tsx`, `FilterPanel.tsx`, `MapTypeSelector.tsx`,
   `UserLocationMarker.tsx`, `DirectionsButton.tsx`, `RatingDisplay.tsx`
-- **Utils:** `utils/distance.ts`, `utils/geocode.ts`, `utils/navigation.ts`
+- **Utils:** `utils/distance.ts`, `utils/geocode.ts`, `utils/navigation.ts`,
+  `utils/dealActivity.ts` (activity detection + schedule-label/active-set helpers)
 - **DB:** `restaurants` (public read where `is_active`), `deals` (public read of active)
-- **Notes:** Restaurants limited to 500; fallback region is Toronto. Active-deal
-  filtering for the map happens in `useActiveDealsMap` (expired out; recurring/one-time
-  active-now or starting within 1h; flagged excluded). The list view applies its own
-  filtering — keep the two in sync.
+- **Notes:** Restaurants limited to 500; the initial map viewport is intentionally
+  wide (~0.08 delta / user-fix ~0.06 delta) so more downtown-Toronto pins show on
+  first load — later user pan/zoom is preserved (the map is uncontrolled via
+  `initialRegion`). Active-deal filtering for the **map pins / "deals active
+  nearby" count** happens in `useActiveDealsMap` (expired out; recurring/one-time
+  active-now or starting within 1h; flagged excluded); the list view applies the
+  same `filterActiveDeals` for its deal pills — keep the two in sync.
+- **Restaurant card (`RestaurantDetailCard`):** shows **all** published deals
+  (no schedule filtering — see ADR-0003); currently-active deals get a full-card
+  green treatment while inactive/upcoming stay neutral/muted. Hierarchy on open:
+  primary deal name + schedule/status → rating/address → deals → partner-request
+  CTA (below the deals). It is a single unified scroll (image, info, headings and
+  deals scroll together). The footer has a single **Navigate** action that hands
+  off to the external maps app (the in-app "Show route" preview was removed).
 
-## 3. Favourites
+## 3. Favourites / Liked
 
-- **Components:** `components/AccountPanel.tsx`, `RestaurantDetailCard.tsx`
+- **Screen:** `app/liked.tsx` (the "Liked" view — a first-class, linkable list)
+- **Components:** `components/AccountPanel.tsx` (menu "Liked" entry → `/liked`),
+  `RestaurantDetailCard.tsx` (heart toggle writes the state)
 - **DB:** `profiles.favourites` (`uuid[]`), mutated via RPCs `append_favourite` / `remove_favourite`
-- **Notes:** Favourites are an array on the profile, not a join table. Guests are
-  prompted to create an account to save favourites.
+- **Notes:** Favourites are an array on the profile, not a join table. The heart on
+  the restaurant card writes the state; the AccountPanel "Liked" menu item opens the
+  dedicated `/liked` screen, which reads `profiles.favourites` and hands off a tapped
+  restaurant to the map via `/map?focus=<id>`. Guests are prompted to sign in.
 
 ## 4. QR deal redemption
 

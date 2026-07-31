@@ -27,6 +27,7 @@ is declared in `app/_layout.tsx`. The URL scheme is `dealish://` (see
 | `/reset-password` | `app/reset-password.tsx` | Set new password after recovery | recovery |
 | `/map` | `app/map.tsx` | Main map + list discovery surface | guest ok |
 | `/account` | `app/account.tsx` | Profile, stats, recent activity | signed-in |
+| `/liked` | `app/liked.tsx` | Liked (favourite) restaurants; taps hand off to `/map?focus=<id>` | guest ok (prompts sign-in) |
 | `/settings` | `app/settings.tsx` | Notifications / privacy / appearance | signed-in |
 | `/partner` | `app/partner.tsx` | "Partner with us" marketing/contact | any |
 | `/about` | `app/about.tsx` | About the app | any |

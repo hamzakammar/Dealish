@@ -2,10 +2,18 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { AppState } from "react-native";
 import { supabase } from "@/app/lib/supabase";
 import { Deal } from "@/types/restaurant";
-import { filterActiveDeals } from "@/utils/dealActivity";
 
 const PAGE_SIZE = 20;
 
+/**
+ * Fetches every published deal for a restaurant.
+ *
+ * Note: this intentionally does NOT filter by schedule/activity. All available
+ * deals are returned so the restaurant card can show them by default, with
+ * currently-active deals distinguished through presentation (see PM revision
+ * ticket item 3.3). `atTime` is accepted for API compatibility (plan-time) but
+ * no longer hides deals — activity is derived for display, not filtering.
+ */
 export function useRestaurantDeals(restaurantId: string | null, atTime: Date | null = null) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +49,7 @@ export function useRestaurantDeals(restaurantId: string | null, atTime: Date | n
       if (error) throw error;
 
       if (mountedRef.current && currentFetchId === fetchCountRef.current) {
-        const processedDeals = filterActiveDeals(data || [], atTime);
+        const processedDeals = (data || []) as Deal[];
         
         if (isInitial) {
           setDeals(processedDeals);

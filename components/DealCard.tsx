@@ -2,7 +2,11 @@ import { Deal } from "@/types/restaurant";
 import { supabase } from "@/app/lib/supabase";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { calculateSavings } from "@/utils/activity";
-import { isRecurringDealActive } from "@/utils/dealActivity";
+import {
+  getDealDaysLabel,
+  getDealTimeWindow,
+  isRecurringDealActive,
+} from "@/utils/dealActivity";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -12,6 +16,12 @@ import DealQRCode from "./DealQRCode";
 type DealCardProps = {
   deal: Deal;
   isPartner?: boolean;
+  /**
+   * Whether the deal is currently active (or active at the planned time).
+   * When provided it drives the full-card green treatment and the "Active Now"
+   * badge. When omitted, the card falls back to its own urgency detection.
+   */
+  isActive?: boolean;
 };
 
 /**
@@ -79,7 +89,7 @@ function getUrgencyStatus(deal: Deal): UrgencyStatus {
   return 'active_now';
 }
 
-export default function DealCard({ deal, isPartner = false }: DealCardProps) {
+export default function DealCard({ deal, isPartner = false, isActive }: DealCardProps) {
   const colors = useThemeColors();
   const [showQRCode, setShowQRCode] = useState(false);
   const [userVote, setUserVote] = useState<'thumbs_up' | 'thumbs_down' | null>(null);
@@ -87,85 +97,10 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
 
   const urgencyStatus = useMemo(() => getUrgencyStatus(deal), [deal]);
 
-  /**
-   * Formats a time string "HH:MM:SS" or "HH:MM" into display format like "3:00 PM"
-   */
-  const formatTimeFromString = (timeString?: string): string | null => {
-    if (!timeString) return null;
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours, minutes || 0, 0);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  /**
-   * Formats a date string into a display time like "3:00 PM"
-   */
-  const formatTime = (dateString?: string): string | null => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  const getDayNames = (dayNumbers: number[]): string => {
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const sortedDays = [...dayNumbers].sort((a, b) => a - b);
-    const names = sortedDays.map(day => dayNames[day]);
-
-    if (names.length <= 2) {
-      return names.join(', ');
-    }
-
-    const isConsecutive = sortedDays.every((day, index) =>
-      index === 0 || day === sortedDays[index - 1] + 1
-    );
-
-    if (isConsecutive && names.length > 2) {
-      return `${names[0]}–${names[names.length - 1]}`;
-    }
-
-    return names.join(', ');
-  };
-
-  /**
-   * Returns the time window string, e.g. "3:00 PM – 6:00 PM"
-   */
-  const getTimeWindow = (): string | null => {
-    if (deal.is_recurring && deal.recurrence_start_time && deal.recurrence_end_time) {
-      const start = formatTimeFromString(deal.recurrence_start_time);
-      const end = formatTimeFromString(deal.recurrence_end_time);
-      if (start && end) return `${start} – ${end}`;
-      return null;
-    }
-
-    if (deal.start_at || deal.end_at) {
-      const start = formatTime(deal.start_at);
-      const end = formatTime(deal.end_at);
-      if (start && end) return `${start} – ${end}`;
-      if (start) return `Starts ${start}`;
-      if (end) return `Until ${end}`;
-    }
-
-    return null;
-  };
-
-  /**
-   * Returns the days string for recurring deals
-   */
-  const getDaysLabel = (): string | null => {
-    if (deal.is_recurring && deal.recurrence_days && deal.recurrence_days.length > 0) {
-      return getDayNames(deal.recurrence_days);
-    }
-    return null;
-  };
+  // Resolve the "active now" state: prefer the explicit prop (computed by the
+  // restaurant card via the shared deal-activity logic, respecting plan time),
+  // otherwise fall back to this card's own urgency detection.
+  const isActiveNow = isActive ?? (urgencyStatus === 'active_now');
 
   // Format discount label for display
   const getDiscountLabel = (): string | null => {
@@ -184,8 +119,8 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
 
   const savings = deal.savings_amount ?? calculateSavings(deal);
   const discountLabel = getDiscountLabel();
-  const timeWindow = getTimeWindow();
-  const daysLabel = getDaysLabel();
+  const timeWindow = getDealTimeWindow(deal);
+  const daysLabel = getDealDaysLabel(deal);
 
   const handleFlag = async (type: 'thumbs_up' | 'thumbs_down') => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -221,14 +156,20 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
   };
 
   const renderUrgencyBadge = () => {
+    // The explicit active state wins so the badge matches the green treatment.
+    if (isActiveNow) {
+      return (
+        <View style={[styles.urgencyBadge, styles.urgencyBadgeActive]}>
+          <View style={styles.urgencyDot} />
+          <Text style={styles.urgencyBadgeActiveText}>Active Now</Text>
+        </View>
+      );
+    }
     switch (urgencyStatus) {
       case 'active_now':
-        return (
-          <View style={[styles.urgencyBadge, styles.urgencyBadgeActive]}>
-            <View style={styles.urgencyDot} />
-            <Text style={styles.urgencyBadgeActiveText}>Active Now</Text>
-          </View>
-        );
+        // isActive prop said this is NOT active now (e.g. planning a later time)
+        // — don't show the green badge; treat as no specific urgency.
+        return null;
       case 'starts_soon':
         return (
           <View style={[styles.urgencyBadge, styles.urgencyBadgeSoon]}>
@@ -252,9 +193,18 @@ export default function DealCard({ deal, isPartner = false }: DealCardProps) {
     }
   };
 
+  const isExpired = urgencyStatus === 'expired';
+
   return (
     <>
-      <View style={[styles.dealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View
+        style={[
+          styles.dealCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          isActiveNow && (colors.isDark ? styles.dealCardActiveDark : styles.dealCardActive),
+          !isActiveNow && isExpired && styles.dealCardMuted,
+        ]}
+      >
         {/* Header row: title + urgency badge */}
         <View style={styles.dealHeader}>
           <Text style={[styles.dealTitle, { color: colors.text }]} numberOfLines={2}>
@@ -387,6 +337,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
+  },
+  /* Full-card green treatment for currently-active deals */
+  dealCardActive: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#22C55E",
+    borderWidth: 1.5,
+    shadowColor: "#22C55E",
+    shadowOpacity: 0.25,
+  },
+  dealCardActiveDark: {
+    backgroundColor: "rgba(34, 197, 94, 0.14)",
+    borderColor: "#22C55E",
+    borderWidth: 1.5,
+    shadowColor: "#22C55E",
+    shadowOpacity: 0.3,
+  },
+  /* Muted treatment for expired deals */
+  dealCardMuted: {
+    opacity: 0.6,
   },
   dealHeader: {
     flexDirection: "row",

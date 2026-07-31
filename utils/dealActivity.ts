@@ -115,6 +115,123 @@ export function filterActiveDeals(deals: Deal[], atTime: Date | null, tz: string
 }
 
 /**
+ * ─── Presentation helpers ──────────────────────────────────────────────────
+ * These format a deal's schedule for display and derive which deals are
+ * *currently* active (for the full-card green treatment / primary-deal
+ * headline). They reuse `filterActiveDeals` so the activity logic stays in one
+ * place — they do NOT re-implement it.
+ */
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Formats "HH:MM:SS" / "HH:MM" into a display time like "3:00 PM". */
+export function formatClockTime(timeString?: string | null): string | null {
+  if (!timeString) return null;
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes || 0, 0, 0);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** Formats an ISO date string into a display time like "3:00 PM". */
+export function formatDateTime(dateString?: string | null): string | null {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** Formats a set of day numbers (0=Sun..6=Sat) into "Mon–Fri" / "Mon, Wed". */
+export function formatDayNames(dayNumbers: number[]): string {
+  const sortedDays = [...dayNumbers].sort((a, b) => a - b);
+  const names = sortedDays.map((day) => DAY_NAMES[day]);
+
+  if (names.length <= 2) {
+    return names.join(', ');
+  }
+
+  const isConsecutive = sortedDays.every(
+    (day, index) => index === 0 || day === sortedDays[index - 1] + 1
+  );
+
+  if (isConsecutive && names.length > 2) {
+    return `${names[0]}–${names[names.length - 1]}`;
+  }
+
+  return names.join(', ');
+}
+
+/** Returns a deal's time window, e.g. "3:00 PM – 6:00 PM" / "Starts 3:00 PM". */
+export function getDealTimeWindow(deal: Deal): string | null {
+  if (deal.is_recurring && deal.recurrence_start_time && deal.recurrence_end_time) {
+    const start = formatClockTime(deal.recurrence_start_time);
+    const end = formatClockTime(deal.recurrence_end_time);
+    if (start && end) return `${start} – ${end}`;
+    return null;
+  }
+
+  if (deal.start_at || deal.end_at) {
+    const start = formatDateTime(deal.start_at);
+    const end = formatDateTime(deal.end_at);
+    if (start && end) return `${start} – ${end}`;
+    if (start) return `Starts ${start}`;
+    if (end) return `Until ${end}`;
+  }
+
+  return null;
+}
+
+/** Returns a deal's recurring-days label, e.g. "Mon–Fri". */
+export function getDealDaysLabel(deal: Deal): string | null {
+  if (deal.is_recurring && deal.recurrence_days && deal.recurrence_days.length > 0) {
+    return formatDayNames(deal.recurrence_days);
+  }
+  return null;
+}
+
+/**
+ * Combined schedule label, e.g. "Mon–Fri · 3:00 PM – 6:00 PM".
+ * Returns null when the deal has no schedule information to show.
+ */
+export function getDealScheduleLabel(deal: Deal): string | null {
+  const daysLabel = getDealDaysLabel(deal);
+  const timeWindow = getDealTimeWindow(deal);
+  if (daysLabel && timeWindow) return `${daysLabel} · ${timeWindow}`;
+  return timeWindow ?? daysLabel;
+}
+
+/**
+ * Set of deal ids that are active *right now* (or at `atTime` when planning).
+ * Uses `filterActiveDeals` with a concrete reference time so there is no
+ * "starting soon" lookahead — only genuinely active deals get the green
+ * treatment; upcoming deals stay muted.
+ */
+export function getActiveDealIdSet(deals: Deal[], atTime: Date | null = null): Set<string> {
+  const ref = atTime ?? new Date();
+  return new Set(filterActiveDeals(deals, ref).map((d) => d.id));
+}
+
+/**
+ * Picks the "primary" deal to headline on the restaurant card: the first
+ * currently-active deal (preserving input order), falling back to the first
+ * deal when none are active.
+ */
+export function getPrimaryDeal(deals: Deal[], atTime: Date | null = null): Deal | null {
+  if (!deals || deals.length === 0) return null;
+  const activeIds = getActiveDealIdSet(deals, atTime);
+  const active = deals.find((d) => activeIds.has(d.id));
+  return active ?? deals[0];
+}
+
+/**
  * Finds the next upcoming deal that will become active today.
  * Returns the deal along with its formatted start time, or null if none found.
  */

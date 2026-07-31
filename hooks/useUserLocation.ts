@@ -12,11 +12,14 @@ export type Region = {
   longitudeDelta: number;
 };
 
+// Wider default so more downtown Toronto deal pins are visible on first load
+// (~9km span). Only affects the *initial* viewport — user pan/zoom is preserved
+// because the map is uncontrolled (initialRegion) after mount.
 const DEFAULT_REGION: Region = {
   latitude: 43.6532,
   longitude: -79.3832,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
 };
 
 const LOCATION_GET_TIMEOUT_MS = 20_000;
@@ -36,7 +39,9 @@ export function useUserLocation(mapRef: React.RefObject<any> | React.MutableRefO
   const [region, setRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const initialDelta = { latitudeDelta: 0.01, longitudeDelta: 0.01 };
+  // Wider initial zoom so the first fix on the user's location still reveals
+  // several nearby (downtown Toronto) deal pins rather than a tight ~1km box.
+  const initialDelta = { latitudeDelta: 0.06, longitudeDelta: 0.06 };
 
   useEffect(() => {
     let mounted = true;

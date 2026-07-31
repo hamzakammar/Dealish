@@ -1,6 +1,5 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
-import RatingDisplay from "@/components/RatingDisplay";
 import { useAccountNavigation } from "@/hooks/useAccountNavigation";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { Restaurant } from "@/types/restaurant";
@@ -13,7 +12,6 @@ import {
     Alert,
     Animated,
     useWindowDimensions,
-    FlatList,
     Image,
     StyleSheet,
     Text,
@@ -29,8 +27,6 @@ type AccountPanelProps = {
   onOpenFilters?: () => void;
 };
 
-type PanelView = "menu" | "favourites";
-
 export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPanToRestaurant, onOpenFilters }: AccountPanelProps) {
   const { session, profile } = useAuthContext();
   const colors = useThemeColors();
@@ -39,9 +35,6 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [currentView, setCurrentView] = useState<PanelView>("menu");
-  const [favourites, setFavourites] = useState<Restaurant[]>([]);
-  const [loadingFavourites, setLoadingFavourites] = useState(false);
   
   // Dynamic styles based on theme
   const dynamicStyles = useMemo(() => ({
@@ -73,9 +66,6 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
       backgroundColor: colors.cardSecondary,
     },
   }), [colors]);
-
-  // Dynamic labels based on count
-  const favouritesLabel = favourites.length === 1 ? "Favourite" : "Favourites";
 
   const { width: screenWidth } = useWindowDimensions();
   const panelWidth = screenWidth * 0.82;
@@ -130,60 +120,6 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     loadProfile();
   }, [session, profile]);
 
-  // Load favorites
-  const loadFavourites = async () => {
-    if (!session?.user) return;
-
-    setLoadingFavourites(true);
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("favourites")
-        .eq("id", session.user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      const favoriteIds = profileData?.favourites || [];
-
-      if (favoriteIds && favoriteIds.length > 0) {
-        const { data: restaurantData, error: restError } = await supabase
-          .from("restaurants")
-          .select("*")
-          .in("id", favoriteIds);
-
-        if (restError) throw restError;
-
-        const parsed: Restaurant[] =
-          restaurantData?.map((r) => ({
-            id: r.id,
-            name: r.name,
-            lat: Number(r.lat),
-            lng: Number(r.lng),
-            partner: Boolean(r.partner),
-            description: r.description ?? undefined,
-            address: r.address ?? undefined,
-            phone: r.phone ?? undefined,
-            type: r.type ?? undefined,
-            rating: r.rating ?? undefined,
-            rating_count: r.num_ratings ?? undefined,
-            image_url: r.hero_image_url ?? r.display_image ?? undefined,
-            logo_url: r.hero_image_url ?? r.display_image ?? undefined,
-            display_image: r.display_image ?? undefined,
-          })) ?? [];
-
-        setFavourites(parsed);
-      } else {
-        setFavourites([]);
-      }
-    } catch (error) {
-      console.error("Error loading favourites:", error);
-      Alert.alert("Error", "Failed to load favorites");
-    } finally {
-      setLoadingFavourites(false);
-    }
-  };
-
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
@@ -224,24 +160,14 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     }
   };
 
-  const handleFavouritesPress = () => {
-    setCurrentView("favourites");
-    loadFavourites();
-  };
-
-  const handleBackToMenu = () => {
-    setCurrentView("menu");
-  };
-
-  const handleFavouriteSelect = (restaurant: Restaurant) => {
-    if (onSelectRestaurant) {
-      onSelectRestaurant(restaurant);
-    }
-    if (onPanToRestaurant) {
-      onPanToRestaurant(restaurant.lat, restaurant.lng);
-    }
+  const handleLikedPress = () => {
     onClose();
-  };  
+    try {
+      router.push('/liked' as any);
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
 
   const navigateToAccount = useAccountNavigation();
 
@@ -285,7 +211,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
     : [
         { label: "My Account", icon: "user", action: navigateToAccount },
         { label: "Filters", icon: "filter", action: handleFiltersPress },
-        { label: "Favourites", icon: "heart", action: handleFavouritesPress },
+        { label: "Liked", icon: "heart", action: handleLikedPress },
         { label: "Settings", icon: "setting", action: handleSettingsPress },
         { label: "About", icon: "information-circle", action: () => router.push('/about' as any) },
         { label: "Help", icon: "help-circle", action: () => router.push('/help' as any) },
@@ -319,8 +245,7 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
           <AntDesign name="close" size={24} color="#333" />
         </TouchableOpacity>
 
-        {currentView === "menu" ? (
-          <>
+        <>
             {/* User Profile Section */}
             <View style={styles.profileSection}>
               {isGuest ? (
@@ -392,74 +317,6 @@ export default function AccountPanel({ isOpen, onClose, onSelectRestaurant, onPa
               </TouchableOpacity>
             )}
           </>
-        ) : (
-          <>
-            {/* Back Button */}
-            <TouchableOpacity
-              style={[styles.backButton, dynamicStyles.backButton]}
-              onPress={handleBackToMenu}
-            >
-              <AntDesign name="left" size={24} color={colors.text} />
-            </TouchableOpacity>
-
-            {/* Favorites List */}
-            <Text style={[styles.favouritesTitle, dynamicStyles.favouritesTitle]}>{favouritesLabel}</Text>
-            {loadingFavourites ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#FE902A" />
-              </View>
-            ) : favourites.length === 0 ? (
-              <View style={styles.emptyState}>
-                <AntDesign name="heart" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>No favourites yet</Text>
-              </View>
-            ) : (
-              <FlatList
-                    data={favourites}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[styles.favoriteItem, dynamicStyles.favoriteItem]}
-                    onPress={() => handleFavouriteSelect(item)}
-                  >
-                    <View style={styles.favoriteImageContainer}>
-                      {(item.logo_url || item.display_image) ? (
-                        <Image
-                          source={{ uri: item.logo_url || item.display_image }}
-                          style={styles.favoriteImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={styles.favoriteImagePlaceholder}>
-                          <Ionicons name="restaurant-outline" size={22} color={colors.textTertiary} />
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.favoriteInfo}>
-                      <Text style={[styles.favoriteName, dynamicStyles.favoriteName]}>{item.name}</Text>
-                      <RatingDisplay
-                        rating={item.rating}
-                        ratingCount={item.rating_count}
-                        size={10}
-                        showCount={true}
-                      />
-                      {item.address && (
-                        <Text
-                          style={[styles.favoriteAddress, dynamicStyles.favoriteAddress]}
-                          numberOfLines={1}
-                        >
-                          {item.address}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                scrollEnabled
-                nestedScrollEnabled
-              />
-            )}
-          </>
-        )}
       </Animated.View>
     </>
   );

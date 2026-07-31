@@ -202,6 +202,7 @@ function RootLayoutNav() {
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
           <Stack.Screen name="map" options={{ headerShown: false }} />
           <Stack.Screen name="account" options={{ headerShown: false }} />
+          <Stack.Screen name="liked" options={{ headerShown: false }} />
           <Stack.Screen name="about" options={{ headerShown: false }} />
           <Stack.Screen name="help" options={{ headerShown: false }} />
           <Stack.Screen name="partner" options={{ headerShown: false }} />

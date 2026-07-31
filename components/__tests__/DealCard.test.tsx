@@ -97,6 +97,24 @@ describe('DealCard accuracy buttons visibility', () => {
   });
 });
 
+describe('DealCard active-state presentation (isActive prop)', () => {
+  it('shows the "Active Now" badge when isActive is true', () => {
+    const { getByText } = render(<DealCard deal={mockDeal} isActive={true} />);
+    expect(getByText('Active Now')).toBeTruthy();
+  });
+
+  it('does NOT show "Active Now" when isActive is false', () => {
+    const { queryByText } = render(<DealCard deal={mockDeal} isActive={false} />);
+    expect(queryByText('Active Now')).toBeNull();
+  });
+
+  it('falls back to urgency detection when isActive is omitted (deal with no schedule is active)', () => {
+    // mockDeal has no time constraints -> getUrgencyStatus() returns 'active_now'
+    const { getByText } = render(<DealCard deal={mockDeal} />);
+    expect(getByText('Active Now')).toBeTruthy();
+  });
+});
+
 describe('DealCard accuracy button interactions', () => {
   it('calls supabase upsert with thumbs_up when authenticated user taps thumbs-up', async () => {
     const mockFrom = getMockSupabase().from as jest.Mock;

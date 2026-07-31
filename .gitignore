@@ -54,4 +54,5 @@ dealish-*.json
 supabase/.temp/
 .vercel
 
-build-1783290409773.aab
+# Android app bundles (local build artifacts — never source)
+build-*.aab
