@@ -3,6 +3,7 @@ import { Restaurant } from "@/types/restaurant";
 import { FilterState, DEFAULT_FILTERS } from "@/types/filters";
 import { calculateDistance } from "@/utils/distance";
 import { UserLocation } from "@/types/restaurant";
+import { AnalyticsEvents, captureEvent } from "@/utils/analytics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const FILTER_STORAGE_KEY = "@dealish_filters";
@@ -42,6 +43,21 @@ export function useRestaurantFilters(
   const updateFilters = (newFilters: FilterState) => {
     setFilters(newFilters);
     saveFilters(newFilters);
+    const activeCount = [
+      newFilters.maxDistance !== null,
+      newFilters.minRating !== null,
+      newFilters.types.length > 0,
+      newFilters.partnerOnly,
+      newFilters.hasDealsOnly,
+    ].filter(Boolean).length;
+    captureEvent(AnalyticsEvents.FILTER_APPLIED, {
+      active_count: activeCount,
+      max_distance: newFilters.maxDistance,
+      min_rating: newFilters.minRating,
+      types: newFilters.types,
+      partner_only: newFilters.partnerOnly,
+      has_deals_only: newFilters.hasDealsOnly,
+    });
   };
 
   const clearFilters = () => {

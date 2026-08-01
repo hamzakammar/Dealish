@@ -2,6 +2,7 @@ import { useAuthContext } from "@/app/providers/auth";
 import QRScanner from "@/components/QRScanner";
 import { sendPushNotification } from "@/utils/notifications";
 import { success as hapticSuccess } from "@/utils/haptics";
+import { AnalyticsEvents, captureEvent } from "@/utils/analytics";
 import { parseQRCodeData, redeemRedemptionToken } from "@/utils/qrCode";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,6 +40,16 @@ export default function QRScannerScreen() {
         setProcessing(false);
         return;
       }
+
+      // Analytics: deal_redeemed. Emitted from the MERCHANT's scanning device, so
+      // the credited customer is recorded as a property (redeemed_by_user_id) —
+      // never attributed to the merchant's PostHog identity. See docs/analytics.md.
+      captureEvent(AnalyticsEvents.DEAL_REDEEMED, {
+        restaurant_id: result.out_restaurant_id ?? null,
+        deal_title: result.deal_title ?? null,
+        saved_amount: result.saved_amount ?? null,
+        redeemed_by_user_id: result.out_user_id ?? null,
+      });
 
       // Notify the customer's device (best-effort; never blocks the flow). The
       // customer id is returned by the server from the bound redemption row.

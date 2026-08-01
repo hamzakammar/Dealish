@@ -1,4 +1,5 @@
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { AnalyticsEvents, captureEvent } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -99,6 +100,8 @@ export default function WelcomeScreen() {
   };
 
   const handleSkip = async () => {
+    // Continuing into the app without signing in (App Store 5.1.1(v) guest browsing).
+    captureEvent(AnalyticsEvents.LOGIN_SKIPPED, { source: 'welcome_skip' });
     try {
       await AsyncStorage.setItem('hasSeenWelcome', 'true');
       router.replace('/map');
@@ -110,6 +113,7 @@ export default function WelcomeScreen() {
   };
 
   const handleGetStarted = async () => {
+    captureEvent(AnalyticsEvents.LOGIN_SKIPPED, { source: 'welcome_get_started' });
     try {
       await AsyncStorage.setItem('hasSeenWelcome', 'true');
       router.replace('/map');

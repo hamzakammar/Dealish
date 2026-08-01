@@ -1,5 +1,7 @@
 import { supabase } from "@/app/lib/supabase";
 import { router } from "expo-router";
+import { useAuthContext } from "@/app/providers/auth";
+import { AnalyticsEvents, captureEvent } from "@/utils/analytics";
 import DealCard from "@/components/DealCard";
 import RatingDisplay from "@/components/RatingDisplay";
 import { getPartnerRequestCount } from "@/hooks/usePartnerRequests";
@@ -94,6 +96,8 @@ type RestaurantDetailCardProps = {
   /** Initial state of the sheet. Defaults to 'half' for backward compatibility */
   initialState?: SheetState;
   planTime?: Date | null;
+  /** Where the open came from (map/list/search/deep_link/account) — analytics only. */
+  sourceScreen?: string;
 };
 
 export type RestaurantDetailCardRef = {
@@ -129,9 +133,12 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   userLocation,
   initialState = 'half', // Default to 'half' for backward compatibility
   planTime = null,
+  sourceScreen,
 }, ref) => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { session } = useAuthContext();
+  const isAuthenticated = Boolean(session?.user?.id);
   const mapsAppName = Platform.OS === "ios" ? "Apple Maps" : "Google Maps";
   const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id, planTime);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
@@ -165,6 +172,16 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
 
     // Track visit when restaurant detail is opened
     trackVisit(restaurant.id);
+
+    // Analytics: restaurant detail opened (fires once per opened restaurant — not
+    // on raw marker/list taps, so accidental clicks don't distort the metric).
+    captureEvent(AnalyticsEvents.RESTAURANT_OPENED, {
+      restaurant_id: restaurant.id,
+      restaurant_name: restaurant.name,
+      city: restaurant.city ?? null,
+      source_screen: sourceScreen ?? null,
+      authenticated: isAuthenticated,
+    });
 
     fetchIsFavourite(restaurant.id)
       .then((fav) => {
@@ -293,7 +310,28 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   );
   const primaryDealActive = primaryDeal ? activeDealIds.has(primaryDeal.id) : false;
   const primaryDealSchedule = primaryDeal ? getDealScheduleLabel(primaryDeal) : null;
-  
+
+  // Analytics: deal_viewed — fire once per opened restaurant, when its deals have
+  // loaded and at least one is shown. Deduped per restaurant so scroll/rerenders
+  // don't double-count. `deal_id` is the headline (primary) deal when applicable.
+  const dealViewedRestaurantRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (dealsLoading) return;
+    if (!deals || deals.length === 0) return;
+    if (dealViewedRestaurantRef.current === restaurant.id) return;
+    dealViewedRestaurantRef.current = restaurant.id;
+    captureEvent(AnalyticsEvents.DEAL_VIEWED, {
+      restaurant_id: restaurant.id,
+      restaurant_name: restaurant.name,
+      city: restaurant.city ?? null,
+      deal_id: primaryDeal?.id ?? null,
+      deal_count: deals.length,
+      source_screen: sourceScreen ?? null,
+      authenticated: isAuthenticated,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant.id, deals, dealsLoading]);
+
   /**
    * Clamp helper for height bounds
    */

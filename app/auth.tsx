@@ -1,5 +1,6 @@
 import { getAuthRedirectUrl, supabase } from '@/app/lib/supabase';
 import { sendConfirmationEmail } from '@/utils/sendConfirmationEmail';
+import { AnalyticsEvents, captureEvent } from '@/utils/analytics';
 import { useAuthContext } from '@/app/providers/auth';
 import { checkRateLimit, clearRateLimit, formatRemainingTime, recordFailedAttempt } from '@/utils/rateLimit';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -174,6 +175,11 @@ export default function AuthScreen() {
 
   // ALL hooks must be called BEFORE any conditional returns, in consistent order
   
+  // Analytics: login screen viewed (fires once on mount).
+  useEffect(() => {
+    captureEvent(AnalyticsEvents.LOGIN_VIEWED);
+  }, []);
+
   // First useEffect: Check rate limit on mount
   useEffect(() => {
     const checkLimit = async () => {
@@ -298,6 +304,7 @@ export default function AuthScreen() {
           // If not required, user is automatically signed in
           const { data: { session } } = await supabase.auth.getSession();
           if (session && data.user) {
+            captureEvent(AnalyticsEvents.LOGIN_COMPLETED, { method: 'email', type: 'signup' });
             // Refresh profile so index.tsx has up-to-date display_name
             await refetchProfile();
             // Route through index — it will send to /onboarding if display_name is null
@@ -334,7 +341,8 @@ export default function AuthScreen() {
         } else {
           // Clear rate limit on success
           await clearRateLimit();
-          
+          captureEvent(AnalyticsEvents.LOGIN_COMPLETED, { method: 'email', type: 'signin' });
+
           // Fetch profile to check role
           await refetchProfile();
           
@@ -465,6 +473,7 @@ export default function AuthScreen() {
                     if (__DEV__) {
                       console.log('OAuth authentication successful - session created');
                     }
+                    captureEvent(AnalyticsEvents.LOGIN_COMPLETED, { method: 'oauth' });
                     
                     // Check if this is a new user (first time OAuth sign-in)
                     // For new users, we'll default to 'user' role, but they can change it later

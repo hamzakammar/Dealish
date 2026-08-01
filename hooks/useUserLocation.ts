@@ -1,5 +1,6 @@
 import { UserLocation as UserLocationType } from "@/types/restaurant";
 import { withTimeout } from "@/utils/async";
+import { AnalyticsEvents, captureEvent } from "@/utils/analytics";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
@@ -49,8 +50,10 @@ export function useUserLocation(mapRef: React.RefObject<any> | React.MutableRefO
 
     async function bootstrap() {
       try {
+        captureEvent(AnalyticsEvents.LOCATION_PERMISSION_REQUESTED);
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
+          captureEvent(AnalyticsEvents.LOCATION_PERMISSION_DENIED, { status });
           const { showSettingsAlert, getPermissionInfo } = require('@/utils/permissions');
           const info = getPermissionInfo('location');
           showSettingsAlert(
@@ -63,6 +66,7 @@ export function useUserLocation(mapRef: React.RefObject<any> | React.MutableRefO
           }
           return;
         }
+        captureEvent(AnalyticsEvents.LOCATION_PERMISSION_GRANTED);
 
         let pos: Awaited<ReturnType<typeof Location.getCurrentPositionAsync>>;
         try {

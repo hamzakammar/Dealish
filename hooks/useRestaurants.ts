@@ -20,7 +20,7 @@ export function useRestaurants() {
           (async () => {
             return supabase
               .from("restaurants")
-              .select("id,name,lat,lng,address,phone,hero_image_url,type,display_image,rating,num_ratings,partner")
+              .select("id,name,lat,lng,address,city,phone,hero_image_url,type,display_image,rating,num_ratings,partner")
               .eq("is_active", true)
               .limit(500);
           })(),
@@ -36,6 +36,7 @@ export function useRestaurants() {
             lng: Number(r.lng),
             partner: Boolean(r.partner),
             address: r.address ?? undefined,
+            city: r.city ?? undefined,
             phone: r.phone ?? undefined,
             rating: r.rating ?? undefined,
             rating_count: r.num_ratings ?? undefined,

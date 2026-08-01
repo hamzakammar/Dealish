@@ -1,10 +1,11 @@
 import { supabase } from "@/app/lib/supabase";
 import { useAuthContext } from "@/app/providers/auth";
 import { useThemeColors } from "@/hooks/useThemeColors";
+import { AnalyticsEvents, captureEvent } from "@/utils/analytics";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -42,6 +43,11 @@ export default function OnboardingScreen() {
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+
+  // Fire onboarding_started once when the flow first mounts.
+  useEffect(() => {
+    captureEvent(AnalyticsEvents.ONBOARDING_STARTED);
+  }, []);
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -157,7 +163,8 @@ export default function OnboardingScreen() {
   const handleSkip = async () => {
     // Mark onboarding as complete so it never shows again on this device
     await AsyncStorage.setItem("hasCompletedOnboarding", "true");
-    
+    captureEvent(AnalyticsEvents.ONBOARDING_COMPLETED, { method: "skipped" });
+
     // Check role before redirecting
     if (session?.user?.id) {
       const { data: profile } = await supabase
@@ -209,6 +216,7 @@ export default function OnboardingScreen() {
 
       // Mark onboarding as complete so it never shows again on this device
       await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+      captureEvent(AnalyticsEvents.ONBOARDING_COMPLETED, { method: "completed" });
 
       // Refresh profile to get updated role
       await refetchProfile();

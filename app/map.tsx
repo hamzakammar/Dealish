@@ -15,6 +15,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useColorScheme } from "@/components/useColorScheme";
 import { calculateDistance } from "@/utils/distance";
+import { AnalyticsEvents, captureEvent } from "@/utils/analytics";
 import { lightTap } from "@/utils/haptics";
 import { MapType, Restaurant } from "@/types/restaurant";
 import { Ionicons } from "@expo/vector-icons";
@@ -74,6 +75,8 @@ export default function MapScreen() {
   const [mapGateBypass, setMapGateBypass] = useState(false);
   const params = useLocalSearchParams<{ focus?: string }>();
   const focusHandledRef = useRef<string | null>(null);
+  // How the currently-open restaurant detail card was reached (map/list/search/…).
+  const restaurantOpenSourceRef = useRef<string>("map");
 
   const { restaurants, loading: restaurantsLoading } = useRestaurants();
   const { userLocation, region, loading: locationLoading } = useUserLocation(mapRef);
@@ -244,7 +247,7 @@ export default function MapScreen() {
 
   const handleSuggestionPress = (restaurant: Restaurant) => {
     setSearchQuery("");
-    handleRestaurantSelect(restaurant);
+    handleRestaurantSelect(restaurant, "search");
   };
 
   const loading = restaurantsLoading || locationLoading;
@@ -253,6 +256,37 @@ export default function MapScreen() {
     const t = setTimeout(() => setMapGateBypass(true), 10_000);
     return () => clearTimeout(t);
   }, []);
+
+  // Analytics: home screen viewed (fires once when the map/home screen mounts).
+  useEffect(() => {
+    captureEvent(AnalyticsEvents.HOME_VIEWED);
+  }, []);
+
+  // Analytics: list view shown. Fires whenever the toggle switches to "list".
+  useEffect(() => {
+    if (viewMode === "list") {
+      captureEvent(AnalyticsEvents.RESTAURANT_LIST_VIEWED, {
+        result_count: filteredRestaurants.length,
+      });
+    }
+    // filteredRestaurants intentionally omitted: only fire on view-mode change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
+
+  // Analytics: search performed. Debounced off the query so we never capture a
+  // raw keystroke; fires the settled search with its result count.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) return;
+    const t = setTimeout(() => {
+      captureEvent(AnalyticsEvents.SEARCH_PERFORMED, {
+        query_length: q.length,
+        result_count: filteredRestaurants.length,
+      });
+    }, 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const { session } = useAuthContext();
 
@@ -322,10 +356,13 @@ export default function MapScreen() {
     return () => handler.remove();
   }, [selectedRestaurant, isAccountPanelOpen]);
 
-  const handleRestaurantSelect = React.useCallback((restaurant: Restaurant) => {
+  const handleRestaurantSelect = React.useCallback((restaurant: Restaurant, source?: string) => {
     if (selectedRestaurant?.id === restaurant.id) {
       return;
     }
+    // Record how this open was reached so the detail card can attribute
+    // restaurant_opened's source_screen. Defaults to the current view mode.
+    restaurantOpenSourceRef.current = source ?? viewMode;
     lightTap();
     setMapIsTransitioning(true);
     setTimeout(() => setMapIsTransitioning(false), 650);
@@ -378,7 +415,7 @@ export default function MapScreen() {
     if (target) {
       focusHandledRef.current = focusId;
       setViewMode("map");
-      handleRestaurantSelect(target);
+      handleRestaurantSelect(target, "deep_link");
     }
   }, [params.focus, restaurants, handleRestaurantSelect]);
 
@@ -650,6 +687,7 @@ export default function MapScreen() {
             onOpenExternalMaps={handleOpenExternalMaps}
             userLocation={userLocation}
             planTime={planTime}
+            sourceScreen={restaurantOpenSourceRef.current}
           />
         </>
       )}
@@ -662,6 +700,7 @@ export default function MapScreen() {
         isOpen={isAccountPanelOpen}
         onClose={() => setIsAccountPanelOpen(false)}
         onSelectRestaurant={(restaurant) => {
+          restaurantOpenSourceRef.current = "account";
           setSelectedRestaurant(restaurant);
           setViewMode("map");
         }}

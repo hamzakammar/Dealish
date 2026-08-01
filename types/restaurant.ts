@@ -6,6 +6,7 @@ export type Restaurant = {
   partner?: boolean;
   description?: string;
   address?: string;
+  city?: string;
   phone?: string;
   type?: string;
   rating?: number;

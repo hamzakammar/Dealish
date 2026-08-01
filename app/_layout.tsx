@@ -6,9 +6,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LogBox } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,6 +21,10 @@ import AppErrorBoundary from '@/components/ErrorBoundary';
 import { useColorScheme } from '@/components/useColorScheme';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { AnalyticsEvents, captureEvent, captureScreen, initAnalytics, isFirstAppOpen } from '@/utils/analytics';
+
+// Fire app_opened once per JS process, regardless of re-renders.
+let appOpenedFired = false;
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 if (SENTRY_DSN) {
@@ -69,6 +73,18 @@ function RootLayout() {
     initialize();
   }, []);
 
+  // Analytics: fire app_opened (and first_app_open as the install proxy) exactly
+  // once per launch. Runs independently of the auth init above.
+  useEffect(() => {
+    if (appOpenedFired) return;
+    appOpenedFired = true;
+    initAnalytics();
+    captureEvent(AnalyticsEvents.APP_OPENED);
+    isFirstAppOpen().then((first) => {
+      if (first) captureEvent(AnalyticsEvents.FIRST_APP_OPEN);
+    });
+  }, []);
+
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
@@ -94,6 +110,18 @@ export default SENTRY_DSN ? Sentry.wrap(RootLayout) : RootLayout;
 function RootLayoutNav() {
   const systemColorScheme = useColorScheme();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Screen tracking: one event per distinct route. Deduping on the pathname
+  // avoids the duplicate events that rerenders / navigation focus loops cause.
+  const lastScreenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pathname || pathname === lastScreenRef.current) return;
+    lastScreenRef.current = pathname;
+    // Normalize "/" to a stable name; strip the leading slash otherwise.
+    const screenName = pathname === '/' ? 'index' : pathname.replace(/^\//, '');
+    captureScreen(screenName, { path: pathname });
+  }, [pathname]);
 
   useEffect(() => {
     // Always declare subscription at the top for consistent hook structure

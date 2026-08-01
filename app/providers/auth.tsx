@@ -1,6 +1,7 @@
 import { supabase } from '@/app/lib/supabase'
 import type { Profile } from '@/types/user'
 import type { Session } from '@supabase/supabase-js'
+import { identifyUser, registerSuperProperties, resetAnalytics } from '@/utils/analytics'
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { AppState, AppStateStatus } from 'react-native'
 
@@ -348,6 +349,32 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       isMountedRef.current = false
     }
   }, [])
+
+  // ── PostHog identity ──────────────────────────────────────────────────
+  // Identify by the Supabase user id on login, reset on logout, and keep the
+  // global `authenticated` super-property current. No email/phone is sent.
+  const prevAnalyticsUserIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (session === undefined) return // still resolving initial session
+    const uid = session?.user?.id ?? null
+    registerSuperProperties({ authenticated: Boolean(uid) })
+    if (uid) {
+      if (prevAnalyticsUserIdRef.current !== uid) {
+        identifyUser(uid, { authenticated: true })
+      }
+      prevAnalyticsUserIdRef.current = uid
+    } else {
+      if (prevAnalyticsUserIdRef.current !== null) {
+        resetAnalytics() // logout transition
+      }
+      prevAnalyticsUserIdRef.current = null
+    }
+  }, [session])
+
+  // Non-PII trait: expose role as a super-property for authed-vs-owner analysis.
+  useEffect(() => {
+    if (profile?.role) registerSuperProperties({ user_role: profile.role })
+  }, [profile?.role])
 
   // Fetch the profile when the session changes
   // Must include session so we refetch when user logs in (fetchProfile uses sessionRef)
