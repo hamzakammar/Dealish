@@ -79,6 +79,10 @@ function getClient(): PostHog | null {
       // Batch a little so we don't fire a request per event.
       flushAt: 20,
       flushInterval: 10_000,
+      // Manual instrumentation only: disable the SDK's native lifecycle
+      // autocapture ("Application Opened/Became Active/…") so the event stream is
+      // exactly our explicit funnel events — no auto/duplicate events.
+      captureAppLifecycleEvents: false,
     });
   } catch (e) {
     if (__DEV__) console.warn('[analytics] failed to init PostHog', e);
