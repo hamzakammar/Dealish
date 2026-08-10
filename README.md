@@ -31,3 +31,5 @@ npm install
 npx expo start
 ```
 
+**PRIORITY:** Contain Dealish to the technical co-founder lane, aiming for 1,000 weekly users before reassessing
+
