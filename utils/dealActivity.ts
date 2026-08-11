@@ -227,15 +227,44 @@ export function getActiveDealIdSet(deals: Deal[], atTime: Date | null = null): S
 }
 
 /**
- * Picks the "primary" deal to headline on the restaurant card: the first
- * currently-active deal (preserving input order), falling back to the first
- * deal when none are active.
+ * True if the deal runs *today* (its recurring days include today, or a one-time
+ * deal whose window covers today) — regardless of the current clock time.
+ */
+export function isDealActiveToday(deal: Deal, ref: Date = new Date(), tz: string = DEFAULT_TZ): boolean {
+  if (deal.is_active === false) return false;
+
+  if (deal.is_recurring) {
+    if (!deal.recurrence_days?.length) return true; // recurring with no day restriction
+    const { day } = getLocalComponents(ref, tz);
+    return deal.recurrence_days.includes(day);
+  }
+
+  // One-time: today if it hasn't ended and it has started (or starts later today).
+  const startAt = deal.start_at ? new Date(deal.start_at) : null;
+  const endAt = deal.end_at ? new Date(deal.end_at) : null;
+  if (endAt && !isNaN(endAt.getTime()) && endAt < ref) return false;
+  if (startAt && !isNaN(startAt.getTime()) && startAt > ref) {
+    // Not started yet — only counts as "today" if it starts later this same day.
+    return getLocalComponents(startAt, tz).day === getLocalComponents(ref, tz).day;
+  }
+  return true;
+}
+
+/**
+ * Picks the "primary" deal to headline on the restaurant card, so it stays
+ * consistent with the map pin and shows the most relevant offer:
+ *   1. a deal that's live right now (preferring input order), else
+ *   2. a deal that runs today (so "Happy Hour — Today" beats "Wings — next Tue"), else
+ *   3. the first deal.
  */
 export function getPrimaryDeal(deals: Deal[], atTime: Date | null = null): Deal | null {
   if (!deals || deals.length === 0) return null;
   const activeIds = getActiveDealIdSet(deals, atTime);
   const active = deals.find((d) => activeIds.has(d.id));
-  return active ?? deals[0];
+  if (active) return active;
+  const ref = atTime ?? new Date();
+  const today = deals.find((d) => isDealActiveToday(d, ref));
+  return today ?? deals[0];
 }
 
 /**

@@ -136,7 +136,27 @@ describe('getPrimaryDeal', () => {
     expect(primary?.id).toBe('active');
   });
 
-  it('falls back to the first deal when none are active', () => {
+  it('prefers a deal running today over an upcoming other-day deal (when none live now)', () => {
+    // On a Tuesday evening: an upcoming Wednesday deal vs a Tuesday lunch deal that
+    // already ended for the day. Neither is live now, but the Tuesday one is "today".
+    const upcomingWed = recurring({
+      id: 'wed',
+      recurrence_days: [3],
+      recurrence_start_time: '17:00:00',
+      recurrence_end_time: '21:00:00',
+    });
+    const todayTueLunch = recurring({
+      id: 'tue-lunch',
+      recurrence_days: [2],
+      recurrence_start_time: '11:00:00',
+      recurrence_end_time: '13:00:00',
+    });
+    // Input order lists the upcoming one first (e.g. created_at desc).
+    const primary = getPrimaryDeal([upcomingWed, todayTueLunch], TUE_DINNER);
+    expect(primary?.id).toBe('tue-lunch');
+  });
+
+  it('falls back to the first deal when none are active or today', () => {
     const first = recurring({ id: 'first', recurrence_days: [3] });
     const second = recurring({ id: 'second', recurrence_days: [4] });
     const primary = getPrimaryDeal([first, second], TUE_DINNER);
