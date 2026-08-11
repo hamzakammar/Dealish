@@ -47,24 +47,24 @@ export default function CreateRestaurantPage() {
       setError("Restaurant name is required.");
       return false;
     }
+    // Location is captured from the selected address suggestion, not entered by hand.
     if (!latitude.trim() || !longitude.trim()) {
       setError(
-        "Location is required. Enter latitude and longitude coordinates."
+        "Please pick your restaurant's address from the dropdown suggestions so we can place it on the map."
       );
       return false;
     }
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
-    if (isNaN(lat) || isNaN(lng)) {
-      setError("Latitude and longitude must be valid numbers.");
-      return false;
-    }
-    if (lat < -90 || lat > 90) {
-      setError("Latitude must be between -90 and 90.");
-      return false;
-    }
-    if (lng < -180 || lng > 180) {
-      setError("Longitude must be between -180 and 180.");
+    if (
+      isNaN(lat) ||
+      isNaN(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180
+    ) {
+      setError("That address couldn't be located. Please choose a different suggestion.");
       return false;
     }
     return true;
@@ -86,8 +86,8 @@ export default function CreateRestaurantPage() {
         city: city.trim() || null,
         phone: phone.trim() || null,
         type: type.trim() || null,
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
+        lat: parseFloat(latitude),
+        lng: parseFloat(longitude),
         hero_image_url: imageUrl.trim() || null,
         is_active: true,
       };
@@ -212,20 +212,42 @@ export default function CreateRestaurantPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Address
+              Address *
             </label>
             <AddressAutocomplete
               value={address}
-              onChange={setAddress}
+              onChange={(v) => {
+                setAddress(v);
+                // Typing after a selection invalidates the captured location until
+                // a suggestion is picked again.
+                setLatitude("");
+                setLongitude("");
+              }}
               onSelect={(result: AddressResult) => {
                 setAddress(result.address);
                 setCity(result.city);
                 setLatitude(String(result.lat));
                 setLongitude(String(result.lng));
               }}
-              placeholder="Street address"
+              placeholder="Start typing and pick your restaurant"
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
             />
+            {latitude && longitude ? (
+              <div className="mt-2 flex items-center gap-1.5 text-sm text-green-700">
+                <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Location confirmed
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                Pick your restaurant from the suggestions to set its location.
+              </p>
+            )}
           </div>
 
           <div>
@@ -265,61 +287,6 @@ export default function CreateRestaurantPage() {
               placeholder="e.g., Italian, Fast Food, Cafe"
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
             />
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-5">
-          <h2 className="text-lg font-semibold text-gray-900">Location *</h2>
-          <p className="text-sm text-gray-500">
-            Enter the latitude and longitude coordinates for your restaurant.
-          </p>
-
-          {latitude && longitude && (
-            <div className="flex items-center gap-2 rounded-xl border border-green-300 bg-green-50 px-4 py-2.5">
-              <svg
-                className="h-4 w-4 text-green-500"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="text-sm text-green-700 font-medium">
-                {parseFloat(latitude).toFixed(6)},{" "}
-                {parseFloat(longitude).toFixed(6)}
-              </span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Latitude
-              </label>
-              <input
-                type="text"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="e.g., 43.6532"
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Longitude
-              </label>
-              <input
-                type="text"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="e.g., -79.3832"
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
-              />
-            </div>
           </div>
         </div>
 

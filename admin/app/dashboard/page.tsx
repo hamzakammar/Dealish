@@ -22,8 +22,48 @@ export default function DashboardPage() {
   const [averageSale, setAverageSale] = useState(0);
   const [activeDeals, setActiveDeals] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  // Delete a restaurant the current user owns. RLS only permits deleting your own
+  // restaurants; FK cascade removes its deals/members/etc. `.select()` confirms a
+  // row was actually deleted (RLS returns success with 0 rows if not permitted).
+  const handleDelete = async (r: Restaurant) => {
+    const ok = window.confirm(
+      `Delete "${r.name}"? This permanently removes the restaurant and all of its deals. This can't be undone.`
+    );
+    if (!ok) return;
+
+    setDeletingId(r.id);
+    setDeleteError(null);
+    const { data, error } = await supabase
+      .from("restaurants")
+      .delete()
+      .eq("id", r.id)
+      .select("id");
+
+    if (error) {
+      setDeleteError(`Couldn't delete "${r.name}": ${error.message}`);
+      setDeletingId(null);
+      return;
+    }
+    if (!data || data.length === 0) {
+      setDeleteError(
+        `You don't have permission to delete "${r.name}", or it was already removed.`
+      );
+      setDeletingId(null);
+      return;
+    }
+
+    const remaining = restaurants.filter((x) => x.id !== r.id);
+    setRestaurants(remaining);
+    if (selectedRestaurantId === r.id) {
+      setSelectedRestaurantId(remaining[0]?.id ?? null);
+    }
+    setDeletingId(null);
+  };
 
   useEffect(() => {
     fetchRestaurants();
@@ -345,6 +385,45 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Your Restaurants — manage / delete restaurants you've added */}
+      {restaurants.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Your Restaurants
+          </h2>
+          {deleteError && (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
+          <div className="space-y-3">
+            {restaurants.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-4"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{r.name}</p>
+                  {r.address && (
+                    <p className="text-sm text-gray-500 truncate">
+                      {r.address}
+                      {r.city ? `, ${r.city}` : ""}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(r)}
+                  disabled={deletingId === r.id}
+                  className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {deletingId === r.id ? "Deleting…" : "Delete"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
