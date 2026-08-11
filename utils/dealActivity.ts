@@ -151,7 +151,14 @@ export function formatDateTime(dateString?: string | null): string | null {
 
 /** Formats a set of day numbers (0=Sun..6=Sat) into "Mon–Fri" / "Mon, Wed". */
 export function formatDayNames(dayNumbers: number[]): string {
-  const sortedDays = [...dayNumbers].sort((a, b) => a - b);
+  const uniqueDays = Array.from(new Set(dayNumbers));
+  const sortedDays = [...uniqueDays].sort((a, b) => a - b);
+
+  // A deal that runs every day of the week is "recurring/daily", not a weekday.
+  if (sortedDays.length >= 7) {
+    return 'Every day';
+  }
+
   const names = sortedDays.map((day) => DAY_NAMES[day]);
 
   if (names.length <= 2) {

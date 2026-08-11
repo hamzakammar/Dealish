@@ -524,32 +524,8 @@ export default function MapScreen() {
 
       {!isAccountPanelOpen && !isFilterPanelOpen && (
         <View style={[styles.topBarContainer, { paddingTop: insets.top + 8 }, viewMode === "list" && { backgroundColor: colors.cardSecondary }]}>
-          {viewMode === "map" && region && Platform.OS === 'ios' && MapView && (
-            <View style={styles.blurredMapBackground}>
-              <MapView
-                ref={(r: any) => {
-                  blurredMapRef.current = r;
-                }}
-                style={StyleSheet.absoluteFillObject}
-                region={currentRegionRef.current || region || fallbackRegion}
-                mapType={mapType}
-                provider={PROVIDER_DEFAULT}
-                customMapStyle={undefined}
-                scrollEnabled={false}
-                zoomEnabled={false}
-                pitchEnabled={false}
-                rotateEnabled={false}
-                toolbarEnabled={false}
-              />
-              <BlurView intensity={colors.isDark ? 80 : 60} style={StyleSheet.absoluteFillObject} tint={colors.isDark ? "dark" : "light"} />
-            </View>
-          )}
-          {viewMode === "map" && Platform.OS === 'android' && MapView && (
-            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
-          )}
-          {viewMode === "map" && Platform.OS === 'web' && (
-            <View style={[styles.blurredMapBackground, { backgroundColor: colors.isDark ? 'rgba(44, 44, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]} />
-          )}
+          {/* Map mode: no opaque bar — the search/toggle/deal-count/filter controls
+              float directly over the full-bleed map below. */}
           <View style={styles.topBarContent}>
             <View style={styles.topBar}>
               <TouchableOpacity
@@ -666,7 +642,7 @@ export default function MapScreen() {
             )}
 
             {activeDealCount > 0 && !selectedRestaurant && !showComingSoonBanner && (
-              <Text style={[styles.activeDealCountText, { color: colors.textSecondary }]}>
+              <Text style={[styles.activeDealCountText, { color: colors.textSecondary, backgroundColor: colors.card }]}>
                 {activeDealCount} {activeDealCount === 1 ? 'deal' : 'deals'} active nearby
               </Text>
             )}
@@ -891,9 +867,15 @@ const styles = StyleSheet.create({
   },
   activeDealCountText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 8,
+    // Legible pill since it now floats over the live map.
+    alignSelf: 'center',
+    overflow: 'hidden',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   comingSoonBanner: {
     flexDirection: 'row',
@@ -959,7 +941,9 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     flex: 1,
-    paddingTop: 170,
+    // Map is full-bleed from the top; the search/toggle/deal-count/filter bar
+    // floats over it (see topBarContainer) instead of pushing it down.
+    paddingTop: 0,
   },
   accountPanelOverlay: {
     position: 'absolute',

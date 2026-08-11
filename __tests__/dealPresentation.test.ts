@@ -53,6 +53,15 @@ describe('getDealScheduleLabel', () => {
     expect(getDealScheduleLabel(deal)).toBe('Mon–Fri · 3:00 PM – 6:00 PM');
   });
 
+  it('labels an all-week recurring deal as "Every day" (not a weekday range)', () => {
+    const deal = recurring({
+      recurrence_days: [0, 1, 2, 3, 4, 5, 6],
+      recurrence_start_time: '11:00:00',
+      recurrence_end_time: '23:00:00',
+    });
+    expect(getDealScheduleLabel(deal)).toBe('Every day · 11:00 AM – 11:00 PM');
+  });
+
   it('shows days only when there is no time window', () => {
     const deal = recurring({
       recurrence_days: [0, 6],

@@ -310,6 +310,13 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   );
   const primaryDealActive = primaryDeal ? activeDealIds.has(primaryDeal.id) : false;
   const primaryDealSchedule = primaryDeal ? getDealScheduleLabel(primaryDeal) : null;
+  // The headline already shows the primary deal, so the list below shows only the
+  // OTHER deals — no duplicate entry (Card 2). All deals stay visible: the primary
+  // in the headline, the rest here.
+  const otherDeals = useMemo(
+    () => sortedDeals.filter((d) => d.id !== primaryDeal?.id),
+    [sortedDeals, primaryDeal]
+  );
 
   // Analytics: deal_viewed — fire once per opened restaurant, when its deals have
   // loaded and at least one is shown. Deduped per restaurant so scroll/rerenders
@@ -652,12 +659,28 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
               )}
             </View>
             <View style={styles.headerContent}>
+              {/* Card 1: identity data (name + rating · distance · address) in two
+                  lines next to the photo, so deal content sits higher. */}
               <Text style={[styles.restaurantName, { color: colors.text }]} numberOfLines={1}>
                 {restaurant.name}
               </Text>
-              {sheetState === 'peek' && distance && (
-                <Text style={styles.peekDistanceText}>{distance} away</Text>
-              )}
+              <View style={styles.headerMetaRow}>
+                <RatingDisplay
+                  rating={restaurant.rating}
+                  ratingCount={restaurant.rating_count}
+                  size={12}
+                  showCount={true}
+                />
+                {(distance || restaurant.address) && (
+                  <Text
+                    style={[styles.headerMetaText, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {distance ? ` · ${distance}` : ""}
+                    {restaurant.address ? ` · ${restaurant.address}` : ""}
+                  </Text>
+                )}
+              </View>
             </View>
           </View>
           <TouchableOpacity
@@ -720,28 +743,6 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             </View>
           )}
 
-          {/* Restaurant meta: rating, address, distance (after deal headline) */}
-          <View style={styles.metaSection}>
-            <RatingDisplay
-              rating={restaurant.rating}
-              ratingCount={restaurant.rating_count}
-              size={14}
-              showCount={true}
-            />
-            {restaurant.address && (
-              <View style={styles.addressRow}>
-                <AntDesign name="environment" size={14} color={colors.textSecondary} />
-                <Text style={[styles.addressText, { color: colors.textSecondary }]}>{restaurant.address}</Text>
-              </View>
-            )}
-            {distance && (
-              <View style={styles.distanceRow}>
-                <AntDesign name="environment" size={14} color="#FE902A" />
-                <Text style={styles.distanceText}>{distance} away</Text>
-              </View>
-            )}
-          </View>
-
           {/* Description */}
           {restaurant.description && (
             <View style={styles.section}>
@@ -749,29 +750,35 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             </View>
           )}
 
-          {/* Deals section — all available deals; active ones get green treatment */}
-          <View style={styles.dealsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Deals</Text>
-            {dealsLoading ? (
+          {/* Deals section — the headline above shows the top deal; this lists the
+              REST (no duplicate). "No deals available" shows only when the
+              restaurant has zero deals configured. */}
+          {dealsLoading ? (
+            <View style={styles.dealsSection}>
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FE902A" />
               </View>
-            ) : sortedDeals.length > 0 ? (
-              sortedDeals.map((deal) => (
+            </View>
+          ) : deals.length === 0 ? (
+            <View style={styles.dealsSection}>
+              <View style={styles.emptyState}>
+                <AntDesign name="inbox" size={48} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No deals available</Text>
+              </View>
+            </View>
+          ) : otherDeals.length > 0 ? (
+            <View style={styles.dealsSection}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>More deals</Text>
+              {otherDeals.map((deal) => (
                 <DealCard
                   key={deal.id}
                   deal={deal}
                   isPartner={Boolean(restaurant.partner)}
                   isActive={activeDealIds.has(deal.id)}
                 />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <AntDesign name="inbox" size={48} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>No deals available</Text>
-              </View>
-            )}
-          </View>
+              ))}
+            </View>
+          ) : null}
 
           {/* Partner request CTA — below deal information */}
           {!restaurant.partner && (
@@ -955,6 +962,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginBottom: 6,
+  },
+  headerMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerMetaText: {
+    flex: 1,
+    fontSize: 12,
   },
   restaurantNameOverlayFull: {
     color: 'transparent',
