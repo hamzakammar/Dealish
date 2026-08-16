@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AddressAutocomplete, { AddressResult } from "@/components/AddressAutocomplete";
+
+// Matches the restaurant-images bucket config (setup_restaurant_images_storage.sql).
+const RESTAURANT_IMAGES_BUCKET = "restaurant-images";
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
 
 export default function CreateRestaurantPage() {
   const supabase = createClient();
@@ -26,9 +31,77 @@ export default function CreateRestaurantPage() {
   const [longitude, setLongitude] = useState("");
   const [imageUrl, setImageUrl] = useState("");
 
+  // Direct upload state (the URL field still works as an alternative).
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "error">("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUser();
   }, []);
+
+  // Revoke the object URL preview when it changes / on unmount to avoid leaks.
+  useEffect(() => {
+    return () => {
+      if (localPreview) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Allow re-selecting the same file later.
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadError(null);
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError("Unsupported format. Use JPEG, PNG, or WebP.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max is 5 MB.`);
+      return;
+    }
+
+    // Immediate local preview while the upload runs.
+    if (localPreview) URL.revokeObjectURL(localPreview);
+    setLocalPreview(URL.createObjectURL(file));
+    setUploadState("uploading");
+
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const fileName = `hero-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+      // Uploaded with the authenticated anon-key client — Storage RLS on the
+      // restaurant-images bucket governs who may write. No service-role key here.
+      const { data, error: uploadErr } = await supabase.storage
+        .from(RESTAURANT_IMAGES_BUCKET)
+        .upload(fileName, file, { contentType: file.type, upsert: false });
+
+      if (uploadErr) {
+        const msg = uploadErr.message || "";
+        setUploadError(
+          msg.toLowerCase().includes("bucket") || msg.toLowerCase().includes("not found")
+            ? "Storage bucket 'restaurant-images' isn't configured. See setup_restaurant_images_storage.sql."
+            : msg.toLowerCase().includes("row-level security") || msg.toLowerCase().includes("policy")
+            ? "You don't have permission to upload images. Check the restaurant-images Storage policy."
+            : `Upload failed: ${msg}`
+        );
+        setUploadState("error");
+        return;
+      }
+
+      const { data: pub } = supabase.storage.from(RESTAURANT_IMAGES_BUCKET).getPublicUrl(data.path);
+      // Store the public URL in the same field URL-based images use.
+      setImageUrl(pub.publicUrl);
+      setUploadState("idle");
+    } catch (err: any) {
+      setUploadError(`Upload failed: ${err?.message || String(err)}`);
+      setUploadState("error");
+    }
+  };
 
   const fetchUser = async () => {
     const {
@@ -294,6 +367,57 @@ export default function CreateRestaurantPage() {
         <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-5">
           <h2 className="text-lg font-semibold text-gray-900">Hero Image</h2>
 
+          {/* Upload from device */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Upload an image
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadState === "uploading"}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 hover:border-[#FE902A] hover:text-[#FE902A] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {uploadState === "uploading" ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-[#FE902A]" />
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 9l5-5 5 5M12 4v12" />
+                  </svg>
+                  Choose an image
+                </>
+              )}
+            </button>
+            <p className="mt-2 text-xs text-gray-500">JPEG, PNG, or WebP · up to 5 MB.</p>
+            {uploadError && (
+              <p className="mt-2 text-sm text-red-600">{uploadError}</p>
+            )}
+            {uploadState === "idle" && imageUrl && localPreview && !uploadError && (
+              <p className="mt-2 text-sm text-green-700">Image uploaded ✓</p>
+            )}
+          </div>
+
+          {/* Or paste a URL */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-xs text-gray-400">or paste a URL</span>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Image URL
@@ -301,16 +425,23 @@ export default function CreateRestaurantPage() {
             <input
               type="url"
               value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
+              onChange={(e) => {
+                setImageUrl(e.target.value);
+                // A typed URL supersedes any uploaded-file preview.
+                if (localPreview) {
+                  URL.revokeObjectURL(localPreview);
+                  setLocalPreview(null);
+                }
+              }}
               placeholder="https://..."
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
             />
           </div>
 
-          {imageUrl && (
+          {(localPreview || imageUrl) && (
             <div className="rounded-xl overflow-hidden border border-gray-200">
               <img
-                src={imageUrl}
+                src={localPreview || imageUrl}
                 alt="Restaurant hero preview"
                 className="w-full h-40 object-cover"
                 onError={(e) => {
