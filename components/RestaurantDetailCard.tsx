@@ -98,6 +98,8 @@ type RestaurantDetailCardProps = {
   planTime?: Date | null;
   /** Where the open came from (map/list/search/deep_link/account) — analytics only. */
   sourceScreen?: string;
+  /** Deal to headline (from a deal push tap) — overrides the default primary. */
+  highlightDealId?: string | null;
 };
 
 export type RestaurantDetailCardRef = {
@@ -134,6 +136,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   initialState = 'half', // Default to 'half' for backward compatibility
   planTime = null,
   sourceScreen,
+  highlightDealId = null,
 }, ref) => {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -305,8 +308,16 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
     [deals, activeDealIds]
   );
   const primaryDeal = useMemo(
-    () => getPrimaryDeal(deals, planTime),
-    [deals, planTime]
+    () => {
+      // A deal push tap headlines its specific deal, if still present; otherwise
+      // fall back to the normal "most relevant deal" selection.
+      if (highlightDealId) {
+        const hit = deals.find((d) => d.id === highlightDealId);
+        if (hit) return hit;
+      }
+      return getPrimaryDeal(deals, planTime);
+    },
+    [deals, planTime, highlightDealId]
   );
   const primaryDealActive = primaryDeal ? activeDealIds.has(primaryDeal.id) : false;
   const primaryDealSchedule = primaryDeal ? getDealScheduleLabel(primaryDeal) : null;

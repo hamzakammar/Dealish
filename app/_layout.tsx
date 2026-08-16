@@ -302,7 +302,10 @@ function NotificationHandler() {
       // the tap opens its detail card (and its deals), not just the bare map.
       const focusRestaurantId = notificationData.restaurant_id;
       if (notificationData.screen === '/map' && focusRestaurantId) {
-        router.push({ pathname: '/map', params: { focus: String(focusRestaurantId) } } as any);
+        const mapParams: Record<string, string> = { focus: String(focusRestaurantId) };
+        // Deal pushes also carry deal_id — headline that specific deal.
+        if (notificationData.deal_id) mapParams.deal = String(notificationData.deal_id);
+        router.push({ pathname: '/map', params: mapParams } as any);
       } else {
         router.push(notificationData.screen as any);
       }

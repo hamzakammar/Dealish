@@ -66,6 +66,9 @@ export default function MapScreen() {
   const regionBeforeSelectRef = useRef<RegionType | null>(null);
   const cameraBeforeSelectRef = useRef<CameraType | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  // Deal to headline in the detail card, set when arriving from a deal push so
+  // the tapped deal is the one shown first. Cleared on close / manual select.
+  const [highlightDealId, setHighlightDealId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "list">(Platform.OS === 'web' ? "list" : "map");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(true);
@@ -73,7 +76,7 @@ export default function MapScreen() {
   const [latitudeDelta, setLatitudeDelta] = useState(0.05);
   const [mapIsTransitioning, setMapIsTransitioning] = useState(false);
   const [mapGateBypass, setMapGateBypass] = useState(false);
-  const params = useLocalSearchParams<{ focus?: string }>();
+  const params = useLocalSearchParams<{ focus?: string; deal?: string }>();
   const focusHandledRef = useRef<string | null>(null);
   // How the currently-open restaurant detail card was reached (map/list/search/…).
   const restaurantOpenSourceRef = useRef<string>("map");
@@ -321,6 +324,7 @@ export default function MapScreen() {
   useEffect(() => {
     if (selectedRestaurant === null) {
       clearRoute();
+      setHighlightDealId(null);
     }
   }, [selectedRestaurant, clearRoute]);
 
@@ -375,6 +379,9 @@ export default function MapScreen() {
     if (selectedRestaurant?.id === restaurant.id) {
       return;
     }
+    // A manual open (marker/list/search) clears any push deal highlight; the
+    // deep-link path sets it right after this call.
+    if (source !== "deep_link") setHighlightDealId(null);
     // Record how this open was reached so the detail card can attribute
     // restaurant_opened's source_screen. Defaults to the current view mode.
     restaurantOpenSourceRef.current = source ?? viewMode;
@@ -431,8 +438,10 @@ export default function MapScreen() {
       focusHandledRef.current = focusId;
       setViewMode("map");
       handleRestaurantSelect(target, "deep_link");
+      // Headline the specific deal from the push, if one was passed.
+      setHighlightDealId(typeof params.deal === "string" ? params.deal : null);
     }
-  }, [params.focus, restaurants, handleRestaurantSelect]);
+  }, [params.focus, params.deal, restaurants, handleRestaurantSelect]);
 
   const handleRecenter = () => {
     if (!userLocation || viewMode !== "map") return;
@@ -679,6 +688,7 @@ export default function MapScreen() {
             userLocation={userLocation}
             planTime={planTime}
             sourceScreen={restaurantOpenSourceRef.current}
+            highlightDealId={highlightDealId}
           />
         </>
       )}
@@ -692,6 +702,7 @@ export default function MapScreen() {
         onClose={() => setIsAccountPanelOpen(false)}
         onSelectRestaurant={(restaurant) => {
           restaurantOpenSourceRef.current = "account";
+          setHighlightDealId(null);
           setSelectedRestaurant(restaurant);
           setViewMode("map");
         }}
