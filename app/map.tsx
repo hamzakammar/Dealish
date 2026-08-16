@@ -197,7 +197,22 @@ export default function MapScreen() {
       stylers: [{ color: "#17263c" }]
     },
   ], []);
-  
+
+  // Hide Google's own POI/transit ICONS (food, shops, stations — the "pizza
+  // slice" glyphs) while keeping text labels. Dealish draws its own restaurant
+  // pins at these spots, so Google's business icons are redundant, and — more
+  // importantly — on Android they were briefly showing THROUGH a pin while
+  // react-native-maps re-rasterized it on selection (the reported flicker).
+  const poiIconHideStyle = useMemo(() => [
+    { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  ], []);
+
+  const standardMapStyle = useMemo(
+    () => (isDarkMode ? [...darkMapStyle, ...poiIconHideStyle] : poiIconHideStyle),
+    [isDarkMode, darkMapStyle, poiIconHideStyle],
+  );
+
   const [mapType, setMapType] = useState<MapType>(() => {
     return settings?.appearance?.defaultMapType || "standard";
   });
@@ -457,7 +472,7 @@ export default function MapScreen() {
             showsUserLocation={true}
             mapType={mapType}
             provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
-            customMapStyle={isDarkMode && mapType === "standard" ? darkMapStyle : undefined}
+            customMapStyle={mapType === "standard" ? standardMapStyle : undefined}
             pitchEnabled={Platform.OS !== 'android'}
             toolbarEnabled={false}
             onRegionChangeComplete={(r: any) => {

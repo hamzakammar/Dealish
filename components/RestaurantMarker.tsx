@@ -33,9 +33,9 @@ const MARKER_IMAGES = {
 };
 
 export function MarkerAssetsWarmup() {
-  if (Platform.OS === 'web') return null;
-
+  // Hook must run unconditionally (rules of hooks); the web guard lives inside.
   React.useEffect(() => {
+    if (Platform.OS === 'web') return;
     const allImages: ImageSourcePropType[] = [
       MARKER_IMAGES["partner-deal"].normal,
       MARKER_IMAGES["partner-deal"].selected,
@@ -79,12 +79,9 @@ export default function RestaurantMarker({
     onPress(restaurant);
   }, [restaurant, onPress]);
 
-  if (restaurant.lat == null || restaurant.lng == null) return null;
-  if (Platform.OS === 'web' || !Marker) return null;
-
-  const markerImage = getMarkerImage(hasActiveDeal, isPartner, isSelected);
-  const size = getMarkerSize(hasActiveDeal, isPartner, isSelected, scale);
-
+  // Hooks must run unconditionally, before any early return (rules of hooks).
+  // `tracked` re-enables tracksViewChanges only briefly so react-native-maps can
+  // re-rasterize the custom pin after its image/size changes, then pins it off.
   const [tracked, setTracked] = React.useState(true);
 
   React.useEffect(() => {
@@ -92,6 +89,16 @@ export default function RestaurantMarker({
     const t = setTimeout(() => setTracked(false), 500);
     return () => clearTimeout(t);
   }, [isSelected, hasActiveDeal]);
+
+  if (restaurant.lat == null || restaurant.lng == null) return null;
+  if (Platform.OS === 'web' || !Marker) return null;
+
+  const markerImage = getMarkerImage(hasActiveDeal, isPartner, isSelected);
+  const size = getMarkerSize(hasActiveDeal, isPartner, isSelected, scale);
+  // Keep the rasterized marker bounds constant across selection so Android does
+  // not blank the pin while the image swaps — the container stays at the largest
+  // (selected) size and the image is centered within it.
+  const containerSize = getMarkerSize(hasActiveDeal, isPartner, true, scale);
 
   return (
     <Marker
@@ -101,7 +108,7 @@ export default function RestaurantMarker({
       tracksViewChanges={tracked}
       tappable={true}
     >
-      <View style={{ width: size, height: size }}>
+      <View style={{ width: containerSize, height: containerSize, alignItems: 'center', justifyContent: 'center' }}>
         <Image
           source={markerImage}
           style={{ width: size, height: size, borderRadius: size / 2 }}
