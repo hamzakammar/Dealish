@@ -1,9 +1,16 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
+
+// Identifier of the last notification tap we've already routed on. Persisted so
+// a cold start caused by a tap deep-links once, while a later *normal* relaunch
+// (where getLastNotificationResponseAsync still returns that old tap) does not
+// re-navigate to a stale deal.
+const LAST_HANDLED_NOTIF_KEY = 'lastHandledNotificationId';
 
 // Check if we're in Expo Go (where notifications don't work)
 function isExpoGo(): boolean {
@@ -101,13 +108,34 @@ export function usePushNotifications() {
         setNotification(notification);
       });
 
-      // Listen for notification taps (when app is in background/closed)
-      responseListener.current = NotificationsModule.addNotificationResponseReceivedListener((response: Record<string, unknown>) => {
+      // Listen for notification taps while the app is running (foreground) or
+      // suspended in the background. This does NOT fire when a tap cold-launches
+      // a killed app — that case is handled below.
+      responseListener.current = NotificationsModule.addNotificationResponseReceivedListener((response: Record<string, any>) => {
         if (__DEV__) {
           console.log('Notification tapped:', response);
         }
+        const id = response?.notification?.request?.identifier;
+        if (id) AsyncStorage.setItem(LAST_HANDLED_NOTIF_KEY, String(id)).catch(() => {});
         setLastNotificationResponse(response);
       });
+
+      // Cold start: when a tap launches a killed app, the listener above never
+      // fires. Pull the launching tap explicitly and route on it — but only once
+      // per notification (deduped by identifier) so opening the app normally
+      // afterwards doesn't re-trigger navigation to an already-handled deal.
+      if (typeof NotificationsModule.getLastNotificationResponseAsync === 'function') {
+        NotificationsModule.getLastNotificationResponseAsync()
+          .then(async (response: Record<string, any> | null) => {
+            const id = response?.notification?.request?.identifier;
+            if (!response || !id) return;
+            const handledId = await AsyncStorage.getItem(LAST_HANDLED_NOTIF_KEY);
+            if (String(handledId) === String(id)) return;
+            await AsyncStorage.setItem(LAST_HANDLED_NOTIF_KEY, String(id));
+            setLastNotificationResponse(response);
+          })
+          .catch(() => {});
+      }
     } catch (e) {
       // Silently fail - notifications not available in Expo Go
     }

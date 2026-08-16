@@ -297,8 +297,15 @@ function NotificationHandler() {
         return;
       }
 
-      // Navigate to the screen specified in notification data
-      router.push(notificationData.screen as any);
+      // Navigate to the screen in the notification data. Deal/partner pushes
+      // carry a restaurant_id — route to the map FOCUSED on that restaurant so
+      // the tap opens its detail card (and its deals), not just the bare map.
+      const focusRestaurantId = notificationData.restaurant_id;
+      if (notificationData.screen === '/map' && focusRestaurantId) {
+        router.push({ pathname: '/map', params: { focus: String(focusRestaurantId) } } as any);
+      } else {
+        router.push(notificationData.screen as any);
+      }
     } catch (e) {
       // Ignore errors in notification handling
       console.warn('Error handling notification:', e);
