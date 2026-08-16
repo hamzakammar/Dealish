@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
+import { notifyNewDeal } from '@/utils/notifications';
 
 export type ScrapedCandidate = {
   id: string;
@@ -100,6 +101,13 @@ export function useScrapedDealCandidates() {
         const { error: insertErr } = await supabase.from('deals').insert([dealData]);
         // PGRST204 = "no rows returned" from an insert without a select; harmless.
         if (insertErr && insertErr.code !== 'PGRST204') throw insertErr;
+
+        // Notify users who favourited this restaurant — this publish path is a
+        // "new deal" too (deal-form.tsx already does this for manual creation).
+        // getNotificationRecipients() scopes to favouriters; best-effort only.
+        notifyNewDeal(dealId, c.restaurant_id, c.title, c.description || undefined).catch((e) => {
+          if (__DEV__) console.warn('notifyNewDeal (scraped approve) failed:', e);
+        });
 
         const { error: updateErr } = await supabase
           .from('scraped_deal_candidates')
