@@ -98,11 +98,12 @@ export function useRestaurantDeals(restaurantId: string | null, atTime: Date | n
     };
   }, [restaurantId, atTime]);
 
-  return { 
-    deals, 
-    loading, 
-    error, 
-    hasMore, 
-    loadMore: () => fetchDeals(false) 
+  return {
+    deals,
+    loading,
+    error,
+    hasMore,
+    loadMore: () => fetchDeals(false),
+    refetch: () => fetchDeals(true),
   };
 }

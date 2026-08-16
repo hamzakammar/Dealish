@@ -128,8 +128,10 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export function formatClockTime(timeString?: string | null): string | null {
   if (!timeString) return null;
   const [hours, minutes] = timeString.split(':').map(Number);
+  // Malformed time (e.g. "", "abc", "25:99") — don't render "Invalid Date".
+  if (isNaN(hours) || hours < 0 || hours > 23) return null;
   const date = new Date();
-  date.setHours(hours, minutes || 0, 0, 0);
+  date.setHours(hours, isNaN(minutes) ? 0 : minutes, 0, 0);
   return date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',

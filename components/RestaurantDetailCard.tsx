@@ -140,7 +140,7 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
   const { session } = useAuthContext();
   const isAuthenticated = Boolean(session?.user?.id);
   const mapsAppName = Platform.OS === "ios" ? "Apple Maps" : "Google Maps";
-  const { deals, loading: dealsLoading } = useRestaurantDeals(restaurant.id, planTime);
+  const { deals, loading: dealsLoading, error: dealsError, refetch: refetchDeals } = useRestaurantDeals(restaurant.id, planTime);
   const [isFavouriteState, setIsFavouriteState] = useState<boolean>(false);
   const [isRequestingPartner, setIsRequestingPartner] = useState<boolean>(false);
   const [requestCount, setRequestCount] = useState<number>(0);
@@ -750,13 +750,32 @@ const RestaurantDetailCard = forwardRef<RestaurantDetailCardRef, RestaurantDetai
             </View>
           )}
 
-          {/* Deals section — the headline above shows the top deal; this lists the
-              REST (no duplicate). "No deals available" shows only when the
-              restaurant has zero deals configured. */}
+          {/* Deals section — distinguishes: loading, a load FAILURE (retryable),
+              a restaurant with genuinely zero deals, and deals present. Inactive/
+              upcoming deals still render (with status) via the headline + list —
+              they are never reported as "no deals". */}
           {dealsLoading ? (
             <View style={styles.dealsSection}>
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FE902A" />
+              </View>
+            </View>
+          ) : dealsError && deals.length === 0 ? (
+            // Query/network failure — do NOT claim there are no deals.
+            <View style={styles.dealsSection}>
+              <View style={styles.emptyState}>
+                <AntDesign name="exclamation-circle" size={44} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
+                  Couldn&apos;t load deals
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => refetchDeals()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading deals"
+                >
+                  <Text style={styles.retryButtonText}>Try again</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ) : deals.length === 0 ? (
@@ -1258,6 +1277,19 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: "#999",
+  },
+  retryButton: {
+    marginTop: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#FE902A",
+  },
+  retryButtonText: {
+    color: "#FE902A",
+    fontSize: 14,
+    fontWeight: "600",
   },
   /**
    * Full state content styles
