@@ -82,6 +82,8 @@ export function useScrapedDealCandidates() {
           tags: [],
           is_active: true,
           is_recurring: !!c.is_recurring,
+          // Scraped candidates are always discounts, never flat prices.
+          pricing_type: 'amount_off',
           discount_type: c.discount_type || undefined,
           discount_value: c.discount_value ?? undefined,
           source: 'scraped',

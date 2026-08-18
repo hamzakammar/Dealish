@@ -3,12 +3,21 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import {
+  buildDealPricingFields,
+  formatDealPriceLabel,
+  PRICING_TYPES,
+  PricingType,
+  validateDealPricing,
+} from "@/lib/dealPricing";
 
 type Deal = {
   id: string;
   restaurant_id: string;
   title: string;
   description: string | null;
+  pricing_type: string | null;
+  price: number | null;
   discount_type: string | null;
   discount_value: number | null;
   start_at: string | null;
@@ -39,7 +48,9 @@ export default function DealsPage() {
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [discountType, setDiscountType] = useState("percentage");
+  const [pricingType, setPricingType] = useState<PricingType>("amount_off");
+  const [price, setPrice] = useState(""); // fixed_price only
+  const [discountType, setDiscountType] = useState("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [isRecurring, setIsRecurring] = useState(true);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
@@ -100,7 +111,9 @@ export default function DealsPage() {
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setDiscountType("percentage");
+    setPricingType("amount_off");
+    setPrice("");
+    setDiscountType("percent");
     setDiscountValue("");
     setIsRecurring(true);
     setRecurrenceDays([0, 1, 2, 3, 4, 5, 6]);
@@ -120,8 +133,18 @@ export default function DealsPage() {
     setEditingDeal(deal);
     setTitle(deal.title);
     setDescription(deal.description || "");
-    setDiscountType(deal.discount_type || "percentage");
-    setDiscountValue(deal.discount_value?.toString() || "");
+    // Legacy rows with no pricing_type are amount_off. Normalize "percentage" -> "percent".
+    if (deal.pricing_type === "fixed_price") {
+      setPricingType("fixed_price");
+      setPrice(deal.price != null ? String(deal.price) : "");
+      setDiscountType("percent");
+      setDiscountValue("");
+    } else {
+      setPricingType("amount_off");
+      setPrice("");
+      setDiscountType(deal.discount_type === "percentage" ? "percent" : deal.discount_type || "percent");
+      setDiscountValue(deal.discount_value?.toString() || "");
+    }
     setIsRecurring(deal.is_recurring);
     setRecurrenceDays(deal.recurrence_days || [0, 1, 2, 3, 4, 5, 6]);
     setRecurrenceStartTime(deal.recurrence_start_time?.substring(0, 5) || "11:00");
@@ -133,14 +156,22 @@ export default function DealsPage() {
 
   const handleSave = async () => {
     if (!title.trim() || !selectedRestaurantId) return;
+
+    const pricingError = validateDealPricing({ pricingType, price, discountType, discountValue });
+    if (pricingError) {
+      setError(pricingError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     const payload: any = {
       title: title.trim(),
       description: description.trim() || null,
-      discount_type: discountType,
-      discount_value: discountValue ? parseFloat(discountValue) : null,
+      // Pricing columns for the selected type; incompatible fields become null
+      // so switching type on edit clears stale values.
+      ...buildDealPricingFields({ pricingType, price, discountType, discountValue }),
       is_recurring: isRecurring,
       recurrence_days: isRecurring ? recurrenceDays : null,
       recurrence_start_time: isRecurring ? recurrenceStartTime + ":00" : null,
@@ -265,34 +296,71 @@ export default function DealsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Deal Type
+                </label>
+                <select
+                  value={pricingType}
+                  onChange={(e) => setPricingType(e.target.value as PricingType)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
+                >
+                  {PRICING_TYPES.map(({ key, label }) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {pricingType === "fixed_price"
+                    ? 'A flat special price (e.g. "$10"). No savings are shown.'
+                    : "A discount off the regular price."}
+                </p>
+              </div>
+
+              {pricingType === "fixed_price" ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Discount Type
-                  </label>
-                  <select
-                    value={discountType}
-                    onChange={(e) => setDiscountType(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
-                  >
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="bogo">BOGO</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Value
+                    Price ($)
                   </label>
                   <input
                     type="number"
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
-                    placeholder={discountType === "percentage" ? "20" : "5.00"}
+                    placeholder="10.00"
                   />
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Discount Type
+                    </label>
+                    <select
+                      value={discountType}
+                      onChange={(e) => setDiscountType(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
+                    >
+                      <option value="percent">Percentage</option>
+                      <option value="fixed">Fixed Amount</option>
+                      <option value="bogo">BOGO</option>
+                    </select>
+                  </div>
+                  {discountType !== "bogo" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Value
+                      </label>
+                      <input
+                        type="number"
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:border-[#FE902A] focus:outline-none focus:ring-1 focus:ring-[#FE902A]"
+                        placeholder={discountType === "percent" ? "20" : "5.00"}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -498,14 +566,8 @@ export default function DealsPage() {
                         {deal.recurrence_end_time?.substring(0, 5)}
                       </span>
                     )}
-                    {deal.discount_value && (
-                      <span>
-                        {deal.discount_type === "percentage"
-                          ? `${deal.discount_value}% off`
-                          : deal.discount_type === "fixed"
-                          ? `$${deal.discount_value} off`
-                          : "BOGO"}
-                      </span>
+                    {formatDealPriceLabel(deal) && (
+                      <span>{formatDealPriceLabel(deal)}</span>
                     )}
                   </div>
                 </div>

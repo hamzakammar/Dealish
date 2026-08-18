@@ -56,3 +56,6 @@ supabase/.temp/
 
 # Android app bundles (local build artifacts — never source)
 build-*.aab
+
+# Local env backups (may contain secrets — never source)
+.env.local.bak*

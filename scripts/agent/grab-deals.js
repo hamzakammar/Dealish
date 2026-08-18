@@ -305,6 +305,8 @@ async function publishCandidate(candidateId, c) {
     tags: [],
     is_active: true,
     is_recurring: !!c.is_recurring,
+    // The scraper only extracts discounts (percent/fixed/bogo), never flat prices.
+    pricing_type: 'amount_off',
     discount_type: c.discount_type || null,
     discount_value: c.discount_value,
     source: 'scraped',

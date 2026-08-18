@@ -1,7 +1,7 @@
 import { Deal } from "@/types/restaurant";
 import { supabase } from "@/app/lib/supabase";
 import { useThemeColors } from "@/hooks/useThemeColors";
-import { calculateSavings } from "@/utils/activity";
+import { formatDealPriceLabel, getDealSavings } from "@/utils/dealPricing";
 import {
   getDealDaysLabel,
   getDealTimeWindow,
@@ -102,23 +102,11 @@ export default function DealCard({ deal, isPartner = false, isActive }: DealCard
   // otherwise fall back to this card's own urgency detection.
   const isActiveNow = isActive ?? (urgencyStatus === 'active_now');
 
-  // Format discount label for display
-  const getDiscountLabel = (): string | null => {
-    if (!deal.discount_type) return null;
-    switch (deal.discount_type) {
-      case 'percent':
-        return deal.discount_value ? `${deal.discount_value}% OFF` : null;
-      case 'fixed':
-        return deal.discount_value ? `$${deal.discount_value} OFF` : null;
-      case 'bogo':
-        return 'BOGO';
-      default:
-        return null;
-    }
-  };
-
-  const savings = deal.savings_amount ?? calculateSavings(deal);
-  const discountLabel = getDiscountLabel();
+  // Pricing label + savings come from the shared formatter (utils/dealPricing),
+  // the single source of truth: fixed_price deals render just "$10" with no
+  // savings; amount_off deals render "20% OFF"/"$5 OFF"/"BOGO" and a savings line.
+  const savings = getDealSavings(deal);
+  const discountLabel = formatDealPriceLabel(deal);
   const timeWindow = getDealTimeWindow(deal);
   const daysLabel = getDealDaysLabel(deal);
 

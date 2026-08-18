@@ -1,6 +1,6 @@
 import { supabase } from '@/app/lib/supabase';
 import { useAuthContext } from '@/app/providers/auth';
-import { Deal } from '@/types/restaurant';
+import { buildDealPricingFields, PricingType, validateDealPricing } from '@/utils/dealPricing';
 import { notifyNewDeal } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
@@ -31,7 +31,11 @@ export default function DealForm() {
   const [isActive, setIsActive] = useState(true);
   const [isRecurring, setIsRecurring] = useState(false);
 
-  // Discount fields for savings tracking
+  // Pricing type: amount_off (a discount) vs fixed_price (a flat "$10" special).
+  const [pricingType, setPricingType] = useState<PricingType>('amount_off');
+  const [price, setPrice] = useState(''); // fixed_price only
+
+  // Discount fields (amount_off only) for savings tracking
   const [discountType, setDiscountType] = useState<'percent' | 'fixed' | 'bogo'>(
     suggestedDiscount ? 'percent' : 'percent'
   );
@@ -79,10 +83,16 @@ export default function DealForm() {
         setIsActive(data.is_active);
         setIsRecurring(data.is_recurring || false);
 
-        // Load discount fields
-        if (data.discount_type) setDiscountType(data.discount_type);
-        if (data.discount_value) setDiscountValue(String(data.discount_value));
-        if (data.original_price) setOriginalPrice(String(data.original_price));
+        // Load pricing type + fields (legacy rows with no pricing_type are amount_off)
+        if (data.pricing_type === 'fixed_price') {
+          setPricingType('fixed_price');
+          if (data.price != null) setPrice(String(data.price));
+        } else {
+          setPricingType('amount_off');
+          if (data.discount_type) setDiscountType(data.discount_type);
+          if (data.discount_value) setDiscountValue(String(data.discount_value));
+          if (data.original_price) setOriginalPrice(String(data.original_price));
+        }
 
         if (data.is_recurring) {
           setRecurrenceDays(data.recurrence_days || []);
@@ -147,27 +157,11 @@ export default function DealForm() {
       }
     }
 
-    // Validate discount fields
-    if (discountType === 'percent' && discountValue) {
-      const pct = parseFloat(discountValue);
-      if (isNaN(pct) || pct <= 0 || pct > 100) {
-        Alert.alert('Error', 'Discount percentage must be between 1 and 100');
-        return false;
-      }
-    }
-    if (discountType === 'fixed' && discountValue) {
-      const amt = parseFloat(discountValue);
-      if (isNaN(amt) || amt <= 0) {
-        Alert.alert('Error', 'Discount amount must be greater than 0');
-        return false;
-      }
-    }
-    if (originalPrice) {
-      const price = parseFloat(originalPrice);
-      if (isNaN(price) || price <= 0) {
-        Alert.alert('Error', 'Original price must be greater than 0');
-        return false;
-      }
+    // Validate pricing fields for the selected pricing type (shared helper).
+    const pricingError = validateDealPricing({ pricingType, price, discountType, discountValue, originalPrice });
+    if (pricingError) {
+      Alert.alert('Error', pricingError);
+      return false;
     }
 
     return true;
@@ -179,16 +173,16 @@ export default function DealForm() {
     try {
       setIsSaving(true);
 
-      const dealData: Partial<Deal> = {
+      const dealData: Record<string, unknown> = {
         restaurant_id: restaurantId,
         title: title.trim(),
         description: description.trim() || undefined,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         is_active: isActive,
         is_recurring: isRecurring,
-        discount_type: discountType,
-        discount_value: discountValue ? parseFloat(discountValue) : undefined,
-        original_price: originalPrice ? parseFloat(originalPrice) : undefined,
+        // Pricing columns for the selected type. Incompatible fields come back
+        // as explicit null so switching type on an EDIT clears stale DB values.
+        ...buildDealPricingFields({ pricingType, price, discountType, discountValue, originalPrice }),
       };
 
       if (isRecurring) {
@@ -337,70 +331,116 @@ export default function DealForm() {
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Discount & Savings</Text>
-          <Text style={[styles.helpText, { marginTop: -12, marginBottom: 16 }]}>
-            Used to track customer savings when they redeem this deal
-          </Text>
+          <Text style={styles.sectionTitle}>Pricing</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Discount Type</Text>
+            <Text style={styles.label}>Deal Type</Text>
             <View style={styles.discountTypeRow}>
-              {(['percent', 'fixed', 'bogo'] as const).map((type) => (
+              {([
+                { key: 'amount_off', label: 'Amount off' },
+                { key: 'fixed_price', label: 'Fixed price' },
+              ] as const).map(({ key, label }) => (
                 <TouchableOpacity
-                  key={type}
+                  key={key}
                   style={[
                     styles.discountTypeButton,
-                    discountType === type && styles.discountTypeButtonSelected,
+                    pricingType === key && styles.discountTypeButtonSelected,
                   ]}
-                  onPress={() => setDiscountType(type)}
+                  onPress={() => setPricingType(key)}
                 >
                   <Text
                     style={[
                       styles.discountTypeText,
-                      discountType === type && styles.discountTypeTextSelected,
+                      pricingType === key && styles.discountTypeTextSelected,
                     ]}
                   >
-                    {type === 'percent' ? '% Off' : type === 'fixed' ? '$ Off' : 'BOGO'}
+                    {label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.helpText}>
+              {pricingType === 'fixed_price'
+                ? 'A flat special price (e.g. "$10"). No savings are shown.'
+                : 'A discount off the regular price. Used to track customer savings.'}
+            </Text>
           </View>
 
-          {discountType !== 'bogo' && (
+          {pricingType === 'fixed_price' ? (
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                {discountType === 'percent' ? 'Discount Percentage' : 'Discount Amount ($)'}
-              </Text>
+              <Text style={styles.label}>Price ($)</Text>
               <TextInput
                 style={styles.input}
-                value={discountValue}
-                onChangeText={setDiscountValue}
-                placeholder={discountType === 'percent' ? 'e.g., 20' : 'e.g., 5.00'}
+                value={price}
+                onChangeText={setPrice}
+                placeholder="e.g., 10.00"
                 placeholderTextColor="#94A3B8"
                 keyboardType="numeric"
               />
             </View>
-          )}
+          ) : (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Discount Type</Text>
+                <View style={styles.discountTypeRow}>
+                  {(['percent', 'fixed', 'bogo'] as const).map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.discountTypeButton,
+                        discountType === type && styles.discountTypeButtonSelected,
+                      ]}
+                      onPress={() => setDiscountType(type)}
+                    >
+                      <Text
+                        style={[
+                          styles.discountTypeText,
+                          discountType === type && styles.discountTypeTextSelected,
+                        ]}
+                      >
+                        {type === 'percent' ? '% Off' : type === 'fixed' ? '$ Off' : 'BOGO'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              {discountType === 'bogo' ? 'Item Price ($)' : 'Original Price ($)'}
-            </Text>
-            <Text style={styles.helpText}>
-              {discountType === 'bogo'
-                ? 'Price of one item (savings = getting one free)'
-                : 'Helps calculate exact savings for customers'}
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={originalPrice}
-              onChangeText={setOriginalPrice}
-              placeholder="e.g., 15.99"
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-            />
-          </View>
+              {discountType !== 'bogo' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>
+                    {discountType === 'percent' ? 'Discount Percentage' : 'Discount Amount ($)'}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={discountValue}
+                    onChangeText={setDiscountValue}
+                    placeholder={discountType === 'percent' ? 'e.g., 20' : 'e.g., 5.00'}
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                  />
+                </View>
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  {discountType === 'bogo' ? 'Item Price ($)' : 'Original Price ($)'}
+                </Text>
+                <Text style={styles.helpText}>
+                  {discountType === 'bogo'
+                    ? 'Price of one item (savings = getting one free)'
+                    : 'Helps calculate exact savings for customers'}
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  value={originalPrice}
+                  onChangeText={setOriginalPrice}
+                  placeholder="e.g., 15.99"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                />
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.formCard}>

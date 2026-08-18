@@ -26,10 +26,12 @@ export type Deal = {
   title: string;
   description?: string;
   tags?: string[];
-  discount_type?: 'percent' | 'fixed' | 'bogo'; // Type of discount offered
-  discount_value?: number; // Percentage (0-100) for percent, dollar amount for fixed
-  original_price?: number; // Original price before discount (for fixed savings calculation)
-  savings_amount?: number; // Server-calculated numeric savings
+  pricing_type?: 'fixed_price' | 'amount_off'; // fixed_price = flat "$10" special; amount_off = discount (default). See utils/dealPricing.ts
+  price?: number; // The flat special price for fixed_price deals (e.g. 10 => "$10"). Null/undefined for amount_off
+  discount_type?: 'percent' | 'fixed' | 'bogo'; // amount_off only: type of discount offered
+  discount_value?: number; // amount_off only: percentage (0-100) for percent, dollar amount for fixed
+  original_price?: number; // amount_off only: original price before discount (for savings calculation)
+  savings_amount?: number; // Server-calculated numeric savings (amount_off only)
   start_at?: string;
   end_at?: string;
   is_active: boolean;
