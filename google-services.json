@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "333829841663",
+    "project_id": "dealish-10147",
+    "storage_bucket": "dealish-10147.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:333829841663:android:30bb679452dd62ca7462ca",
+        "android_client_info": {
+          "package_name": "com.anonymous.Dealish"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDY0U-rOawXYA8EK_Q6i0Mqt-0ISzcWGF0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

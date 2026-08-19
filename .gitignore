@@ -41,6 +41,9 @@ dealish-*.json
 !package-lock.json
 !tsconfig.json
 !app.json
+# FCM client config — NOT a secret (bundled in the APK); must be tracked for EAS builds.
+# The FCM V1 service-account key stays ignored via `dealish-*.json` above.
+!google-services.json
 !eas.json
 
 # typescript
