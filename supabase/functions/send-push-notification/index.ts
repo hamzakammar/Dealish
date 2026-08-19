@@ -123,8 +123,10 @@ serve(async (req) => {
       );
     }
 
-    // Prepare notifications for all tokens
-    const messages = Array.from(tokens).map(token => ({
+    // Prepare notifications for all tokens. Keep token order so we can map each
+    // Expo response ticket back to the exact token that failed.
+    const tokenList = Array.from(tokens);
+    const messages = tokenList.map(token => ({
       to: token,
       title,
       body,
@@ -153,13 +155,63 @@ serve(async (req) => {
     }
 
     const result = await pushResponse.json();
-    
-    // Cleanup invalid tokens (optional enhancement: detect "DeviceNotRegistered")
-    // For Phase 3, we'll just log the result
-    console.log(`Sent ${messages.length} notifications for user ${user_id}`, result);
-    
+
+    // Inspect the per-message tickets. Expo returns { data: [ { status, id?,
+    // message?, details? }, ... ] } in the SAME order as `messages`. A 200 from
+    // Expo does NOT mean the notification was delivered: an Android/FCM misconfig
+    // (details.error = "InvalidCredentials" / "MismatchSenderId") or a stale token
+    // ("DeviceNotRegistered") shows up per-ticket. Previously these were logged as
+    // a success and silently swallowed — which is exactly why broken Android push
+    // looked healthy. Surface them, and prune permanently-dead tokens.
+    const tickets: Array<{ status?: string; id?: string; message?: string; details?: { error?: string } }> =
+      Array.isArray(result?.data) ? result.data : [];
+
+    let okCount = 0;
+    const errors: Array<{ token: string; message?: string; error?: string }> = [];
+    const deadTokens: string[] = [];
+
+    tickets.forEach((ticket, i) => {
+      const token = tokenList[i];
+      if (ticket?.status === 'ok') {
+        okCount++;
+        return;
+      }
+      const errCode = ticket?.details?.error;
+      errors.push({ token, message: ticket?.message, error: errCode });
+      // DeviceNotRegistered => token is permanently invalid; stop using it.
+      if (errCode === 'DeviceNotRegistered') deadTokens.push(token);
+    });
+
+    if (errors.length > 0) {
+      console.error(
+        `Push errors for user ${user_id}: ${errors.length}/${tickets.length} failed`,
+        JSON.stringify(errors)
+      );
+    }
+
+    // Prune permanently-dead tokens so we stop trying (and stop miscounting).
+    if (deadTokens.length > 0) {
+      await supabase.from('user_push_tokens').delete().in('push_token', deadTokens);
+      if (profileResult.data?.push_token && deadTokens.includes(profileResult.data.push_token)) {
+        await supabase.from('profiles').update({ push_token: null }).eq('id', user_id);
+      }
+    }
+
+    console.log(
+      `Push for user ${user_id}: ${okCount} ok, ${errors.length} error(s), ${deadTokens.length} pruned`
+    );
+
+    // `success` now reflects reality: false if any ticket errored. Still HTTP 200
+    // (fire-and-forget callers shouldn't treat a partial failure as a hard error),
+    // but the body carries the FCM error details for logs/observability.
     return new Response(
-      JSON.stringify({ success: true, count: messages.length, result }),
+      JSON.stringify({
+        success: errors.length === 0,
+        sent: okCount,
+        failed: errors.length,
+        pruned: deadTokens.length,
+        errors,
+      }),
       {
         status: 200,
         headers: {
